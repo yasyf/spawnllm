@@ -1988,11 +1988,16 @@ adapter = [
     { name = "zstandard" },
 ]
 dev = [
+    { name = "anyio" },
+    { name = "numpy" },
+    { name = "orjson" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "ty" },
+    { name = "zstandard" },
 ]
 mlx = [
+    { name = "anyio" },
     { name = "huggingface-hub" },
     { name = "mlx-lm", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'" },
     { name = "numpy" },
@@ -2008,18 +2013,25 @@ docs = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", marker = "extra == 'dev'", specifier = ">=4" },
+    { name = "anyio", marker = "extra == 'mlx'", specifier = ">=4.4" },
     { name = "click", specifier = ">=8" },
     { name = "huggingface-hub", marker = "extra == 'mlx'", specifier = ">=0.25" },
     { name = "loguru", specifier = ">=0.7" },
     { name = "mlx-lm", marker = "platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'mlx'", specifier = ">=0.31.3" },
     { name = "numpy", marker = "extra == 'adapter'", specifier = ">=1.26" },
+    { name = "numpy", marker = "extra == 'dev'", specifier = ">=1.26" },
+    { name = "numpy", marker = "extra == 'mlx'", specifier = ">=1.26" },
     { name = "orjson", marker = "extra == 'adapter'", specifier = ">=3.10" },
+    { name = "orjson", marker = "extra == 'dev'", specifier = ">=3.10" },
+    { name = "orjson", marker = "extra == 'mlx'", specifier = ">=3.10" },
     { name = "pydantic", specifier = ">=2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8" },
-    { name = "subllm-py", extras = ["adapter"], marker = "extra == 'mlx'" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.44" },
     { name = "zstandard", marker = "extra == 'adapter'", specifier = ">=0.25.0" },
+    { name = "zstandard", marker = "extra == 'dev'", specifier = ">=0.25.0" },
+    { name = "zstandard", marker = "extra == 'mlx'", specifier = ">=0.25.0" },
 ]
 provides-extras = ["dev", "adapter", "mlx"]
 

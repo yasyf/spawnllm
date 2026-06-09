@@ -24,9 +24,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "anyio>=4",
     "pytest>=8.0",
     "ruff>=0.8",
     "ty>=0.0.44",
+    # Codec tests exercise zstandard/numpy/orjson.
+    "zstandard>=0.25.0",
+    "numpy>=1.26",
+    "orjson>=3.10",
 ]
 # Cross-platform LoRA adapter codec (zstd + numpy); imported without mlx.
 adapter = [
@@ -35,9 +40,12 @@ adapter = [
     "orjson>=3.10",
 ]
 # Local Apple-Silicon MLX engine. mlx-lm carries the darwin/arm64 marker; the
-# rest are cross-platform but only meaningful alongside it.
+# codec libs and anyio are cross-platform but only meaningful alongside it.
 mlx = [
-    "subllm-py[adapter]",
+    "zstandard>=0.25.0",
+    "numpy>=1.26",
+    "orjson>=3.10",
+    "anyio>=4.4",
     "huggingface-hub>=0.25",
     "mlx-lm>=0.31.3; sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
@@ -62,6 +70,7 @@ module-root = ""
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+anyio_mode = "auto"
 addopts = ["-ra", "--strict-markers", "--tb=short", "-q"]
 markers = [
     "unit: Pure unit tests",
@@ -74,6 +83,9 @@ markers = [
 [tool.ty.rules]
 # Keep cross-checker `# type: ignore` / `# pyright: ignore` comments from tripping ty.
 unused-type-ignore-comment = "ignore"
+# The MLX engine lazily imports optional native deps (mlx_lm, mlx, huggingface_hub)
+# that are absent off Apple Silicon and in the dev/CI environment.
+unresolved-import = "ignore"
 
 # pyright is kept as a secondary checker (editors / `uvx pyright`). Basic mode plus
 # a few disables covers the noise; ty is the gate that runs in CI.
