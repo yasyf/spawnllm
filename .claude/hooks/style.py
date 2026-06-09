@@ -3,8 +3,9 @@ from __future__ import annotations
 import ast
 from collections.abc import Iterator
 
-from captain_hook import Allow, Input, Warn, gate
-from captain_hook.style import StyleDiffRule, StyleRule, Violation, matchers as M, styleguide
+from captain_hook import Allow, Input, Waiting, Warn, gate
+from captain_hook.style import StyleDiffRule, StyleRule, Violation, styleguide
+from captain_hook.style import matchers as M
 
 
 def any_label(node: ast.AST) -> str:
@@ -22,14 +23,14 @@ class NoUnderscorePrefixes(StyleRule):
     This edit introduces underscore-prefixed class(es) or constant(s): {violations}
 
     This project never uses leading underscores on classes, constants, or module-level
-    helpers — use `__all__` for export control instead. See STYLEGUIDE.md § Code Organization.
+    helpers. See STYLEGUIDE.md § Code Organization.
     """
 
     tests = {
         Input(file="m.py", content="class _Helper:\n    pass\n"): Warn(),
         Input(file="m.py", content="_MAX_RETRIES = 3\n"): Warn(),
         Input(file="m.py", content="class Helper:\n    pass\n"): Allow(),
-        Input(file="m.py", content="__all__ = ['Helper']\n"): Allow(),
+        Input(file="m.py", content="MAX_RETRIES = 3\n"): Allow(),
     }
     match = M.private & (M.cls | (M.assignment & M.constant))
 
@@ -130,6 +131,7 @@ class NoWeakeningToAny(StyleDiffRule):
             file="x.py", old="def f() -> dict[str, Foo]:\n    ...", content="def f() -> dict[str, Any]:\n    ..."
         ): Allow(),
     }
+
     def check(self, pre: ast.Module, post: ast.Module) -> Iterator[Violation]:
         yield from M.annotated(M.ref("Any")).diff(pre, post, key=any_label, label=any_label)
 
@@ -142,6 +144,7 @@ gate(
     when=lambda evt: any(
         f.matches("**/subllm/**/*.py") and not f.is_test for f in evt.ctx.t.extract_files(["Edit", "Write"])
     ),
+    skip_if=[Waiting()],
 )
 
 styleguide(
