@@ -1,0 +1,117 @@
+[project]
+name = "subllm-py"
+version = "0.1.0"
+description = "Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Yasyf Mohamedali", email = "yasyfm@gmail.com" }]
+keywords = []
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Typing :: Typed",
+]
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8",
+    "loguru>=0.7",
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.8",
+    "ty>=0.0.44",
+]
+# Cross-platform LoRA adapter codec (zstd + numpy); imported without mlx.
+adapter = [
+    "zstandard>=0.25.0",
+    "numpy>=1.26",
+    "orjson>=3.10",
+]
+# Local Apple-Silicon MLX engine. mlx-lm carries the darwin/arm64 marker; the
+# rest are cross-platform but only meaningful alongside it.
+mlx = [
+    "subllm-py[adapter]",
+    "huggingface-hub>=0.25",
+    "mlx-lm>=0.31.3; sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
+
+[project.scripts]
+subllm-py = "subllm.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yasyf/subllm"
+Documentation = "https://yasyf.github.io/subllm/"
+Repository = "https://github.com/yasyf/subllm"
+Issues = "https://github.com/yasyf/subllm/issues"
+Changelog = "https://github.com/yasyf/subllm/blob/main/CHANGELOG.md"
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "subllm"
+module-root = ""
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--tb=short", "-q"]
+markers = [
+    "unit: Pure unit tests",
+    "integration: Integration tests",
+]
+
+# ty (Astral) is the default type checker — run `uv run ty check subllm`.
+# It is fast, understands modern syntax, and avoids the strict-pyright false
+# positives on pydantic/attrs-style dynamic defaults and PK-type overrides.
+[tool.ty.rules]
+# Keep cross-checker `# type: ignore` / `# pyright: ignore` comments from tripping ty.
+unused-type-ignore-comment = "ignore"
+
+# pyright is kept as a secondary checker (editors / `uvx pyright`). Basic mode plus
+# a few disables covers the noise; ty is the gate that runs in CI.
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "basic"
+include = ["subllm"]
+venvPath = "."
+venv = ".venv"
+reportImplicitOverride = "none"
+reportIncompatibleVariableOverride = "none"
+reportUnknownVariableType = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownParameterType = "none"
+reportUnknownLambdaType = "none"
+reportMissingTypeArgument = "none"
+reportPrivateImportUsage = "none"
+reportUnusedCallResult = "none"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+src = [".", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[dependency-groups]
+docs = [
+    # great-docs imports griffe's 2.x module layout; griffelib is the modern
+    # griffe (2.x) distribution, overriding the legacy griffe<2 pin great-docs
+    # itself still declares.
+    "griffelib>=2.0",
+    # Tracking great-docs main until a release newer than 0.13.0: main carries
+    # build-time GitHub widget stats (embedded via the CI GITHUB_TOKEN), which
+    # drop the navbar widget's client-side API calls — the source of GitHub 403
+    # errors on the published site.
+    # TODO(bootstrap): revert to a PyPI pin (`great-docs>=0.14`) once released.
+    "great-docs @ git+https://github.com/posit-dev/great-docs@main",
+]

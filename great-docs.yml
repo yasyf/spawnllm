@@ -1,0 +1,56 @@
+# Great Docs configuration — https://posit-dev.github.io/great-docs/
+# Build: uv run great-docs build · Preview: uv run great-docs preview
+
+module: subllm
+display_name: subllm
+parser: google
+dynamic: true
+repo: https://github.com/yasyf/subllm
+site_url: "https://yasyf.github.io/subllm/"
+pypi: true
+github_style: widget
+jupyter: python3
+
+# Conservative defaults: a solid navbar and a single accent, no gradient
+# presets or hero starfield. The gradient/starfield extras read as busy and the
+# starfield canvas intercepts homepage clicks; keep them off unless asked.
+navbar_color: "#1e293b"
+accent_color: "#7c3aed"
+dark_mode_toggle: true
+back_to_top: true
+keyboard_nav: true
+
+hero:
+  name: subllm
+  tagline: "Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools."
+
+# Narrative doc sections are optional — dynamic mode generates the API reference
+# from docstrings without them. Uncomment and point at docs/ dirs as they appear.
+# sections:
+#   - title: Getting Started
+#     dir: docs/getting-started
+#     index: true
+#   - title: Guide
+#     dir: docs/guide
+#     navbar_after: Getting Started
+#     index: true
+
+cli:
+  enabled: true
+  module: subllm.cli
+  name: cli
+
+authors:
+  - name: Yasyf Mohamedali
+    role: Maintainer
+    github: yasyf
+    email: yasyfm@gmail.com
+
+# Curated symbol reference (public API only). Optional — without it, dynamic
+# mode documents everything in subllm.__all__.
+# reference:
+#   - title: Core
+#     desc: The main entry points.
+#     contents:
+#       - SomePublicClass
+#       - some_public_function
