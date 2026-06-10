@@ -55,11 +55,10 @@ def parse_structured_output[M: BaseModel](raw: str, response_model: type[M] | No
     if not response_model:
         return raw
     data = json.loads(raw)
-    if isinstance(data, list) and data:
-        return extract_structured(
-            cast(list[dict[str, Any]], data), response_model
-        ) or response_model.model_validate_json(raw)
-    return response_model.model_validate_json(raw)
+    events = data if isinstance(data, list) else [data] if isinstance(data, dict) else []
+    return extract_structured(
+        cast(list[dict[str, Any]], events), response_model
+    ) or response_model.model_validate_json(raw)
 
 
 def parse_result_envelope(stdout: bytes, *, argv: list[str], stderr: bytes) -> str:

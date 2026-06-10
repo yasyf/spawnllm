@@ -52,6 +52,19 @@ class TestParseStructuredOutput:
         assert isinstance(result, Verdict)
         assert result.should_block is False
 
+    def test_single_result_envelope_structured_output(self) -> None:
+        envelope = json.dumps(
+            {
+                "type": "result",
+                "is_error": False,
+                "result": "",
+                "structured_output": {"should_block": True, "reason": "x"},
+            }
+        )
+        result = parse_structured_output(envelope, Verdict)
+        assert isinstance(result, Verdict)
+        assert result.should_block is True
+
 
 class TestParseResultEnvelope:
     def test_returns_result(self) -> None:
