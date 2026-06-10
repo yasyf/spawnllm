@@ -6,7 +6,7 @@ import json
 import os
 import subprocess
 import tempfile
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, overload
 
 from spawnllm.backends.codex import CodexCliBackend
 
@@ -39,7 +39,7 @@ def resolve_schema_path(backend: LlmBackend, schema: str | None) -> str | None:
     return schema
 
 
-def extract_structured(events: list[dict[str, Any]], model: type[BaseModel]) -> BaseModel | None:
+def extract_structured[M: BaseModel](events: list[dict[str, Any]], model: type[M]) -> M | None:
     """Return the validated ``structured_output`` from a stream-json event list, if present."""
     for e in events:
         if e.get("type") == "result" and "structured_output" in e:
@@ -47,7 +47,11 @@ def extract_structured(events: list[dict[str, Any]], model: type[BaseModel]) -> 
     return None
 
 
-def parse_structured_output(raw: str, response_model: type[BaseModel] | None) -> str | BaseModel:
+@overload
+def parse_structured_output(raw: str, response_model: None) -> str: ...
+@overload
+def parse_structured_output[M: BaseModel](raw: str, response_model: type[M]) -> M: ...
+def parse_structured_output[M: BaseModel](raw: str, response_model: type[M] | None) -> str | M:
     if not response_model:
         return raw
     data = json.loads(raw)
