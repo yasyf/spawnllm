@@ -7,13 +7,13 @@ import subprocess
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
-from subllm.backends.base import LlmBackend
-from subllm.structured import parse_result_envelope, parse_structured_output
+from spawnllm.backends.base import LlmBackend
+from spawnllm.structured import parse_result_envelope, parse_structured_output
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-    from subllm.types import TModel
+    from spawnllm.types import TModel
 
 CLAUDE_MODELS: dict[TModel, str] = {"small": "haiku", "medium": "sonnet", "large": "opus"}
 

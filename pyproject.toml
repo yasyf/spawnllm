@@ -1,5 +1,5 @@
 [project]
-name = "subllm-py"
+name = "spawnllm"
 version = "0.1.0"
 description = "Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools."
 readme = "README.md"
@@ -51,21 +51,21 @@ mlx = [
 ]
 
 [project.scripts]
-subllm-py = "subllm.cli:main"
+spawnllm = "spawnllm.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yasyf/subllm"
-Documentation = "https://yasyf.github.io/subllm/"
-Repository = "https://github.com/yasyf/subllm"
-Issues = "https://github.com/yasyf/subllm/issues"
-Changelog = "https://github.com/yasyf/subllm/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/yasyf/spawnllm"
+Documentation = "https://yasyf.github.io/spawnllm/"
+Repository = "https://github.com/yasyf/spawnllm"
+Issues = "https://github.com/yasyf/spawnllm/issues"
+Changelog = "https://github.com/yasyf/spawnllm/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["uv_build>=0.11,<0.12"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "subllm"
+module-name = "spawnllm"
 module-root = ""
 
 [tool.pytest.ini_options]
@@ -77,7 +77,7 @@ markers = [
     "integration: Integration tests",
 ]
 
-# ty (Astral) is the default type checker — run `uv run ty check subllm`.
+# ty (Astral) is the default type checker — run `uv run ty check spawnllm`.
 # It is fast, understands modern syntax, and avoids the strict-pyright false
 # positives on pydantic/attrs-style dynamic defaults and PK-type overrides.
 [tool.ty.rules]
@@ -92,7 +92,7 @@ unresolved-import = "ignore"
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "basic"
-include = ["subllm"]
+include = ["spawnllm"]
 venvPath = "."
 venv = ".venv"
 reportImplicitOverride = "none"

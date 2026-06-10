@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, ClassVar
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-    from subllm.types import TModel
+    from spawnllm.types import TModel
 
 
 class LlmBackend(ABC):

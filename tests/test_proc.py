@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from subllm.proc import arun_cli, map_concurrent, run_cli
+from spawnllm.proc import arun_cli, map_concurrent, run_cli
 
 
 class TestRunCli:

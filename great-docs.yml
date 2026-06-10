@@ -1,12 +1,12 @@
 # Great Docs configuration — https://posit-dev.github.io/great-docs/
 # Build: uv run great-docs build · Preview: uv run great-docs preview
 
-module: subllm
-display_name: subllm
+module: spawnllm
+display_name: spawnllm
 parser: google
 dynamic: true
-repo: https://github.com/yasyf/subllm
-site_url: "https://yasyf.github.io/subllm/"
+repo: https://github.com/yasyf/spawnllm
+site_url: "https://yasyf.github.io/spawnllm/"
 pypi: true
 github_style: widget
 jupyter: python3
@@ -21,7 +21,7 @@ back_to_top: true
 keyboard_nav: true
 
 hero:
-  name: subllm
+  name: spawnllm
   tagline: "Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools."
 
 # Narrative doc sections are optional — dynamic mode generates the API reference
@@ -37,7 +37,7 @@ hero:
 
 cli:
   enabled: true
-  module: subllm.cli
+  module: spawnllm.cli
   name: cli
 
 authors:
@@ -47,7 +47,7 @@ authors:
     email: yasyfm@gmail.com
 
 # Curated symbol reference (public API only). Optional — without it, dynamic
-# mode documents everything in subllm.__all__.
+# mode documents everything in spawnllm.__all__.
 # reference:
 #   - title: Core
 #     desc: The main entry points.

@@ -8,12 +8,12 @@ import subprocess
 import tempfile
 from typing import TYPE_CHECKING, Any, cast
 
-from subllm.backends.codex import CodexCliBackend
+from spawnllm.backends.codex import CodexCliBackend
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-    from subllm.backends.base import LlmBackend
+    from spawnllm.backends.base import LlmBackend
 
 __all__ = [
     "extract_structured",

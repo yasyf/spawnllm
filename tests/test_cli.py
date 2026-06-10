@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from click.testing import CliRunner
 
-from subllm.cli import main
+from spawnllm.cli import main
 
 
 def test_help_exits_cleanly() -> None:
@@ -25,7 +25,7 @@ def test_call_dispatches_to_backend(monkeypatch: pytest.MonkeyPatch) -> None:
         captured.update(prompt=prompt, backend=type(backend).__name__, model=model, agent=agent)
         return "RESULT"
 
-    monkeypatch.setattr("subllm.cli.call_backend", fake_call)
+    monkeypatch.setattr("spawnllm.cli.call_backend", fake_call)
     result = CliRunner().invoke(main, ["call", "--backend", "claude", "hello"])
     assert result.exit_code == 0
     assert result.output == "RESULT\n"

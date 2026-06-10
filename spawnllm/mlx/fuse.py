@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from subllm.mlx.codec import AdapterCodec
+    from spawnllm.mlx.codec import AdapterCodec
 
 
 class AdapterFuser:

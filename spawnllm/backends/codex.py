@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-from subllm.backends.base import LlmBackend
+from spawnllm.backends.base import LlmBackend
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-    from subllm.types import TModel
+    from spawnllm.types import TModel
 
 
 class CodexCliBackend(LlmBackend):

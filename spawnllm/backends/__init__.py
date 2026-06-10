@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from subllm.backends.base import LlmBackend
-from subllm.backends.claude import (
+from spawnllm.backends.base import LlmBackend
+from spawnllm.backends.claude import (
     ClaudeCliBackend,
     ClaudeNotAuthenticated,
     ClaudeNotInstalled,
@@ -11,8 +11,8 @@ from subllm.backends.claude import (
     ClaudeStatus,
     check_status,
 )
-from subllm.backends.codex import CodexCliBackend
-from subllm.backends.registry import LlmBackends
+from spawnllm.backends.codex import CodexCliBackend
+from spawnllm.backends.registry import LlmBackends
 
 __all__ = [
     "ClaudeCliBackend",

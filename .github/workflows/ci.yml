@@ -30,7 +30,7 @@ jobs:
 
       - name: Type check (ty)
         continue-on-error: true
-        run: uv run ty check subllm
+        run: uv run ty check spawnllm
 
       - name: Test (pytest)
         run: uv run pytest
@@ -41,4 +41,4 @@ jobs:
           rm -rf .wheel-smoke
           uv venv --seed .wheel-smoke
           uv pip install --python .wheel-smoke/bin/python dist/*.whl
-          .wheel-smoke/bin/subllm-py --help
+          .wheel-smoke/bin/spawnllm --help

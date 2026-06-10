@@ -1,13 +1,13 @@
-# subllm
+# spawnllm
 
-[![PyPI](https://img.shields.io/pypi/v/subllm-py.svg)](https://pypi.org/project/subllm-py/)
-[![Python](https://img.shields.io/pypi/pyversions/subllm-py.svg)](https://pypi.org/project/subllm-py/)
-[![Docs](https://img.shields.io/github/actions/workflow/status/yasyf/subllm/docs.yml?branch=main&label=docs)](https://yasyf.github.io/subllm/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/yasyf/subllm/blob/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/spawnllm.svg)](https://pypi.org/project/spawnllm/)
+[![Python](https://img.shields.io/pypi/pyversions/spawnllm.svg)](https://pypi.org/project/spawnllm/)
+[![Docs](https://img.shields.io/github/actions/workflow/status/yasyf/spawnllm/docs.yml?branch=main&label=docs)](https://yasyf.github.io/spawnllm/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/yasyf/spawnllm/blob/main/LICENSE)
 
 Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools.
 
-subllm centralizes the LLM-calling plumbing that small tools keep re-inventing: driving the
+spawnllm centralizes the LLM-calling plumbing that small tools keep re-inventing: driving the
 `claude` and `codex` CLIs as subshells — with structured Pydantic output, model tiers, and
 faithful error capture — and running local Apple-Silicon MLX models with adapter fusion,
 prompt-cache reuse, and batched generation. Depend on it once and each tool keeps only its
@@ -18,28 +18,28 @@ domain logic instead of its own copy of the backends.
 No install needed — run everything through [uvx](https://docs.astral.sh/uv/):
 
 ```bash
-uvx subllm-py --help
+uvx spawnllm --help
 ```
 
-`uvx` fetches subllm into a throwaway environment and runs it. To add it
+`uvx` fetches spawnllm into a throwaway environment and runs it. To add it
 to a project instead:
 
 ```bash
-uv add subllm-py
+uv add spawnllm
 ```
 
 For the local MLX engine (Apple Silicon only), pull the extra:
 
 ```bash
-uv add "subllm-py[mlx]"
+uv add "spawnllm[mlx]"
 ```
 
 ## Quickstart
 
-List the backends subllm can drive:
+List the backends spawnllm can drive:
 
 ```bash
-uvx subllm-py backends
+uvx spawnllm backends
 ```
 
 ```
@@ -61,4 +61,4 @@ mlx
 
 ## Docs
 
-[Read the docs](https://yasyf.github.io/subllm/) for the full guide and API reference.
+[Read the docs](https://yasyf.github.io/spawnllm/) for the full guide and API reference.

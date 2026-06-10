@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-from subllm.backends.claude import ClaudeCliBackend
-from subllm.backends.codex import CodexCliBackend
+from spawnllm.backends.claude import ClaudeCliBackend
+from spawnllm.backends.codex import CodexCliBackend
 
 if TYPE_CHECKING:
-    from subllm.backends.base import LlmBackend
-    from subllm.types import TSpecialty
+    from spawnllm.backends.base import LlmBackend
+    from spawnllm.types import TSpecialty
 
 
 class LlmBackends:

@@ -142,7 +142,7 @@ gate(
     "prefixes, match for type dispatch, minimal try/except, make invalid states "
     "unrepresentable, flat over nested). Fix any violations in the code you wrote.",
     when=lambda evt: any(
-        f.matches("**/subllm/**/*.py") and not f.is_test for f in evt.ctx.t.extract_files(["Edit", "Write"])
+        f.matches("**/spawnllm/**/*.py") and not f.is_test for f in evt.ctx.t.extract_files(["Edit", "Write"])
     ),
     skip_if=[Waiting()],
 )

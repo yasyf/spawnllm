@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import anyio.to_thread
 
-from subllm.mlx.patches import MLXPatches
+from spawnllm.mlx.patches import MLXPatches
 
 if TYPE_CHECKING:
     from collections.abc import Callable

@@ -1,6 +1,6 @@
-# subllm Style Guide
+# spawnllm Style Guide
 
-The concrete style rules for `subllm/`. Target Python 3.13+.
+The concrete style rules for `spawnllm/`. Target Python 3.13+.
 
 ## Core Principles
 
@@ -85,7 +85,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from subllm.models import Record
+    from spawnllm.models import Record
 
 def process(self, record: Record) -> bool: ...
 ```
@@ -96,14 +96,14 @@ body, before any logic, and never inside an `if`, `for`, or `try`.
 ```python
 # Good
 def model_version() -> str:
-    from subllm.state import RESOURCES
+    from spawnllm.state import RESOURCES
 
     return RESOURCES.lookup()
 
 # Bad — import buried in a branch
 def model_version() -> str:
     if cached:
-        from subllm.state import RESOURCES
+        from spawnllm.state import RESOURCES
         ...
 ```
 

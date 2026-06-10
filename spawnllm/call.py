@@ -5,14 +5,14 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from subllm.proc import run_cli
-from subllm.structured import resolve_schema_path, schema_for
+from spawnllm.proc import run_cli
+from spawnllm.structured import resolve_schema_path, schema_for
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-    from subllm.backends.base import LlmBackend
-    from subllm.types import TModel
+    from spawnllm.backends.base import LlmBackend
+    from spawnllm.types import TModel
 
 
 def call(
@@ -27,7 +27,7 @@ def call(
 
     Args:
         prompt: The user prompt, delivered to the backend over stdin.
-        backend: The :class:`~subllm.backends.base.LlmBackend` to invoke.
+        backend: The :class:`~spawnllm.backends.base.LlmBackend` to invoke.
         model: Abstract model tier (``small``/``medium``/``large``).
         agent: Whether the call may use tools / agent capabilities.
         response_model: Pydantic model for structured output, or ``None`` for text.

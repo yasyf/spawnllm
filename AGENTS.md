@@ -1,12 +1,12 @@
-# subllm Development Guide
+# spawnllm Development Guide
 
-Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools. Published to PyPI as `subllm-py`; the CLI is `subllm-py`, run as `uvx subllm-py`.
+Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools. Published to PyPI as `spawnllm`; the CLI is `spawnllm`, run as `uvx spawnllm`.
 
 ## Repository Structure
 
 ```
-subllm/
-├── subllm/            # The package — Claude/Codex CLI backends, MLX engine, transport, Click CLI
+spawnllm/
+├── spawnllm/            # The package — Claude/Codex CLI backends, MLX engine, transport, Click CLI
 ├── tests/            # Pytest suite
 ├── .github/          # GitHub Actions workflows
 ├── AGENTS.md         # This file — shared conventions

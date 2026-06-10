@@ -5,7 +5,7 @@ import subprocess
 import pytest
 from pydantic import BaseModel
 
-from subllm import ClaudeCliBackend, CodexCliBackend, LlmBackends
+from spawnllm import ClaudeCliBackend, CodexCliBackend, LlmBackends
 
 
 class TestClaudeArgv:

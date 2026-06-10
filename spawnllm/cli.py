@@ -6,23 +6,23 @@ from typing import cast
 import click
 from loguru import logger
 
-from subllm.backends import ClaudeCliBackend, CodexCliBackend
-from subllm.call import call as call_backend
-from subllm.types import TModel
+from spawnllm.backends import ClaudeCliBackend, CodexCliBackend
+from spawnllm.call import call as call_backend
+from spawnllm.types import TModel
 
 BACKENDS = ("claude", "codex", "mlx")
 CLI_BACKENDS = {"claude": ClaudeCliBackend, "codex": CodexCliBackend}
 
 
 @click.group()
-@click.version_option(package_name="subllm-py")
+@click.version_option(package_name="spawnllm")
 def main() -> None:
     """Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools."""
 
 
 @main.command()
 def backends() -> None:
-    """List the LLM backends subllm can drive."""
+    """List the LLM backends spawnllm can drive."""
     logger.debug("backends invoked")
     for name in BACKENDS:
         click.echo(name)

@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
-from subllm import ClaudeCliBackend, CodexCliBackend
-from subllm.structured import parse_result_envelope, parse_structured_output, resolve_schema_path, schema_for
+from spawnllm import ClaudeCliBackend, CodexCliBackend
+from spawnllm.structured import parse_result_envelope, parse_structured_output, resolve_schema_path, schema_for
 
 
 class Verdict(BaseModel):

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from subllm.mlx import MlxEngine
+from spawnllm.mlx import MlxEngine
 
 MLX_AVAILABLE: bool = find_spec("mlx_lm") is not None and sys.platform == "darwin"
 
@@ -101,7 +101,7 @@ class TestThreadAffinity:
 
         with (
             patch.dict(sys.modules, {"mlx_lm": mock_mlx_lm}),
-            patch("subllm.mlx.engine.MLXPatches.apply"),
+            patch("spawnllm.mlx.engine.MLXPatches.apply"),
         ):
             engine = MlxEngine(
                 Path("/tmp/fake-fused"),

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from subllm.mlx import AdapterCodec
+from spawnllm.mlx import AdapterCodec
 
 
 def make_safetensors(tensors: dict[str, tuple[str, bytes]]) -> bytes:

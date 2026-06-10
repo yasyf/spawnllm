@@ -9,4 +9,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial scaffolding.
 
-[Unreleased]: https://github.com/yasyf/subllm/commits/main
+[Unreleased]: https://github.com/yasyf/spawnllm/commits/main
