@@ -6,7 +6,7 @@ Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across 
 
 ```
 subllm/
-├── subllm/            # The package — public API + Click CLI (Claude/Codex/MLX backends land here next)
+├── subllm/            # The package — Claude/Codex CLI backends, MLX engine, transport, Click CLI
 ├── tests/            # Pytest suite
 ├── .github/          # GitHub Actions workflows
 ├── AGENTS.md         # This file — shared conventions
