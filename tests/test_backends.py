@@ -43,7 +43,7 @@ class TestClaudeArgv:
     def test_models_and_env(self) -> None:
         backend = ClaudeCliBackend()
         assert backend.models == {"small": "haiku", "medium": "sonnet", "large": "opus"}
-        assert backend.env() == {"CLAUDE_CODE_SIMPLE": "1"}
+        assert backend.env() == {}  # CLAUDE_CODE_SIMPLE breaks claude.ai keychain auth
 
     def test_parse_response_passthrough_without_model(self) -> None:
         assert ClaudeCliBackend().parse_response("raw text", None) == "raw text"

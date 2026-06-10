@@ -94,7 +94,9 @@ class ClaudeCliBackend(LlmBackend):
         return parse_structured_output(raw, response_model)
 
     def env(self) -> dict[str, str]:
-        return {"CLAUDE_CODE_SIMPLE": "1"}
+        # CLAUDE_CODE_SIMPLE=1 breaks claude.ai keychain auth ("Not logged in")
+        # on current CLIs; --setting-sources ""/--strict-mcp-config already trim startup.
+        return {}
 
     def build_argv(self, content: str, *, model: str) -> list[str]:
         """Build the inline ``-p`` argv for the sentiment/pushback scoring path."""
