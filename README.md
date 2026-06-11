@@ -50,14 +50,19 @@ mlx
 
 ## What problems does this solve?
 
-- **Duplicate subshell plumbing.** Building `claude`/`codex` argv, piping stdin/stdout, teeing
-  stderr, and turning non-zero exits into useful errors — written once, not re-derived per tool.
-- **Structured-output boilerplate.** A Pydantic model becomes a JSON-schema constraint and a
-  parsed, validated result the same way for every backend.
-- **Local MLX is fiddly.** Adapter fusion, prompt-cache reuse, worker-thread lifecycle, and
-  batched single-token generation live behind one engine instead of in every consumer.
-- **Behavior drift.** Two tools that call the same models stay byte-for-byte consistent because
-  they share the backend layer rather than each maintaining a copy.
+Every tool that shells out to `claude` or `codex` rebuilds the same plumbing: argv
+construction, stdin/stdout piping, stderr teeing, and turning non-zero exits into useful
+errors. spawnllm holds it once.
+
+Structured output is boilerplate too. A Pydantic model becomes a JSON-schema constraint
+and a parsed, validated result, identically for both CLI backends.
+
+Local MLX is fiddly. Adapter fusion, prompt-cache reuse, worker-thread lifecycle, and
+batched single-token generation live behind one engine instead of in every consumer.
+
+Behavior drift goes away with the duplication: two tools that call the same models stay
+byte-for-byte consistent because they share the backend layer, not a pair of diverging
+copies.
 
 ## Docs
 
