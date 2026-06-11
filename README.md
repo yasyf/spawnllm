@@ -1,5 +1,7 @@
 # spawnllm
 
+![spawnllm banner](https://github.com/yasyf/spawnllm/raw/main/docs/assets/readme-banner.png)
+
 [![PyPI](https://img.shields.io/pypi/v/spawnllm.svg)](https://pypi.org/project/spawnllm/)
 [![Python](https://img.shields.io/pypi/pyversions/spawnllm.svg)](https://pypi.org/project/spawnllm/)
 [![Docs](https://img.shields.io/github/actions/workflow/status/yasyf/spawnllm/docs.yml?branch=main&label=docs)](https://yasyf.github.io/spawnllm/)
