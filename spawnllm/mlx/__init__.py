@@ -1,7 +1,7 @@
 """Local MLX engine, adapter codec, fuser, and runtime patches.
 
-Imports here are lazy so that ``import spawnllm`` never pulls ``mlx_lm``/``zstandard``;
-only consumers that touch ``spawnllm.mlx`` attributes load the heavy dependencies.
+Imports here are lazy so that `import spawnllm` never pulls `mlx_lm`/`zstandard`;
+only consumers that touch `spawnllm.mlx` attributes load the heavy dependencies.
 """
 
 from __future__ import annotations

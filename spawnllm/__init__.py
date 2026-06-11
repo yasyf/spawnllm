@@ -1,8 +1,8 @@
 """Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools.
 
 The top-level namespace exposes the CLI backends, subprocess transport, and
-structured-output helpers. The MLX engine lives under :mod:`spawnllm.mlx` and is
-imported lazily so that ``import spawnllm`` never pulls ``mlx_lm``/``zstandard``.
+structured-output helpers. The MLX engine lives under `spawnllm.mlx`, whose
+imports are lazy so that `import spawnllm` never pulls `mlx_lm`/`zstandard`.
 """
 
 from __future__ import annotations

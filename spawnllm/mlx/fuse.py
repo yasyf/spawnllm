@@ -11,6 +11,13 @@ if TYPE_CHECKING:
 
 
 class AdapterFuser:
+    """Fuses a shipped LoRA adapter into a base MLX model.
+
+    The fused model is stored in the Hugging Face hub cache using the
+    standard `models--*/snapshots/*` layout, keyed by the codec's digest, so
+    repeat calls reuse the cached result.
+    """
+
     @classmethod
     def ensure_fused(
         cls,
@@ -20,6 +27,22 @@ class AdapterFuser:
         cache_namespace: str,
         tqdm_class: type | None = None,
     ) -> Path:
+        """Fuse the codec's adapter into `model_repo`, returning the cached result when present.
+
+        On a cache miss, downloads the base model from the Hugging Face hub,
+        decodes the compressed adapter, applies and fuses the LoRA layers, and
+        saves the merged model into the hub cache.
+
+        Args:
+            model_repo: Hugging Face repo id of the base MLX model.
+            codec: Codec providing the compressed adapter and its config.
+            cache_namespace: Names the cache entry
+                `models--{cache_namespace}-{digest}`.
+            tqdm_class: Progress-bar class forwarded to `snapshot_download`.
+
+        Returns:
+            Path to the fused model's snapshot directory.
+        """
         from huggingface_hub.constants import HF_HUB_CACHE
 
         digest = codec.digest()

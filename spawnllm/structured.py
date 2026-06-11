@@ -25,10 +25,20 @@ __all__ = [
 
 
 def schema_for(model: type[BaseModel]) -> str:
+    """Serialize a Pydantic model's JSON schema, with `additionalProperties` set to false."""
     return json.dumps(model.model_json_schema() | {"additionalProperties": False})
 
 
 def resolve_schema_path(backend: LlmBackend, schema: str | None) -> str | None:
+    """Resolve a JSON schema into the argument form the backend's CLI expects.
+
+    Args:
+        backend: The backend the schema is destined for.
+        schema: The JSON schema string, or `None`.
+
+    Returns:
+        A temp-file path for `CodexCliBackend`, the schema unchanged for other backends, or `None` without a schema.
+    """
     if not schema:
         return None
     if isinstance(backend, CodexCliBackend):
@@ -40,7 +50,7 @@ def resolve_schema_path(backend: LlmBackend, schema: str | None) -> str | None:
 
 
 def extract_structured[M: BaseModel](events: list[dict[str, Any]], model: type[M]) -> M | None:
-    """Return the validated ``structured_output`` from a stream-json event list, if present."""
+    """Return the validated `structured_output` from a stream-json event list, if present."""
     for e in events:
         if e.get("type") == "result" and "structured_output" in e:
             return model.model_validate(e["structured_output"])
@@ -52,6 +62,15 @@ def parse_structured_output(raw: str, response_model: None) -> str: ...
 @overload
 def parse_structured_output[M: BaseModel](raw: str, response_model: type[M]) -> M: ...
 def parse_structured_output[M: BaseModel](raw: str, response_model: type[M] | None) -> str | M:
+    """Parse raw CLI stdout into text or a validated model.
+
+    Args:
+        raw: Raw stdout from the backend CLI.
+        response_model: The Pydantic model to validate against, or `None` for text.
+
+    Returns:
+        `raw` for text calls; otherwise `structured_output` from the stream-json events, else `raw` validated as JSON.
+    """
     if not response_model:
         return raw
     data = json.loads(raw)
@@ -62,6 +81,19 @@ def parse_structured_output[M: BaseModel](raw: str, response_model: type[M] | No
 
 
 def parse_result_envelope(stdout: bytes, *, argv: list[str], stderr: bytes) -> str:
+    """Parse a `{is_error, result}` JSON envelope into its result text.
+
+    Args:
+        stdout: Raw stdout bytes holding the envelope.
+        argv: The argv that produced the output, for error reporting.
+        stderr: Raw stderr bytes, attached to the error.
+
+    Returns:
+        The `result` payload.
+
+    Raises:
+        subprocess.CalledProcessError: When the envelope marks the run as an error.
+    """
     data = json.loads(stdout)
     if data["is_error"]:
         raise subprocess.CalledProcessError(0, argv, output=stdout, stderr=stderr)

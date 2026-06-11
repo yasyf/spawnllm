@@ -1,4 +1,4 @@
-"""Cross-platform LoRA adapter codec (byte-shuffle + zstd; imports without ``mlx_lm``)."""
+"""Cross-platform LoRA adapter codec (byte-shuffle + zstd; imports without `mlx_lm`)."""
 
 from __future__ import annotations
 
@@ -11,14 +11,18 @@ import orjson
 
 
 class AdapterCodec:
-    """Compress/decompress a homogeneous-dtype safetensors adapter with byte-shuffle + zstd.
+    """Compresses and decompresses a homogeneous-dtype safetensors LoRA adapter.
 
-    Subclasses override :attr:`DIR`/:attr:`ZST`/:attr:`CONFIG` to point at their
-    shipped package data.
+    Each tensor's bytes are grouped by byte position within the dtype
+    (byte-shuffle) before zstd compression. Subclasses override `DIR`, `ZST`,
+    and `CONFIG` to point at their shipped package data.
 
     Example:
-        >>> AdapterCodec.encode(Path("adapters.safetensors"))
-        >>> AdapterCodec.digest()
+        >>> class ShippedCodec(AdapterCodec):
+        ...     DIR = Path(__file__).parent
+        ...     ZST = DIR / "adapters.safetensors.zst"
+        ...     CONFIG = DIR / "adapter_config.json"
+        >>> ShippedCodec.encode(Path("trained/adapters.safetensors"))
     """
 
     DIR: ClassVar[Path] = Path(__file__).parent
@@ -29,10 +33,20 @@ class AdapterCodec:
 
     @classmethod
     def digest(cls) -> str:
+        """Return the first 16 hex digits of the SHA-256 of the compressed adapter `ZST`."""
         return hashlib.sha256(cls.ZST.read_bytes()).hexdigest()[:16]
 
     @classmethod
     def encode(cls, src: Path) -> None:
+        """Compress the safetensors adapter at `src` into `ZST`.
+
+        Byte-shuffles each tensor's data, then compresses with zstd at
+        `COMPRESSION_LEVEL`. All tensors must share one dtype drawn from
+        `TYPESIZES`.
+
+        Args:
+            src: Path to the adapter's safetensors file.
+        """
         import zstandard as zstd
 
         raw = src.read_bytes()
@@ -41,12 +55,18 @@ class AdapterCodec:
 
     @classmethod
     def decode(cls, dst: Path) -> None:
+        """Decompress `ZST` and write the restored safetensors adapter to `dst`.
+
+        Args:
+            dst: Destination path for the safetensors file.
+        """
         import zstandard as zstd
 
         dst.write_bytes(cls._walk(zstd.ZstdDecompressor().decompress(cls.ZST.read_bytes()), shuffle=False))
 
     @classmethod
     def dtype(cls) -> str:
+        """Return the safetensors dtype shared by the compressed adapter's tensors, e.g. `"BF16"`."""
         import zstandard as zstd
 
         raw = zstd.ZstdDecompressor().decompress(cls.ZST.read_bytes())

@@ -1,4 +1,4 @@
-"""Subprocess transport for CLI-backed LLM calls (sync ``run_cli`` + async ``arun_cli``)."""
+"""Subprocess transport for CLI-backed LLM calls (sync `run_cli` + async `arun_cli`)."""
 
 from __future__ import annotations
 
@@ -17,6 +17,23 @@ def run_cli(
     env: dict[str, str] | None = None,
     cwd: str | None = None,
 ) -> str:
+    """Run a CLI command to completion and return its stdout.
+
+    Args:
+        argv: The command and its arguments.
+        input: Text delivered to the process over stdin.
+        timeout: Seconds to wait before the process is killed.
+        env: Environment for the process; `None` inherits the current environment.
+        cwd: Working directory for the process.
+
+    Returns:
+        The decoded stdout.
+
+    Raises:
+        subprocess.CalledProcessError: On a nonzero exit code, with the argv,
+            exit code, and stdout/stderr tails attached as notes.
+        subprocess.TimeoutExpired: When the process outlives `timeout`.
+    """
     result = subprocess.run(
         argv,
         input=input,
@@ -41,6 +58,15 @@ async def collect_process(
     *,
     stderr_tee: Callable[[bytes], None] | None = None,
 ) -> tuple[bytes, bytes, int]:
+    """Drain a subprocess's stdout and stderr concurrently and wait for it to exit.
+
+    Args:
+        proc: A process created with both stdout and stderr piped.
+        stderr_tee: Callback invoked with each stderr line as it arrives.
+
+    Returns:
+        A `(stdout, stderr, returncode)` tuple.
+    """
     assert proc.stderr is not None, "create_subprocess_exec was called with stderr=PIPE"
     assert proc.stdout is not None, "create_subprocess_exec was called with stdout=PIPE"
     stderr_buf = bytearray()
@@ -70,6 +96,21 @@ async def arun_cli(
     cwd: str | None = None,
     stderr_tee: Callable[[bytes], None] | None = None,
 ) -> bytes:
+    """Run a CLI command asynchronously and return its stdout.
+
+    Args:
+        argv: The command and its arguments.
+        input: Text delivered to the process over stdin.
+        env: Environment for the process; `None` inherits the current environment.
+        cwd: Working directory for the process.
+        stderr_tee: Callback invoked with each stderr line as it arrives.
+
+    Returns:
+        The raw stdout bytes.
+
+    Raises:
+        subprocess.CalledProcessError: On a nonzero exit code.
+    """
     proc = await asyncio.create_subprocess_exec(
         *argv,
         stdin=asyncio.subprocess.PIPE if input is not None else None,
@@ -96,6 +137,17 @@ async def map_concurrent[T, R](
     limit: int,
     on_done: Callable[[int], None] | None = None,
 ) -> list[R]:
+    """Map an async function over items with bounded concurrency.
+
+    Args:
+        items: The inputs to process.
+        fn: Async function applied to each item.
+        limit: Maximum number of in-flight calls.
+        on_done: Progress callback invoked with `1` as each item completes.
+
+    Returns:
+        The results, in input order.
+    """
     sem = asyncio.Semaphore(limit)
 
     async def one(item: T) -> R:

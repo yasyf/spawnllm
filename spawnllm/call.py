@@ -1,4 +1,4 @@
-"""High-level one-shot sync LLM call used by the debugging CLI."""
+"""One-shot synchronous LLM call over a CLI backend."""
 
 from __future__ import annotations
 
@@ -27,13 +27,13 @@ def call(
 
     Args:
         prompt: The user prompt, delivered to the backend over stdin.
-        backend: The :class:`~spawnllm.backends.base.LlmBackend` to invoke.
-        model: Abstract model tier (``small``/``medium``/``large``).
+        backend: The `LlmBackend` to invoke.
+        model: Abstract model tier (`small`/`medium`/`large`).
         agent: Whether the call may use tools / agent capabilities.
-        response_model: Pydantic model for structured output, or ``None`` for text.
+        response_model: Pydantic model for structured output, or `None` for text.
 
     Returns:
-        The raw text response, or a validated ``response_model`` instance.
+        The raw text response, or a validated `response_model` instance.
     """
     schema = schema_for(response_model) if response_model is not None else None
     schema_path = resolve_schema_path(backend, schema)

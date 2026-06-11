@@ -1,4 +1,4 @@
-"""Runtime patches applied in-worker before the first ``batch_generate``."""
+"""Runtime patches applied in-worker before the first `batch_generate`."""
 
 from __future__ import annotations
 
@@ -7,10 +7,20 @@ import time
 
 
 class MLXPatches:
+    """Idempotent runtime patches for `mlx_lm`.
+
+    `MlxEngine` applies these on its worker thread before the first
+    `batch_generate` call. The single current patch replaces
+    `BatchGenerator.stats` with a version that clamps the elapsed-time
+    denominators when computing tokens-per-second, preventing a
+    `ZeroDivisionError`.
+    """
+
     applied: bool = False
 
     @classmethod
     def apply(cls) -> None:
+        """Apply all patches once; subsequent calls are no-ops."""
         if cls.applied:
             return
         cls.applied = True

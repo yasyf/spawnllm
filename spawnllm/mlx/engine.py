@@ -22,11 +22,26 @@ WORKER_STOP = object()
 
 
 class MlxEngine:
-    """Run batched MLX inference on a dedicated worker thread.
+    """Runs batched MLX inference on a dedicated worker thread.
 
-    Sentiment/domain specifics are injected: ``logits_processor_factory`` builds the
-    per-model logit processor from the loaded tokenizer, and ``prefix_messages`` is
-    the cached system/demo prefix shared across a batch.
+    The constructor starts a daemon worker thread that loads the model from
+    `fused_dir`, applies `MLXPatches`, and precomputes a prompt cache for
+    `prefix_messages`. Await `ensure_loaded` to surface load failures before
+    generating.
+
+    Args:
+        fused_dir: Directory of the MLX model to load, such as the path
+            returned by `AdapterFuser.ensure_fused`.
+        logits_processor_factory: Builds the logits processor from the loaded
+            tokenizer; the processor is applied to every generation call.
+        prefix_messages: Chat messages shared by every conversation; their
+            prompt cache is computed once and reused across batches. Each
+            conversation passed to `generate` must start with these messages.
+        batch_size: Number of conversations generated per batch.
+        worker_name: Name of the worker thread.
+
+    Raises:
+        RuntimeError: When not running on macOS with Apple Silicon.
     """
 
     def __init__(
@@ -88,11 +103,21 @@ class MlxEngine:
         ).caches[0]
 
     async def ensure_loaded(self) -> None:
+        """Wait for the worker thread to finish loading, re-raising the error if loading failed."""
         await anyio.to_thread.run_sync(self._loaded.wait)
         if self._init_error is not None:
             raise self._init_error
 
     async def submit[R](self, fn: Callable[..., R], *args: Any) -> R:
+        """Run `fn(*args)` on the worker thread and await its result.
+
+        Args:
+            fn: Callable to execute on the worker thread.
+            *args: Positional arguments passed to `fn`.
+
+        Returns:
+            The value returned by `fn`; an exception raised by `fn` propagates to the awaiter.
+        """
         loop = asyncio.get_running_loop()
         fut: asyncio.Future = loop.create_future()
         self._inbox.put(
@@ -128,6 +153,23 @@ class MlxEngine:
         message_lists: list[list[dict[str, str]]],
         on_progress: Callable[[int], None],
     ) -> list[str]:
+        """Generate one single-token completion per conversation.
+
+        Conversations are processed in chunks of `batch_size`, ordered by the
+        length of each conversation's final message so similar-length prompts
+        batch together. Every conversation must start with the engine's
+        `prefix_messages`; the shared prefix is served from the precomputed
+        prompt cache.
+
+        Args:
+            message_lists: Conversations, each a list of chat messages with
+                `role` and `content` keys.
+            on_progress: Called after each chunk with the number of
+                conversations completed in that chunk.
+
+        Returns:
+            Generated texts, in the same order as `message_lists`.
+        """
         order = sorted(range(len(message_lists)), key=lambda i: len(message_lists[i][-1]["content"]))
         responses: list[str] = [""] * len(message_lists)
         for start in range(0, len(order), self._batch_size):
@@ -140,9 +182,11 @@ class MlxEngine:
         return responses
 
     def peak_memory_gb(self) -> float:
+        """Return the process's peak resident set size in GiB."""
         import resource
 
         return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024**3)
 
     async def close(self) -> None:
+        """Signal the worker thread to exit after completing already-queued jobs."""
         self._inbox.put(WORKER_STOP)

@@ -29,7 +29,7 @@ class LlmBackend(ABC):
 
         Args:
             model: Provider-specific model name.
-            schema_path: Schema argument for structured output, or ``None``.
+            schema_path: Schema argument for structured output, or `None`.
             agent: Whether the invocation may use tools / agent capabilities.
 
         Returns:
@@ -42,12 +42,12 @@ class LlmBackend(ABC):
 
         Args:
             raw: Raw stdout from the backend CLI.
-            response_model: Model to validate against, or ``None`` for raw text.
+            response_model: Model to validate against, or `None` for raw text.
 
         Returns:
-            ``raw`` when ``response_model`` is ``None``, else a validated instance.
+            `raw` when `response_model` is `None`, else a validated instance.
         """
 
     @abstractmethod
     def env(self) -> dict[str, str]:
-        """Return extra environment variables to set for the CLI invocation."""
+        """Return extra environment variables for the CLI invocation, merged over the inherited environment."""
