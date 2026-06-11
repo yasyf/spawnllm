@@ -4,7 +4,9 @@
 module: spawnllm
 display_name: spawnllm
 parser: google
-dynamic: true
+# Static analysis: at runtime the `call` re-export shadows the `call` module, so
+# dynamic introspection cannot resolve `call.call`.
+dynamic: false
 repo: https://github.com/yasyf/spawnllm
 site_url: "https://yasyf.github.io/spawnllm/"
 pypi: true
@@ -46,11 +48,46 @@ authors:
     github: yasyf
     email: yasyfm@gmail.com
 
-# Curated symbol reference (public API only). Optional — without it, dynamic
-# mode documents everything in spawnllm.__all__.
-# reference:
-#   - title: Core
-#     desc: The main entry points.
-#     contents:
-#       - SomePublicClass
-#       - some_public_function
+# Curated symbol reference (public API only). The explicit `call.call` path
+# sidesteps the module/function name collision that breaks auto-discovery.
+reference:
+  - title: Calling
+    desc: One-shot LLM calls and structured output.
+    contents:
+      - call.call
+      - schema_for
+      - resolve_schema_path
+      - extract_structured
+      - parse_structured_output
+      - parse_result_envelope
+  - title: Backends
+    desc: CLI backends, the specialty registry, and Claude status checks.
+    contents:
+      - LlmBackend
+      - ClaudeCliBackend
+      - CodexCliBackend
+      - LlmBackends
+      - check_status
+      - ClaudeStatus
+      - ClaudeReady
+      - ClaudeNotInstalled
+      - ClaudeNotAuthenticated
+  - title: Transport
+    desc: Subprocess plumbing shared by the CLI backends.
+    contents:
+      - run_cli
+      - arun_cli
+      - collect_process
+      - map_concurrent
+  - title: Types
+    desc: Shared type aliases.
+    contents:
+      - types.TModel
+      - types.TSpecialty
+  - title: MLX
+    desc: Local Apple-Silicon engine, adapter codec, fuser, and runtime patches.
+    contents:
+      - mlx.MlxEngine
+      - mlx.AdapterCodec
+      - mlx.AdapterFuser
+      - mlx.MLXPatches
