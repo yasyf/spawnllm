@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
@@ -88,6 +89,23 @@ class ClaudeCliBackend(LlmBackend):
             ),
             *(["--json-schema", schema_path, "--output-format", "json"] if schema_path else []),
         ]
+
+    def schema_for(self, model: type[BaseModel]) -> str:
+        """Serialize a Pydantic model into Anthropic's structured-output JSON schema.
+
+        Uses the Anthropic SDK's `transform_schema`, which recursively sets
+        `additionalProperties: false` while preserving Pydantic's `required`,
+        producing the standard JSON Schema the `claude --json-schema` flag expects.
+
+        Args:
+            model: The Pydantic model describing the structured output.
+
+        Returns:
+            A JSON-schema string passed inline to `--json-schema`.
+        """
+        from anthropic.lib._parse._transform import transform_schema
+
+        return json.dumps(transform_schema(model))
 
     def parse_response(self, raw: str, response_model: type[BaseModel] | None) -> str | BaseModel:
         """Parse `claude` stdout into text or a validated model.

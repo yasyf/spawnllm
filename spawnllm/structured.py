@@ -1,4 +1,4 @@
-"""Structured-output helpers: JSON-schema build, schema-path resolution, response parsing."""
+"""Structured-output helpers: schema-path resolution and response parsing."""
 
 from __future__ import annotations
 
@@ -22,15 +22,9 @@ __all__ = [
     "parse_result_envelope",
     "parse_structured_output",
     "resolve_schema_path",
-    "schema_for",
 ]
 
 JSON_FENCE = re.compile(r"```(?:json)?\s*\n?(.*?)\n?```", re.DOTALL)
-
-
-def schema_for(model: type[BaseModel]) -> str:
-    """Serialize a Pydantic model's JSON schema, with `additionalProperties` set to false."""
-    return json.dumps(model.model_json_schema() | {"additionalProperties": False})
 
 
 def extract_json_block(text: str) -> str:

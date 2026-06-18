@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from typing import TYPE_CHECKING, ClassVar
 
@@ -57,6 +58,24 @@ class CodexCliBackend(LlmBackend):
             *([] if agent else ["-c", "features.codex_hooks=false", "-c", "features.mcp_servers=false"]),
             *(["--output-schema", schema_path] if schema_path else []),
         ]
+
+    def schema_for(self, model: type[BaseModel]) -> str:
+        """Serialize a Pydantic model into an OpenAI strict JSON schema.
+
+        Uses the OpenAI SDK's `to_strict_json_schema`, which recursively sets
+        `additionalProperties: false` and forces every property into `required`
+        across `$defs`, `anyOf`, and array items — the form the Responses API
+        requires behind `codex exec --output-schema`.
+
+        Args:
+            model: The Pydantic model describing the structured output.
+
+        Returns:
+            A strict JSON-schema string written to the `--output-schema` file.
+        """
+        from openai.lib._pydantic import to_strict_json_schema
+
+        return json.dumps(to_strict_json_schema(model))
 
     def parse_response(self, raw: str, response_model: type[BaseModel] | None) -> str | BaseModel:
         """Parse `codex` stdout into text or a validated model.

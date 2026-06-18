@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
-from spawnllm import ClaudeCliBackend, CodexCliBackend
-from spawnllm.structured import parse_result_envelope, parse_structured_output, resolve_schema_path, schema_for
+from spawnllm import ClaudeCliBackend, CodexCliBackend, GeminiCliBackend, LlmBackend
+from spawnllm.structured import parse_result_envelope, parse_structured_output, resolve_schema_path
 
 
 class Verdict(BaseModel):
@@ -16,12 +16,38 @@ class Verdict(BaseModel):
     reason: str
 
 
-class TestSchemaFor:
-    def test_byte_identical_to_inline_build(self) -> None:
-        assert schema_for(Verdict) == json.dumps(Verdict.model_json_schema() | {"additionalProperties": False})
+class Leg(BaseModel):
+    price: float
+    note: str | None = None
 
-    def test_additional_properties_false(self) -> None:
-        assert json.loads(schema_for(Verdict))["additionalProperties"] is False
+
+class Window(BaseModel):
+    name: str
+    leg: Leg
+
+
+class TestSchemaFor:
+    @pytest.mark.parametrize("backend", [CodexCliBackend(), ClaudeCliBackend()], ids=["codex", "claude"])
+    def test_strict_backends_set_additional_properties_false_recursively(self, backend: LlmBackend) -> None:
+        schema = json.loads(backend.schema_for(Window))
+        assert schema["additionalProperties"] is False
+        assert schema["$defs"]["Leg"]["additionalProperties"] is False
+
+    def test_codex_forces_all_properties_required(self) -> None:
+        schema = json.loads(CodexCliBackend().schema_for(Window))
+        assert set(schema["required"]) == {"name", "leg"}
+        assert set(schema["$defs"]["Leg"]["required"]) == {"price", "note"}
+
+    def test_claude_preserves_optional_fields(self) -> None:
+        schema = json.loads(ClaudeCliBackend().schema_for(Window))
+        assert set(schema["required"]) == {"name", "leg"}
+        assert schema["$defs"]["Leg"]["required"] == ["price"]
+
+    def test_gemini_emits_plain_schema(self) -> None:
+        schema = json.loads(GeminiCliBackend().schema_for(Window))
+        assert "additionalProperties" not in schema
+        assert "additionalProperties" not in schema["$defs"]["Leg"]
+        assert schema["$defs"]["Leg"]["properties"]["price"]["type"] == "number"
 
 
 class TestResolveSchemaPath:

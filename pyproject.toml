@@ -20,6 +20,11 @@ dependencies = [
     "click>=8",
     "loguru>=0.7",
     "pydantic>=2",
+    # Per-backend strict-schema transforms: openai.lib._pydantic.to_strict_json_schema
+    # and anthropic.lib._parse._transform.transform_schema. Both import paths are
+    # SDK-private, so the floors pin verified-working versions.
+    "openai>=2.43",
+    "anthropic>=0.111",
 ]
 
 [project.optional-dependencies]

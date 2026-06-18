@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -131,6 +132,20 @@ class LlmBackend(ABC):
         Returns:
             `True` when the CLI reports an authenticated session.
         """
+
+    def schema_for(self, model: type[BaseModel]) -> str:
+        """Serialize a Pydantic model into the JSON-schema string this backend's CLI expects.
+
+        The default emits the model's plain JSON schema; provider backends
+        override to apply their SDK's strict-schema transform.
+
+        Args:
+            model: The Pydantic model describing the structured output.
+
+        Returns:
+            A JSON-schema string suitable for this backend's structured-output argument.
+        """
+        return json.dumps(model.model_json_schema())
 
     def invocation(
         self, prompt: str, *, model: str, schema_path: str | None, agent: bool

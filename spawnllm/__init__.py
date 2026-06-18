@@ -28,7 +28,6 @@ from spawnllm.structured import (
     parse_result_envelope,
     parse_structured_output,
     resolve_schema_path,
-    schema_for,
 )
 from spawnllm.types import TModel, TSpecialty
 
@@ -55,6 +54,5 @@ __all__ = [
     "parse_structured_output",
     "resolve_schema_path",
     "run_cli",
-    "schema_for",
     "select_backend",
 ]

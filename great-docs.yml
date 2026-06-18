@@ -55,7 +55,6 @@ reference:
     desc: One-shot LLM calls and structured output.
     contents:
       - call.call
-      - schema_for
       - resolve_schema_path
       - extract_structured
       - parse_structured_output

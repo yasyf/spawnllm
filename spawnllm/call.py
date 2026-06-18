@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from spawnllm.backends.registry import select_backend
 from spawnllm.proc import run_cli
-from spawnllm.structured import resolve_schema_path, schema_for
+from spawnllm.structured import resolve_schema_path
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -41,7 +41,7 @@ def call(
         The raw text response, or a validated `response_model` instance.
     """
     backend = backend or select_backend(specialty=specialty)
-    schema = schema_for(response_model) if response_model is not None else None
+    schema = backend.schema_for(response_model) if response_model is not None else None
     schema_path = resolve_schema_path(backend, schema)
     argv, stdin = backend.invocation(prompt, model=backend.models[model], schema_path=schema_path, agent=agent)
     raw = run_cli(argv, input=stdin, env=os.environ | backend.env(), timeout=180)
