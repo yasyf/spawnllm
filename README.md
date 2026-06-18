@@ -38,17 +38,69 @@ uv add "spawnllm[mlx]"
 
 ## Quickstart
 
-List the backends spawnllm can drive:
+See which backends are installed and authenticated, and which one auto-selection picks:
 
 ```bash
-uvx spawnllm backends
+uvx spawnllm status
 ```
 
 ```
-claude
-codex
-mlx
+claude: ready
+codex: ready
+selected: claude
 ```
+
+Make a request by passing a prompt as the argument, or piping it over stdin:
+
+```bash
+uvx spawnllm call --backend claude "What is 2+2? Reply with just the number."
+```
+
+```
+4
+```
+
+`--model small|medium|large` swaps the tier, which each backend maps to a concrete model.
+The `claude` backend resolves `small` to Haiku, `medium` to Sonnet, and `large` to Opus. Add
+`--agent` to let the call use tools.
+
+### From Python
+
+`call` runs one request and returns the response. With no `backend`, it auto-selects the
+first installed, authenticated CLI:
+
+```python
+from spawnllm import call
+
+print(call("Reply with just the word: pong"))
+# pong
+```
+
+Pin a backend and tier explicitly, or pass a Pydantic model to get a validated object back
+instead of text:
+
+```python
+from pydantic import BaseModel
+
+from spawnllm import call, ClaudeCliBackend
+
+
+class Capital(BaseModel):
+    country: str
+    capital: str
+
+
+result = call(
+    "What is the capital of France?",
+    backend=ClaudeCliBackend(),
+    model="large",
+    response_model=Capital,
+)
+print(result.capital)  # Paris
+```
+
+When you don't pin a backend, set `specialty=` to scope auto-selection by task. The
+`debugging` and `review` specialties route to Codex, and `general` routes to Claude.
 
 ## What problems does this solve?
 
