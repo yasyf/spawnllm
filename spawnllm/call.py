@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from spawnllm.backends.registry import select_backend
@@ -43,6 +44,11 @@ def call(
     backend = backend or select_backend(specialty=specialty)
     schema = backend.schema_for(response_model) if response_model is not None else None
     schema_path = resolve_schema_path(backend, schema)
-    argv, stdin = backend.invocation(prompt, model=backend.models[model], schema_path=schema_path, agent=agent)
-    raw = run_cli(argv, input=stdin, env=os.environ | backend.env(), timeout=180)
-    return backend.parse_response(raw, response_model)
+    inv = backend.invocation(prompt, model=backend.models[model], schema_path=schema_path, agent=agent)
+    try:
+        stdout = run_cli(inv.argv, input=inv.stdin, env=os.environ | backend.env(), timeout=180)
+        raw = Path(inv.result_path).read_text() if inv.result_path else stdout
+        return backend.parse_response(raw, response_model)
+    finally:
+        for path in inv.cleanup_paths:
+            Path(path).unlink(missing_ok=True)

@@ -27,12 +27,26 @@ __all__ = [
 JSON_FENCE = re.compile(r"```(?:json)?\s*\n?(.*?)\n?```", re.DOTALL)
 
 
+def first_json_value(source: str) -> str | None:
+    """Return the first complete JSON object/array in `source`, or `None` when there is none."""
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(source):
+        if char in "{[":
+            try:
+                end = decoder.raw_decode(source, index)[1]
+            except (json.JSONDecodeError, RecursionError):
+                continue
+            return source[index:end]
+    return None
+
+
 def extract_json_block(text: str) -> str:
-    """Extract a JSON object/array from model text, tolerating ```json fences or surrounding prose."""
-    if match := JSON_FENCE.search(text):
-        return match.group(1).strip()
-    start = min((i for i in (text.find("{"), text.find("[")) if i != -1), default=0)
-    return text[start : max(text.rfind("}"), text.rfind("]")) + 1]
+    """Extract the first complete JSON value from model text, tolerating ```json fences or surrounding prose."""
+    fenced = match.group(1) if (match := JSON_FENCE.search(text)) else None
+    for source in (fenced, text):
+        if source is not None and (value := first_json_value(source)) is not None:
+            return value
+    raise ValueError(f"no JSON value found in model output: {text!r}")
 
 
 def resolve_schema_path(backend: LlmBackend, schema: str | None) -> str | None:

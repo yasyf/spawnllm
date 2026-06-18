@@ -8,6 +8,7 @@ from spawnllm.backends.base import (
     BackendReady,
     BackendStatus,
     BackendUnavailable,
+    Invocation,
     LlmBackend,
 )
 from spawnllm.backends.claude import ClaudeCliBackend
@@ -25,6 +26,7 @@ __all__ = [
     "ClaudeCliBackend",
     "CodexCliBackend",
     "GeminiCliBackend",
+    "Invocation",
     "LlmBackend",
     "LlmBackends",
     "select_backend",

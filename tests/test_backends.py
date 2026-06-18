@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
@@ -137,6 +138,21 @@ class TestCodexArgv:
         assert result.block is True
         assert result.reason == "bad"
 
+    def test_invocation_adds_output_file_with_schema(self) -> None:
+        inv = CodexCliBackend().invocation("hi", model="gpt-5.5", schema_path="/tmp/s.json", agent=False)
+        assert inv.argv[-2:] == ["-o", inv.result_path]
+        assert "--output-schema" in inv.argv
+        assert inv.stdin == "hi"
+        assert inv.cleanup_paths == (inv.result_path, "/tmp/s.json")
+        assert Path(inv.result_path).exists()
+        Path(inv.result_path).unlink()
+
+    def test_invocation_no_schema_cleans_only_output_file(self) -> None:
+        inv = CodexCliBackend().invocation("hi", model="gpt-5.5", schema_path=None, agent=False)
+        assert "--output-schema" not in inv.argv
+        assert inv.cleanup_paths == (inv.result_path,)
+        Path(inv.result_path).unlink()
+
 
 class TestRegistry:
     @pytest.mark.parametrize(
@@ -165,17 +181,18 @@ class TestGeminiBackend:
 
     def test_invocation_inline_prompt_empty_stdin(self) -> None:
         backend = GeminiCliBackend()
-        argv, stdin = backend.invocation("hi", model="gemini-2.5-flash", schema_path=None, agent=False)
-        assert argv == backend.build_command("gemini-2.5-flash", None, agent=False) + ["-p", "hi"]
-        assert stdin == ""
+        inv = backend.invocation("hi", model="gemini-2.5-flash", schema_path=None, agent=False)
+        assert inv.argv == backend.build_command("gemini-2.5-flash", None, agent=False) + ["-p", "hi"]
+        assert inv.stdin == ""
+        assert inv.result_path is None
 
     def test_invocation_injects_schema_into_prompt(self) -> None:
         backend = GeminiCliBackend()
-        argv, stdin = backend.invocation("hi", model="gemini-2.5-flash", schema_path='{"type":"object"}', agent=False)
-        assert argv[-2] == "-p"
-        assert "hi" in argv[-1]
-        assert '{"type":"object"}' in argv[-1]
-        assert stdin == ""
+        inv = backend.invocation("hi", model="gemini-2.5-flash", schema_path='{"type":"object"}', agent=False)
+        assert inv.argv[-2] == "-p"
+        assert "hi" in inv.argv[-1]
+        assert '{"type":"object"}' in inv.argv[-1]
+        assert inv.stdin == ""
 
     def test_parse_response_extracts_envelope_text(self) -> None:
         raw = json.dumps({"response": "hello", "stats": {"models": {"gemini-2.5-flash": {"api": {"totalErrors": 0}}}}})

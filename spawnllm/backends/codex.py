@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import tempfile
 from typing import TYPE_CHECKING, ClassVar
 
-from spawnllm.backends.base import LlmBackend
+from spawnllm.backends.base import Invocation, LlmBackend
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -59,6 +61,31 @@ class CodexCliBackend(LlmBackend):
             *(["--output-schema", schema_path] if schema_path else []),
         ]
 
+    def invocation(self, prompt: str, *, model: str, schema_path: str | None, agent: bool) -> Invocation:
+        """Build the `codex exec` invocation, capturing the final message to a file.
+
+        `codex exec` streams an interactive log to stdout, so the result is read
+        from the `-o`/`--output-last-message` file instead. The result file and
+        the schema temp file (when present) are removed after the run.
+
+        Args:
+            prompt: The prompt text, delivered over stdin.
+            model: OpenAI model name, e.g. `gpt-5.5`.
+            schema_path: Path to a JSON schema file passed to `--output-schema`, or `None`.
+            agent: Whether the invocation may use tools / agent capabilities.
+
+        Returns:
+            An `Invocation` whose result is read from the `-o` file.
+        """
+        fd, result_path = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
+        return Invocation(
+            self.build_command(model, schema_path, agent) + ["-o", result_path],
+            prompt,
+            result_path=result_path,
+            cleanup_paths=(result_path, *((schema_path,) if schema_path else ())),
+        )
+
     def schema_for(self, model: type[BaseModel]) -> str:
         """Serialize a Pydantic model into an OpenAI strict JSON schema.
 
@@ -78,10 +105,10 @@ class CodexCliBackend(LlmBackend):
         return json.dumps(to_strict_json_schema(model))
 
     def parse_response(self, raw: str, response_model: type[BaseModel] | None) -> str | BaseModel:
-        """Parse `codex` stdout into text or a validated model.
+        """Parse the final message `codex` wrote to its `-o` file into text or a validated model.
 
         Args:
-            raw: Raw stdout from the `codex` CLI.
+            raw: The final message read from the `-o`/`--output-last-message` file.
             response_model: Model to validate against, or `None` for raw text.
 
         Returns:

@@ -8,7 +8,12 @@ import pytest
 from pydantic import BaseModel
 
 from spawnllm import ClaudeCliBackend, CodexCliBackend, GeminiCliBackend, LlmBackend
-from spawnllm.structured import parse_result_envelope, parse_structured_output, resolve_schema_path
+from spawnllm.structured import (
+    extract_json_block,
+    parse_result_envelope,
+    parse_structured_output,
+    resolve_schema_path,
+)
 
 
 class Verdict(BaseModel):
@@ -104,3 +109,32 @@ class TestParseResultEnvelope:
         assert exc.value.cmd == ["claude", "-p"]
         assert exc.value.output == raw
         assert exc.value.stderr == b"e"
+
+
+class TestExtractJsonBlock:
+    def test_fenced_block(self) -> None:
+        assert json.loads(extract_json_block('```json\n{"x": 1}\n```')) == {"x": 1}
+
+    def test_object_amid_prose(self) -> None:
+        assert json.loads(extract_json_block('Sure, here you go: {"x": 1} hope that helps!')) == {"x": 1}
+
+    def test_skips_invalid_brace_in_leading_prose(self) -> None:
+        assert json.loads(extract_json_block('I considered {a, b} then chose {"x": 1}')) == {"x": 1}
+
+    def test_ignores_trailing_noise(self) -> None:
+        assert json.loads(extract_json_block('{"a": {"b": 2}} trailing } noise')) == {"a": {"b": 2}}
+
+    def test_array_value(self) -> None:
+        assert json.loads(extract_json_block("result: [1, 2, 3].")) == [1, 2, 3]
+
+    def test_falls_back_to_full_text_when_fence_lacks_json(self) -> None:
+        text = "Here is some code:\n```\nnot json at all\n```\nAnswer: {\"x\": 1}"
+        assert json.loads(extract_json_block(text)) == {"x": 1}
+
+    def test_deeply_nested_raises_valueerror_not_recursionerror(self) -> None:
+        with pytest.raises(ValueError, match="no JSON value"):
+            extract_json_block("[" * 2000)
+
+    def test_raises_when_no_json(self) -> None:
+        with pytest.raises(ValueError, match="no JSON value"):
+            extract_json_block("no json here at all")

@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
-from spawnllm.backends.base import LlmBackend
+from spawnllm.backends.base import Invocation, LlmBackend
 from spawnllm.structured import extract_json_block
 
 if TYPE_CHECKING:
@@ -48,14 +48,12 @@ class GeminiFamilyBackend(LlmBackend, ABC):
     def prompt_args(self, text: str) -> list[str]:
         return ["-p", text]
 
-    def invocation(
-        self, prompt: str, *, model: str, schema_path: str | None, agent: bool
-    ) -> tuple[list[str], str | None]:
+    def invocation(self, prompt: str, *, model: str, schema_path: str | None, agent: bool) -> Invocation:
         """Build the argv and inline prompt for a single invocation.
 
         The prompt travels inline via `-p`; structured output appends the JSON
         schema and an instruction to emit only conforming JSON. An empty stdin
-        forces the CLI into non-interactive mode.
+        forces the CLI into non-interactive mode, and the result is read from stdout.
 
         Args:
             prompt: The prompt text to deliver inline.
@@ -64,10 +62,10 @@ class GeminiFamilyBackend(LlmBackend, ABC):
             agent: Whether the invocation may use tools / agent capabilities.
 
         Returns:
-            A `(argv, "")` pair; the empty stdin forces non-interactive output.
+            An `Invocation` with an empty stdin that forces non-interactive output.
         """
         text = prompt if schema_path is None else f"{prompt}\n\n{SCHEMA_PROMPT}\n{schema_path}"
-        return self.build_command(model, None, agent) + self.prompt_args(text), ""
+        return Invocation(self.build_command(model, None, agent) + self.prompt_args(text), "")
 
     def parse_response(self, raw: str, response_model: type[BaseModel] | None) -> str | BaseModel:
         """Parse Gemini-family stdout into text or a validated model.

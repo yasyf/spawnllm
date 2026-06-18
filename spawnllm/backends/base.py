@@ -57,6 +57,24 @@ class BackendUnavailable(RuntimeError):
     """Raised when no backend is ready (installed and authenticated)."""
 
 
+@dataclass(frozen=True)
+class Invocation:
+    """A built CLI invocation: argv, optional stdin, and where to read the result.
+
+    Attributes:
+        argv: The argv list to execute.
+        stdin: Prompt text delivered over stdin, or `None` when delivered inline.
+        result_path: File the backend writes its final message to; when set, the
+            result is read from this file instead of stdout.
+        cleanup_paths: Temp files to remove once the invocation completes.
+    """
+
+    argv: list[str]
+    stdin: str | None = None
+    result_path: str | None = None
+    cleanup_paths: tuple[str, ...] = ()
+
+
 class LlmBackend(ABC):
     """Abstract interface for an LLM CLI backend.
 
@@ -147,13 +165,12 @@ class LlmBackend(ABC):
         """
         return json.dumps(model.model_json_schema())
 
-    def invocation(
-        self, prompt: str, *, model: str, schema_path: str | None, agent: bool
-    ) -> tuple[list[str], str | None]:
-        """Build the argv and stdin text for a single invocation.
+    def invocation(self, prompt: str, *, model: str, schema_path: str | None, agent: bool) -> Invocation:
+        """Build the argv, stdin, and result source for a single invocation.
 
-        The default delivers the prompt over stdin; subclasses override to
-        deliver it inline within the argv.
+        The default delivers the prompt over stdin and reads the result from
+        stdout; subclasses override to deliver the prompt inline or to read the
+        result from a file.
 
         Args:
             prompt: The prompt text to deliver to the CLI.
@@ -162,6 +179,6 @@ class LlmBackend(ABC):
             agent: Whether the invocation may use tools / agent capabilities.
 
         Returns:
-            A `(argv, stdin_text)` pair; `stdin_text` is `None` when the prompt is delivered inline.
+            An `Invocation` carrying the argv, stdin text, and result source.
         """
-        return self.build_command(model, schema_path, agent), prompt
+        return Invocation(self.build_command(model, schema_path, agent), prompt)
