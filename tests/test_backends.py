@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import json
 import subprocess
 
 import pytest
 from pydantic import BaseModel
 
-from spawnllm import ClaudeCliBackend, CodexCliBackend, LlmBackends
+from spawnllm import AntigravityCliBackend, ClaudeCliBackend, CodexCliBackend, GeminiCliBackend, LlmBackends
+
+
+class M(BaseModel):
+    x: int
 
 
 class TestClaudeArgv:
@@ -141,3 +146,69 @@ class TestRegistry:
     )
     def test_for_specialty(self, specialty: str, backend_cls: type) -> None:
         assert isinstance(LlmBackends.for_specialty(specialty), backend_cls)
+
+
+class TestGeminiBackend:
+    @pytest.mark.parametrize(
+        "agent, expected",
+        [
+            (
+                False,
+                ["gemini", "--model", "gemini-2.5-flash", "-o", "json", "--approval-mode", "default", "-e", "none"],
+            ),
+            (True, ["gemini", "--model", "gemini-2.5-flash", "-o", "json", "--approval-mode", "yolo"]),
+        ],
+        ids=["non-agent-default-disables-extensions", "agent-yolo-keeps-extensions"],
+    )
+    def test_build_command(self, agent: bool, expected: list[str]) -> None:
+        assert GeminiCliBackend().build_command("gemini-2.5-flash", None, agent=agent) == expected
+
+    def test_invocation_inline_prompt_empty_stdin(self) -> None:
+        backend = GeminiCliBackend()
+        argv, stdin = backend.invocation("hi", model="gemini-2.5-flash", schema_path=None, agent=False)
+        assert argv == backend.build_command("gemini-2.5-flash", None, agent=False) + ["-p", "hi"]
+        assert stdin == ""
+
+    def test_invocation_injects_schema_into_prompt(self) -> None:
+        backend = GeminiCliBackend()
+        argv, stdin = backend.invocation("hi", model="gemini-2.5-flash", schema_path='{"type":"object"}', agent=False)
+        assert argv[-2] == "-p"
+        assert "hi" in argv[-1]
+        assert '{"type":"object"}' in argv[-1]
+        assert stdin == ""
+
+    def test_parse_response_extracts_envelope_text(self) -> None:
+        raw = json.dumps({"response": "hello", "stats": {"models": {"gemini-2.5-flash": {"api": {"totalErrors": 0}}}}})
+        assert GeminiCliBackend().parse_response(raw, None) == "hello"
+
+    def test_parse_response_raises_on_error_envelope(self) -> None:
+        raw = json.dumps({"response": "", "stats": {"models": {"gemini-2.5-flash": {"api": {"totalErrors": 1}}}}})
+        with pytest.raises(RuntimeError):
+            GeminiCliBackend().parse_response(raw, None)
+
+    def test_parse_response_validates_structured_from_envelope(self) -> None:
+        raw = json.dumps({"response": '```json\n{"x": 1}\n```', "stats": {"models": {"g": {"api": {"totalErrors": 0}}}}})
+        assert GeminiCliBackend().parse_response(raw, M) == M(x=1)
+
+
+class TestAntigravityBackend:
+    def test_build_command_agent_skips_permissions_with_timeout(self) -> None:
+        argv = AntigravityCliBackend().build_command("gemini-3.5", None, agent=True)
+        assert "--dangerously-skip-permissions" in argv
+        assert "--print-timeout" in argv
+        assert "--output-format" not in argv
+        assert "-o" not in argv
+
+    def test_build_command_non_agent_omits_skip_permissions(self) -> None:
+        assert "--dangerously-skip-permissions" not in AntigravityCliBackend().build_command(
+            "gemini-3.5", None, agent=False
+        )
+
+    def test_extract_text_strips_whitespace(self) -> None:
+        assert AntigravityCliBackend().extract_text("  ok  \n") == "ok"
+
+    def test_parse_response_passthrough(self) -> None:
+        assert AntigravityCliBackend().parse_response("ok", None) == "ok"
+
+    def test_parse_response_validates_structured(self) -> None:
+        assert AntigravityCliBackend().parse_response('```json\n{"x": 2}\n```', M) == M(x=2)

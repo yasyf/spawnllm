@@ -1,6 +1,6 @@
 [project]
 name = "spawnllm"
-version = "0.1.3"
+version = "0.2.0"
 description = "Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools."
 readme = "README.md"
 license = "MIT"

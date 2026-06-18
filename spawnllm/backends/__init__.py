@@ -1,27 +1,31 @@
-"""LLM CLI backends (Claude/Codex) and the specialty registry."""
+"""LLM CLI backends (Claude/Codex/Gemini family) and the specialty registry."""
 
 from __future__ import annotations
 
-from spawnllm.backends.base import LlmBackend
-from spawnllm.backends.claude import (
-    ClaudeCliBackend,
-    ClaudeNotAuthenticated,
-    ClaudeNotInstalled,
-    ClaudeReady,
-    ClaudeStatus,
-    check_status,
+from spawnllm.backends.base import (
+    BackendNotAuthenticated,
+    BackendNotInstalled,
+    BackendReady,
+    BackendStatus,
+    BackendUnavailable,
+    LlmBackend,
 )
+from spawnllm.backends.claude import ClaudeCliBackend
 from spawnllm.backends.codex import CodexCliBackend
-from spawnllm.backends.registry import LlmBackends
+from spawnllm.backends.gemini import AntigravityCliBackend, GeminiCliBackend
+from spawnllm.backends.registry import LlmBackends, select_backend
 
 __all__ = [
+    "AntigravityCliBackend",
+    "BackendNotAuthenticated",
+    "BackendNotInstalled",
+    "BackendReady",
+    "BackendStatus",
+    "BackendUnavailable",
     "ClaudeCliBackend",
-    "ClaudeNotAuthenticated",
-    "ClaudeNotInstalled",
-    "ClaudeReady",
-    "ClaudeStatus",
     "CodexCliBackend",
+    "GeminiCliBackend",
     "LlmBackend",
     "LlmBackends",
-    "check_status",
+    "select_backend",
 ]

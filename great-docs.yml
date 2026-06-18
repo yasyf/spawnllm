@@ -61,17 +61,20 @@ reference:
       - parse_structured_output
       - parse_result_envelope
   - title: Backends
-    desc: CLI backends, the specialty registry, and Claude status checks.
+    desc: CLI backends (Claude, Codex, and the Gemini family), the specialty registry, backend selection, and install/auth status checks.
     contents:
       - LlmBackend
       - ClaudeCliBackend
       - CodexCliBackend
+      - GeminiCliBackend
+      - AntigravityCliBackend
       - LlmBackends
-      - check_status
-      - ClaudeStatus
-      - ClaudeReady
-      - ClaudeNotInstalled
-      - ClaudeNotAuthenticated
+      - select_backend
+      - BackendStatus
+      - BackendReady
+      - BackendNotInstalled
+      - BackendNotAuthenticated
+      - BackendUnavailable
   - title: Transport
     desc: Subprocess plumbing shared by the CLI backends.
     contents:

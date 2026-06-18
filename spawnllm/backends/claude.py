@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
@@ -16,51 +15,6 @@ if TYPE_CHECKING:
     from spawnllm.types import TModel
 
 CLAUDE_MODELS: dict[TModel, str] = {"small": "haiku", "medium": "sonnet", "large": "opus"}
-
-
-@dataclass(frozen=True)
-class ClaudeReady:
-    """The `claude` CLI is installed and authenticated."""
-
-
-@dataclass(frozen=True)
-class ClaudeNotInstalled:
-    """The `claude` CLI is not on PATH.
-
-    Attributes:
-        brew_available: Whether the `brew` executable is on PATH to install it with.
-    """
-
-    brew_available: bool
-
-
-@dataclass(frozen=True)
-class ClaudeNotAuthenticated:
-    """The `claude` CLI is installed but not authenticated."""
-
-
-ClaudeStatus = ClaudeReady | ClaudeNotInstalled | ClaudeNotAuthenticated
-"""Result of `check_status`: `ClaudeReady`, `ClaudeNotInstalled`, or `ClaudeNotAuthenticated`."""
-
-
-def check_status(timeout: int = 10) -> ClaudeStatus:
-    """Check whether the `claude` CLI is installed and authenticated.
-
-    Looks for `claude` on PATH, then runs `claude auth status`.
-
-    Args:
-        timeout: Seconds to wait for `claude auth status` before
-            `subprocess.TimeoutExpired` is raised.
-
-    Returns:
-        `ClaudeReady` when authenticated, `ClaudeNotInstalled` when not on PATH, else `ClaudeNotAuthenticated`.
-    """
-    if not shutil.which("claude"):
-        return ClaudeNotInstalled(brew_available=bool(shutil.which("brew")))
-    result = subprocess.run(["claude", "auth", "status"], capture_output=True, text=True, timeout=timeout, check=False)
-    if result.returncode == 0:
-        return ClaudeReady()
-    return ClaudeNotAuthenticated()
 
 
 @dataclass(frozen=True)
@@ -84,6 +38,8 @@ class ClaudeCliBackend(LlmBackend):
     """
 
     models: ClassVar[dict[TModel, str]] = CLAUDE_MODELS
+    binary: ClassVar[str] = "claude"
+    install_hint: ClassVar[str] = "curl -fsSL https://claude.ai/install.sh | bash"
 
     inline_system_prompt: str = ""
     verbose: bool = False
@@ -150,6 +106,22 @@ class ClaudeCliBackend(LlmBackend):
         # CLAUDE_CODE_SIMPLE=1 breaks claude.ai keychain auth ("Not logged in")
         # on current CLIs; --setting-sources ""/--strict-mcp-config already trim startup.
         return {}
+
+    def is_authenticated(self, *, timeout: int) -> bool:
+        """Report whether `claude auth status` exits cleanly, i.e. a claude.ai login is stored.
+
+        Args:
+            timeout: Seconds to wait for `claude auth status`.
+
+        Returns:
+            `True` when the OAuth-aware probe reports a stored claude.ai login.
+        """
+        return (
+            subprocess.run(
+                ["claude", "auth", "status"], capture_output=True, text=True, timeout=timeout, check=False
+            ).returncode
+            == 0
+        )
 
     def build_argv(self, content: str, *, model: str) -> list[str]:
         """Build the inline `-p` argv for the sentiment/pushback scoring path.

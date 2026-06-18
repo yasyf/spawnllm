@@ -6,6 +6,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-18
+
+### Added
+
+- Gemini-family fallback backends for when Claude and Codex are unavailable.
+  `GeminiCliBackend` drives the `gemini` CLI and `AntigravityCliBackend` drives
+  its `agy` successor, both authenticating OAuth-first with no injected API keys.
+  `gemini` reads its credentials from `~/.gemini/oauth_creds.json` while `agy`
+  reads the macOS keychain, and both produce structured output by prompt-injecting
+  the JSON schema since neither CLI exposes a schema flag.
+- `select_backend` returns the first installed and authenticated backend, trying
+  claude, then codex, then agy, then gemini, and accepts an optional specialty to
+  reorder that chain. It raises `BackendUnavailable` when none are ready. `call`
+  now auto-selects a backend when none is passed.
+- `spawnllm status` reports each backend's install and auth state and the
+  selected backend. `gemini` and `antigravity` are now valid `spawnllm call
+  --backend` choices and appear in `spawnllm backends`.
+
+### Changed
+
+- Status checking now spans every backend. `check_status` is a method on each
+  `LlmBackend` and returns the provider-neutral `BackendReady`,
+  `BackendNotInstalled`, or `BackendNotAuthenticated`.
+
+### Removed
+
+- The Claude-specific `ClaudeStatus`, `ClaudeReady`, `ClaudeNotInstalled`, and
+  `ClaudeNotAuthenticated` types and the standalone `check_status` function are
+  gone. Use `BackendStatus` and `backend.check_status` instead. This is a
+  breaking change to the public API.
+
 ## [0.1.3] - 2026-06-10
 
 ### Fixed
@@ -45,7 +76,8 @@ First release, published to PyPI as `spawnllm`.
   generation.
 - Click CLI: `spawnllm backends` and `spawnllm call`.
 
-[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/yasyf/spawnllm/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/yasyf/spawnllm/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/yasyf/spawnllm/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/yasyf/spawnllm/compare/v0.1.0...v0.1.1

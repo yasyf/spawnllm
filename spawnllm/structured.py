@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 from typing import TYPE_CHECKING, Any, cast, overload
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
     from spawnllm.backends.base import LlmBackend
 
 __all__ = [
+    "extract_json_block",
     "extract_structured",
     "parse_result_envelope",
     "parse_structured_output",
@@ -23,10 +25,20 @@ __all__ = [
     "schema_for",
 ]
 
+JSON_FENCE = re.compile(r"```(?:json)?\s*\n?(.*?)\n?```", re.DOTALL)
+
 
 def schema_for(model: type[BaseModel]) -> str:
     """Serialize a Pydantic model's JSON schema, with `additionalProperties` set to false."""
     return json.dumps(model.model_json_schema() | {"additionalProperties": False})
+
+
+def extract_json_block(text: str) -> str:
+    """Extract a JSON object/array from model text, tolerating ```json fences or surrounding prose."""
+    if match := JSON_FENCE.search(text):
+        return match.group(1).strip()
+    start = min((i for i in (text.find("{"), text.find("[")) if i != -1), default=0)
+    return text[start : max(text.rfind("}"), text.rfind("]")) + 1]
 
 
 def resolve_schema_path(backend: LlmBackend, schema: str | None) -> str | None:

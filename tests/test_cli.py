@@ -3,7 +3,25 @@ from __future__ import annotations
 import pytest
 from click.testing import CliRunner
 
+from spawnllm import (
+    AntigravityCliBackend,
+    BackendNotAuthenticated,
+    BackendNotInstalled,
+    BackendReady,
+    ClaudeCliBackend,
+    CodexCliBackend,
+    GeminiCliBackend,
+    LlmBackend,
+)
+from spawnllm.backends.base import BackendStatus
 from spawnllm.cli import main
+
+
+def _patch_statuses(
+    monkeypatch: pytest.MonkeyPatch, statuses: dict[type[LlmBackend], BackendStatus]
+) -> None:
+    for cls, status in statuses.items():
+        monkeypatch.setattr(cls, "check_status", lambda self, *, timeout=10, _s=status: _s)
 
 
 def test_help_exits_cleanly() -> None:
@@ -15,18 +33,75 @@ def test_help_exits_cleanly() -> None:
 def test_backends_lists_available() -> None:
     result = CliRunner().invoke(main, ["backends"])
     assert result.exit_code == 0
-    assert result.output.splitlines() == ["claude", "codex", "mlx"]
+    assert result.output.splitlines() == ["claude", "codex", "antigravity", "gemini", "mlx"]
 
 
-def test_call_dispatches_to_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    ("name", "backend_cls"),
+    [
+        pytest.param("claude", ClaudeCliBackend, id="claude"),
+        pytest.param("gemini", GeminiCliBackend, id="gemini"),
+        pytest.param("antigravity", AntigravityCliBackend, id="antigravity"),
+    ],
+)
+def test_call_dispatches_to_backend(
+    monkeypatch: pytest.MonkeyPatch, name: str, backend_cls: type[LlmBackend]
+) -> None:
     captured: dict[str, object] = {}
 
     def fake_call(prompt: str, *, backend, model, agent):
-        captured.update(prompt=prompt, backend=type(backend).__name__, model=model, agent=agent)
+        captured.update(prompt=prompt, backend=backend, model=model, agent=agent)
         return "RESULT"
 
     monkeypatch.setattr("spawnllm.cli.call_backend", fake_call)
-    result = CliRunner().invoke(main, ["call", "--backend", "claude", "hello"])
+    result = CliRunner().invoke(main, ["call", "--backend", name, "hello"])
     assert result.exit_code == 0
     assert result.output == "RESULT\n"
-    assert captured == {"prompt": "hello", "backend": "ClaudeCliBackend", "model": "small", "agent": False}
+    assert isinstance(captured["backend"], backend_cls)
+    assert captured["prompt"] == "hello"
+    assert captured["model"] == "small"
+    assert captured["agent"] is False
+
+
+def test_status_reports_per_backend_and_selection(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_statuses(
+        monkeypatch,
+        {
+            ClaudeCliBackend: BackendReady("claude"),
+            CodexCliBackend: BackendNotInstalled(
+                binary="codex", install_hint="npm install -g @openai/codex"
+            ),
+            AntigravityCliBackend: BackendNotAuthenticated("agy"),
+            GeminiCliBackend: BackendNotAuthenticated("gemini"),
+        },
+    )
+    result = CliRunner().invoke(main, ["status"])
+    assert result.exit_code == 0
+    assert result.output.splitlines() == [
+        "claude: ready",
+        "codex: not installed — install with: npm install -g @openai/codex",
+        "agy: not authenticated",
+        "gemini: not authenticated",
+        "selected: claude",
+    ]
+
+
+def test_status_reports_none_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_statuses(
+        monkeypatch,
+        {
+            ClaudeCliBackend: BackendNotAuthenticated("claude"),
+            CodexCliBackend: BackendNotAuthenticated("codex"),
+            AntigravityCliBackend: BackendNotAuthenticated("agy"),
+            GeminiCliBackend: BackendNotAuthenticated("gemini"),
+        },
+    )
+    result = CliRunner().invoke(main, ["status"])
+    assert result.exit_code == 0
+    assert result.output.splitlines() == [
+        "claude: not authenticated",
+        "codex: not authenticated",
+        "agy: not authenticated",
+        "gemini: not authenticated",
+        "selected: none available",
+    ]

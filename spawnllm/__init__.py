@@ -8,15 +8,18 @@ imports are lazy so that `import spawnllm` never pulls `mlx_lm`/`zstandard`.
 from __future__ import annotations
 
 from spawnllm.backends import (
+    AntigravityCliBackend,
+    BackendNotAuthenticated,
+    BackendNotInstalled,
+    BackendReady,
+    BackendStatus,
+    BackendUnavailable,
     ClaudeCliBackend,
-    ClaudeNotAuthenticated,
-    ClaudeNotInstalled,
-    ClaudeReady,
-    ClaudeStatus,
     CodexCliBackend,
+    GeminiCliBackend,
     LlmBackend,
     LlmBackends,
-    check_status,
+    select_backend,
 )
 from spawnllm.call import call
 from spawnllm.proc import arun_cli, collect_process, map_concurrent, run_cli
@@ -30,19 +33,21 @@ from spawnllm.structured import (
 from spawnllm.types import TModel, TSpecialty
 
 __all__ = [
+    "AntigravityCliBackend",
+    "BackendNotAuthenticated",
+    "BackendNotInstalled",
+    "BackendReady",
+    "BackendStatus",
+    "BackendUnavailable",
     "ClaudeCliBackend",
-    "ClaudeNotAuthenticated",
-    "ClaudeNotInstalled",
-    "ClaudeReady",
-    "ClaudeStatus",
     "CodexCliBackend",
+    "GeminiCliBackend",
     "LlmBackend",
     "LlmBackends",
     "TModel",
     "TSpecialty",
     "arun_cli",
     "call",
-    "check_status",
     "collect_process",
     "extract_structured",
     "map_concurrent",
@@ -51,4 +56,5 @@ __all__ = [
     "resolve_schema_path",
     "run_cli",
     "schema_for",
+    "select_backend",
 ]

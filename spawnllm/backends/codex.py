@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from typing import TYPE_CHECKING, ClassVar
 
 from spawnllm.backends.base import LlmBackend
@@ -26,6 +27,8 @@ class CodexCliBackend(LlmBackend):
         "medium": "gpt-5.4-mini",
         "large": "gpt-5.5",
     }
+    binary: ClassVar[str] = "codex"
+    install_hint: ClassVar[str] = "npm install -g @openai/codex"
 
     def build_command(self, model: str, schema_path: str | None, agent: bool) -> list[str]:
         """Build the `codex exec` argv for one stdin-prompted invocation.
@@ -70,3 +73,19 @@ class CodexCliBackend(LlmBackend):
     def env(self) -> dict[str, str]:
         """Return no extra environment variables; the `codex` CLI runs with the inherited environment."""
         return {}
+
+    def is_authenticated(self, *, timeout: int) -> bool:
+        """Report whether `codex login status` exits cleanly, i.e. the CLI is logged in.
+
+        Args:
+            timeout: Seconds to wait for `codex login status`.
+
+        Returns:
+            `True` when `codex login status` exits 0.
+        """
+        return (
+            subprocess.run(
+                ["codex", "login", "status"], capture_output=True, text=True, timeout=timeout, check=False
+            ).returncode
+            == 0
+        )
