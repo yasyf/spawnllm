@@ -6,6 +6,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-19
+
+### Added
+
+- `call` accepts `cwd` and `timeout`, forwarding both to the spawned CLI so
+  callers can run the backend in a chosen working directory and bound its
+  runtime. `timeout` keeps the previous fixed value of 180 seconds as its default.
+
+## [0.3.0] - 2026-06-18
+
+### Changed
+
+- `schema_for` is now a method on `LlmBackend`, so each backend emits the strict
+  JSON schema its CLI expects. The Claude backend applies the Anthropic SDK's
+  `transform_schema` and the Codex backend the OpenAI SDK's
+  `to_strict_json_schema`. `openai` and `anthropic` join the runtime dependencies.
+- Backends build their invocation through `backend.invocation`, a new
+  `Invocation` seam carrying argv, stdin, an optional result file, and any temp
+  files to clean up. The Codex backend now reads its final message from a `-o`
+  file instead of its interactive stdout log.
+
+### Removed
+
+- The top-level `schema_for` function is gone; call `backend.schema_for(model)`
+  instead. This is a breaking change to the public API.
+
 ## [0.2.0] - 2026-06-18
 
 ### Added
@@ -76,7 +102,9 @@ First release, published to PyPI as `spawnllm`.
   generation.
 - Click CLI: `spawnllm backends` and `spawnllm call`.
 
-[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/yasyf/spawnllm/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/yasyf/spawnllm/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yasyf/spawnllm/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/yasyf/spawnllm/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/yasyf/spawnllm/compare/v0.1.1...v0.1.2

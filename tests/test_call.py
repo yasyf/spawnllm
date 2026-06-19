@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from spawnllm import CodexCliBackend, call
+from spawnllm import ClaudeCliBackend, CodexCliBackend, call
 
 if TYPE_CHECKING:
     import pytest
@@ -48,3 +48,17 @@ def test_codex_structured_call_reads_file_and_cleans_schema_and_result(monkeypat
     assert call("hi", backend=CodexCliBackend(), response_model=M) == M(x=7)
     assert not Path(captured["schema"]).exists()
     assert not Path(captured["result"]).exists()
+
+
+def test_call_threads_cwd_and_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run_cli(argv: list[str], **kwargs: object) -> str:
+        captured.update(kwargs)
+        return "ok"
+
+    monkeypatch.setattr(CALL_MODULE, "run_cli", fake_run_cli)
+
+    assert call("hi", backend=ClaudeCliBackend(), cwd="/tmp/work", timeout=42) == "ok"
+    assert captured["cwd"] == "/tmp/work"
+    assert captured["timeout"] == 42

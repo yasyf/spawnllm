@@ -25,6 +25,8 @@ def call(
     model: TModel = "small",
     agent: bool = False,
     response_model: type[BaseModel] | None = None,
+    cwd: str | None = None,
+    timeout: int = 180,
 ) -> str | BaseModel:
     """Run one CLI-backed LLM call and parse its response.
 
@@ -37,6 +39,8 @@ def call(
         model: Abstract model tier (`small`/`medium`/`large`).
         agent: Whether the call may use tools / agent capabilities.
         response_model: Pydantic model for structured output, or `None` for text.
+        cwd: Working directory for the CLI process; `None` inherits the caller's.
+        timeout: Seconds to wait before the CLI process is killed.
 
     Returns:
         The raw text response, or a validated `response_model` instance.
@@ -46,7 +50,7 @@ def call(
     schema_path = resolve_schema_path(backend, schema)
     inv = backend.invocation(prompt, model=backend.models[model], schema_path=schema_path, agent=agent)
     try:
-        stdout = run_cli(inv.argv, input=inv.stdin, env=os.environ | backend.env(), timeout=180)
+        stdout = run_cli(inv.argv, input=inv.stdin, env=os.environ | backend.env(), timeout=timeout, cwd=cwd)
         raw = Path(inv.result_path).read_text() if inv.result_path else stdout
         return backend.parse_response(raw, response_model)
     finally:
