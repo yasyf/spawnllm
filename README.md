@@ -17,24 +17,13 @@ domain logic instead of its own copy of the backends.
 
 ## Install
 
-No install needed — run everything through [uvx](https://docs.astral.sh/uv/):
+Run the CLI with [uvx](https://docs.astral.sh/uv/), or `uv add spawnllm` to depend on it as a library:
 
 ```bash
 uvx spawnllm --help
 ```
 
-`uvx` fetches spawnllm into a throwaway environment and runs it. To add it
-to a project instead:
-
-```bash
-uv add spawnllm
-```
-
-For the local MLX engine (Apple Silicon only), pull the extra:
-
-```bash
-uv add "spawnllm[mlx]"
-```
+For the local MLX engine (Apple Silicon only), pull the extra: `uv add "spawnllm[mlx]"`.
 
 ## Quickstart
 
@@ -60,9 +49,9 @@ uvx spawnllm call --backend claude "What is 2+2? Reply with just the number."
 4
 ```
 
-`--model small|medium|large` swaps the tier, which each backend maps to a concrete model.
-The `claude` backend resolves `small` to Haiku, `medium` to Sonnet, and `large` to Opus. Add
-`--agent` to let the call use tools.
+`--model small|medium|large` swaps the tier, which each backend maps to a concrete model — the
+`claude` backend resolves `small` to Haiku, `medium` to Sonnet, and `large` to Opus. Add
+`--agent` to let the call use tools. Run `uvx spawnllm --help` for the full flag list.
 
 ### From Python
 
@@ -124,21 +113,14 @@ result = run_sync(
 print(result.stdout)  # 4
 ```
 
-## What problems does this solve?
+## How it works
 
-Every tool that shells out to `claude` or `codex` rebuilds the same plumbing: argv
-construction, stdin/stdout piping, stderr teeing, and turning non-zero exits into useful
-errors. spawnllm holds it once.
-
-Structured output is boilerplate too. A Pydantic model becomes a JSON-schema constraint
-and a parsed, validated result, identically for both CLI backends.
-
-Local MLX is fiddly. Adapter fusion, prompt-cache reuse, worker-thread lifecycle, and
-batched single-token generation live behind one engine instead of in every consumer.
-
-Behavior drift goes away with the duplication: two tools that call the same models stay
-byte-for-byte consistent because they share the backend layer, not a pair of diverging
-copies.
+Each backend holds plumbing that consumers would otherwise rebuild: the CLI backends own argv
+construction, stdin/stdout piping, stderr teeing, and turning non-zero exits into useful errors,
+and they turn a Pydantic model into a JSON-schema constraint plus a parsed, validated result. The
+MLX engine wraps adapter fusion, prompt-cache reuse, worker-thread lifecycle, and batched
+single-token generation. Tools that share the layer stay byte-for-byte consistent instead of
+drifting across diverging copies.
 
 ## Docs
 
