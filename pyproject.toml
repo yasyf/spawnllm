@@ -1,6 +1,7 @@
 [project]
 name = "spawnllm"
-version = "0.4.0"
+# Inert sentinel: the real version is set from the release tag (uv version --frozen).
+version = "0.0.0"
 description = "Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools."
 readme = "README.md"
 license = "MIT"
