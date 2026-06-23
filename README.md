@@ -17,7 +17,7 @@ domain logic instead of its own copy of the backends.
 
 ## Install
 
-Run the CLI with [uvx](https://docs.astral.sh/uv/), or `uv add spawnllm` to depend on it as a library:
+Run the CLI with [uvx](https://docs.astral.sh/uv/):
 
 ```bash
 uvx spawnllm --help
