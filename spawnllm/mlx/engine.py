@@ -130,7 +130,7 @@ class MlxEngine:
         )
         return await fut
 
-    def _generate_chunk(self, chunk: list[list[dict[str, str]]]) -> list[str]:
+    def _generate_chunk(self, chunk: list[list[dict[str, str]]], max_tokens: int) -> list[str]:
         from mlx_lm import batch_generate
 
         suffixes = [
@@ -143,7 +143,7 @@ class MlxEngine:
             self.model,
             self.tokenizer,
             suffixes,
-            max_tokens=1,
+            max_tokens=max_tokens,
             logits_processors=[self.logit_processor],
             prompt_caches=[copy.deepcopy(self.base_cache) for _ in suffixes],
         ).texts
@@ -152,8 +152,10 @@ class MlxEngine:
         self,
         message_lists: list[list[dict[str, str]]],
         on_progress: Callable[[int], None],
+        *,
+        max_tokens: int = 1,
     ) -> list[str]:
-        """Generate one single-token completion per conversation.
+        """Generate a completion per conversation, defaulting to a single token.
 
         Conversations are processed in chunks of `batch_size`, ordered by the
         length of each conversation's final message so similar-length prompts
@@ -166,6 +168,8 @@ class MlxEngine:
                 `role` and `content` keys.
             on_progress: Called after each chunk with the number of
                 conversations completed in that chunk.
+            max_tokens: Maximum tokens generated per conversation; the default
+                of `1` yields single-token classification output.
 
         Returns:
             Generated texts, in the same order as `message_lists`.
@@ -175,7 +179,7 @@ class MlxEngine:
         for start in range(0, len(order), self._batch_size):
             slice_ = order[start : start + self._batch_size]
             chunk = [message_lists[i] for i in slice_]
-            chunk_responses = await self.submit(self._generate_chunk, chunk)
+            chunk_responses = await self.submit(self._generate_chunk, chunk, max_tokens)
             for i, r in zip(slice_, chunk_responses, strict=True):
                 responses[i] = r
             on_progress(len(chunk))

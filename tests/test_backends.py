@@ -1,13 +1,22 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
 
-from spawnllm import AntigravityCliBackend, ClaudeCliBackend, CodexCliBackend, GeminiCliBackend, LlmBackends
+from spawnllm import (
+    AntigravityCliBackend,
+    ClaudeCliBackend,
+    ClaudeConfig,
+    CodexCliBackend,
+    CodexConfig,
+    GeminiCliBackend,
+    GeminiConfig,
+    LlmBackends,
+    RunSpec,
+)
 
 
 class M(BaseModel):
@@ -15,8 +24,8 @@ class M(BaseModel):
 
 
 class TestClaudeArgv:
-    def test_non_agent_no_schema(self) -> None:
-        assert ClaudeCliBackend().build_command("haiku", None, agent=False) == [
+    def test_lockdown_non_agent(self) -> None:
+        assert ClaudeCliBackend().build_command(RunSpec(prompt="hi", model="haiku")) == [
             "claude",
             "-p",
             "--no-session-persistence",
@@ -30,7 +39,9 @@ class TestClaudeArgv:
         ]
 
     def test_agent_with_schema(self) -> None:
-        assert ClaudeCliBackend().build_command("opus", '{"a":1}', agent=True) == [
+        assert ClaudeCliBackend().build_command(
+            RunSpec(prompt="hi", model="opus", schema='{"a":1}', agent=True)
+        ) == [
             "claude",
             "-p",
             "--no-session-persistence",
@@ -46,55 +57,97 @@ class TestClaudeArgv:
             "json",
         ]
 
-    def test_models_and_env(self) -> None:
-        backend = ClaudeCliBackend()
-        assert backend.models == {"small": "haiku", "medium": "sonnet", "large": "opus"}
-        assert backend.env() == {}  # CLAUDE_CODE_SIMPLE breaks claude.ai keychain auth
-
-    def test_parse_response_passthrough_without_model(self) -> None:
-        assert ClaudeCliBackend().parse_response("raw text", None) == "raw text"
-
-
-class TestClaudeInlinePreset:
-    def test_inline_argv_no_verbose(self) -> None:
-        backend = ClaudeCliBackend.cc_sentiment(system_prompt="SP")
-        assert backend.build_argv("hi", model="claude-haiku-4-5") == [
+    def test_full_config_agent_passthrough(self) -> None:
+        spec = RunSpec(
+            prompt="ping",
+            model="opus",
+            provider_configs={
+                "claude": ClaudeConfig(
+                    permission_mode="bypassPermissions",
+                    mcp_config="{mcp}",
+                    strict_mcp=True,
+                    disallowed_tools=("Bash", "Write"),
+                    append_system_prompt="extra",
+                    settings="{settings}",
+                )
+            },
+        )
+        assert ClaudeCliBackend().build_command(spec) == [
             "claude",
             "-p",
-            "hi",
+            "--no-session-persistence",
             "--model",
-            "claude-haiku-4-5",
+            "opus",
+            "--permission-mode",
+            "bypassPermissions",
+            "--mcp-config",
+            "{mcp}",
+            "--strict-mcp-config",
+            "--disallowedTools",
+            "Bash",
+            "Write",
+            "--append-system-prompt",
+            "extra",
+            "--settings",
+            "{settings}",
+        ]
+
+    def test_folded_sentiment_shape(self) -> None:
+        spec = RunSpec(
+            prompt="hi",
+            model="haiku",
+            provider_configs={
+                "claude": ClaudeConfig(
+                    system_prompt="SP",
+                    max_turns=1,
+                    tools="",
+                    disable_slash_commands=True,
+                    output_format="json",
+                )
+            },
+        )
+        assert ClaudeCliBackend().build_command(spec) == [
+            "claude",
+            "-p",
+            "--no-session-persistence",
+            "--model",
+            "haiku",
             "--system-prompt",
             "SP",
-            "--output-format",
-            "json",
             "--max-turns",
             "1",
             "--tools",
             "",
             "--disable-slash-commands",
+            "--output-format",
+            "json",
         ]
 
-    def test_inline_argv_verbose_appends_flag(self) -> None:
-        backend = ClaudeCliBackend.cc_sentiment(system_prompt="SP", verbose=True)
-        assert backend.build_argv("hi", model="m")[-1] == "--verbose"
+    def test_folded_sentiment_verbose_appends_flag(self) -> None:
+        spec = RunSpec(
+            prompt="hi",
+            model="haiku",
+            provider_configs={"claude": ClaudeConfig(system_prompt="SP", verbose=True)},
+        )
+        assert ClaudeCliBackend().build_command(spec)[-1] == "--verbose"
 
-    def test_parse_result_envelope_returns_result(self) -> None:
-        out = ClaudeCliBackend.parse_result_envelope(b'{"is_error": false, "result": "4"}', argv=["claude"], stderr=b"")
-        assert out == "4"
+    def test_models_and_env(self) -> None:
+        backend = ClaudeCliBackend()
+        assert backend.models == {"small": "haiku", "medium": "sonnet", "large": "opus"}
+        assert backend.env() == {}  # CLAUDE_CODE_SIMPLE breaks claude.ai keychain auth
 
-    def test_parse_result_envelope_raises_on_is_error(self) -> None:
-        raw = b'{"is_error": true, "result": "rate limit"}'
-        with pytest.raises(subprocess.CalledProcessError) as exc:
-            ClaudeCliBackend.parse_result_envelope(raw, argv=["claude"], stderr=b"e")
-        assert exc.value.returncode == 0
-        assert exc.value.output == raw
-        assert exc.value.stderr == b"e"
+    def test_invocation_delivers_prompt_over_stdin(self) -> None:
+        inv = ClaudeCliBackend().invocation(RunSpec(prompt="hi", model="haiku"))
+        assert inv.stdin == "hi"
+        assert inv.result_path is None
+
+    def test_parse_response_passthrough_without_model(self) -> None:
+        assert ClaudeCliBackend().parse_response("raw text", None) == "raw text"
 
 
 class TestCodexArgv:
     def test_non_agent_no_schema(self) -> None:
-        assert CodexCliBackend().build_command("gpt-5.5", None, agent=False) == [
+        assert CodexCliBackend().build_command(RunSpec(prompt="hi", model="gpt-5.5")) == [
             "codex",
             "exec",
             "--ephemeral",
@@ -108,8 +161,8 @@ class TestCodexArgv:
             "features.mcp_servers=false",
         ]
 
-    def test_agent_with_schema(self) -> None:
-        assert CodexCliBackend().build_command("gpt-5.4-mini", "/tmp/s.json", agent=True) == [
+    def test_agent_omits_feature_toggles(self) -> None:
+        assert CodexCliBackend().build_command(RunSpec(prompt="hi", model="gpt-5.4-mini", agent=True)) == [
             "codex",
             "exec",
             "--ephemeral",
@@ -117,8 +170,22 @@ class TestCodexArgv:
             "read-only",
             "--model",
             "gpt-5.4-mini",
-            "--output-schema",
-            "/tmp/s.json",
+        ]
+
+    def test_config_overrides_sandbox_and_reenables_features(self) -> None:
+        spec = RunSpec(
+            prompt="hi",
+            model="gpt-5.5",
+            provider_configs={"codex": CodexConfig(sandbox="workspace-write", enable_hooks=True, enable_mcp=True)},
+        )
+        assert CodexCliBackend().build_command(spec) == [
+            "codex",
+            "exec",
+            "--ephemeral",
+            "--sandbox",
+            "workspace-write",
+            "--model",
+            "gpt-5.5",
         ]
 
     def test_models(self) -> None:
@@ -139,16 +206,18 @@ class TestCodexArgv:
         assert result.reason == "bad"
 
     def test_invocation_adds_output_file_with_schema(self) -> None:
-        inv = CodexCliBackend().invocation("hi", model="gpt-5.5", schema_path="/tmp/s.json", agent=False)
+        inv = CodexCliBackend().invocation(RunSpec(prompt="hi", model="gpt-5.5", schema='{"type":"object"}'))
         assert inv.argv[-2:] == ["-o", inv.result_path]
         assert "--output-schema" in inv.argv
         assert inv.stdin == "hi"
-        assert inv.cleanup_paths == (inv.result_path, "/tmp/s.json")
+        schema_path = inv.argv[inv.argv.index("--output-schema") + 1]
+        assert inv.cleanup_paths == (inv.result_path, schema_path)
         assert Path(inv.result_path).exists()
-        Path(inv.result_path).unlink()
+        for path in inv.cleanup_paths:
+            Path(path).unlink()
 
     def test_invocation_no_schema_cleans_only_output_file(self) -> None:
-        inv = CodexCliBackend().invocation("hi", model="gpt-5.5", schema_path=None, agent=False)
+        inv = CodexCliBackend().invocation(RunSpec(prompt="hi", model="gpt-5.5"))
         assert "--output-schema" not in inv.argv
         assert inv.cleanup_paths == (inv.result_path,)
         Path(inv.result_path).unlink()
@@ -177,18 +246,40 @@ class TestGeminiBackend:
         ids=["non-agent-default-disables-extensions", "agent-yolo-keeps-extensions"],
     )
     def test_build_command(self, agent: bool, expected: list[str]) -> None:
-        assert GeminiCliBackend().build_command("gemini-2.5-flash", None, agent=agent) == expected
+        assert GeminiCliBackend().build_command(RunSpec(prompt="hi", model="gemini-2.5-flash", agent=agent)) == expected
+
+    def test_build_command_config_overrides_approval_and_extensions(self) -> None:
+        spec = RunSpec(
+            prompt="hi",
+            model="gemini-2.5-flash",
+            provider_configs={"gemini": GeminiConfig(approval_mode="auto", extensions=("search", "fs"))},
+        )
+        assert GeminiCliBackend().build_command(spec) == [
+            "gemini",
+            "--model",
+            "gemini-2.5-flash",
+            "-o",
+            "json",
+            "--approval-mode",
+            "auto",
+            "-e",
+            "search",
+            "-e",
+            "fs",
+        ]
 
     def test_invocation_inline_prompt_empty_stdin(self) -> None:
         backend = GeminiCliBackend()
-        inv = backend.invocation("hi", model="gemini-2.5-flash", schema_path=None, agent=False)
-        assert inv.argv == backend.build_command("gemini-2.5-flash", None, agent=False) + ["-p", "hi"]
+        spec = RunSpec(prompt="hi", model="gemini-2.5-flash")
+        inv = backend.invocation(spec)
+        assert inv.argv == backend.build_command(spec) + ["-p", "hi"]
         assert inv.stdin == ""
         assert inv.result_path is None
 
     def test_invocation_injects_schema_into_prompt(self) -> None:
-        backend = GeminiCliBackend()
-        inv = backend.invocation("hi", model="gemini-2.5-flash", schema_path='{"type":"object"}', agent=False)
+        inv = GeminiCliBackend().invocation(
+            RunSpec(prompt="hi", model="gemini-2.5-flash", schema='{"type":"object"}')
+        )
         assert inv.argv[-2] == "-p"
         assert "hi" in inv.argv[-1]
         assert '{"type":"object"}' in inv.argv[-1]
@@ -204,22 +295,20 @@ class TestGeminiBackend:
             GeminiCliBackend().parse_response(raw, None)
 
     def test_parse_response_validates_structured_from_envelope(self) -> None:
-        raw = json.dumps({"response": '```json\n{"x": 1}\n```', "stats": {"models": {"g": {"api": {"totalErrors": 0}}}}})
+        stats = {"models": {"g": {"api": {"totalErrors": 0}}}}
+        raw = json.dumps({"response": '```json\n{"x": 1}\n```', "stats": stats})
         assert GeminiCliBackend().parse_response(raw, M) == M(x=1)
 
 
 class TestAntigravityBackend:
     def test_build_command_agent_skips_permissions_with_timeout(self) -> None:
-        argv = AntigravityCliBackend().build_command("gemini-3.5", None, agent=True)
-        assert "--dangerously-skip-permissions" in argv
-        assert "--print-timeout" in argv
-        assert "--output-format" not in argv
-        assert "-o" not in argv
+        argv = AntigravityCliBackend().build_command(RunSpec(prompt="hi", model="gemini-3.5", agent=True))
+        assert argv == ["agy", "--model", "gemini-3.5", "--dangerously-skip-permissions", "--print-timeout", "120s"]
 
     def test_build_command_non_agent_omits_skip_permissions(self) -> None:
-        assert "--dangerously-skip-permissions" not in AntigravityCliBackend().build_command(
-            "gemini-3.5", None, agent=False
-        )
+        argv = AntigravityCliBackend().build_command(RunSpec(prompt="hi", model="gemini-3.5"))
+        assert argv == ["agy", "--model", "gemini-3.5", "--print-timeout", "120s"]
+        assert "--dangerously-skip-permissions" not in argv
 
     def test_extract_text_strips_whitespace(self) -> None:
         assert AntigravityCliBackend().extract_text("  ok  \n") == "ok"

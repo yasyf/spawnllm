@@ -1,93 +1,104 @@
-"""LlmBackend for the Anthropic `claude` CLI, plus install/auth status checks."""
+"""CliBackend for the Anthropic `claude` CLI, plus install/auth status checks."""
 
 from __future__ import annotations
 
 import json
 import subprocess
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
-from spawnllm.backends.base import LlmBackend
-from spawnllm.structured import parse_result_envelope, parse_structured_output
+from spawnllm.backends.base import CliBackend
+from spawnllm.spec import ClaudeConfig
+from spawnllm.structured import parse_structured_output
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-    from spawnllm.types import TModel
+    from spawnllm.spec import RunSpec
+    from spawnllm.types import ProviderName, TModel
 
 CLAUDE_MODELS: dict[TModel, str] = {"small": "haiku", "medium": "sonnet", "large": "opus"}
 
 
-@dataclass(frozen=True)
-class ClaudeCliBackend(LlmBackend):
-    """`LlmBackend` for the Anthropic `claude` CLI.
+class ClaudeCliBackend(CliBackend):
+    """`CliBackend` for the Anthropic `claude` CLI.
 
-    The default (no-arg) construction delivers the prompt over stdin with abstract
-    model tiers and structured-output parsing. The `cc_sentiment` preset
-    configures inline `-p` prompting with `{is_error, result}` envelope parsing.
+    `build_command` translates a `RunSpec` into a `claude -p` argv with the prompt
+    delivered over stdin. The permission and system-prompt flags resolve through
+    three mutually exclusive branches: explicit `ClaudeConfig` agent fields, an
+    agent run, or a locked-down default. Orthogonal `ClaudeConfig` extras and the
+    output format are appended after.
 
     Attributes:
         models: Mapping from abstract model size to a Claude model alias
             (`haiku`/`sonnet`/`opus`).
-        inline_system_prompt: System prompt that `build_argv` passes via
-            `--system-prompt`.
-        verbose: Whether `build_argv` appends `--verbose`.
 
     Example:
-        >>> ClaudeCliBackend().build_command("haiku", None, agent=False)[:5]
+        >>> from spawnllm.spec import RunSpec
+        >>> ClaudeCliBackend().build_command(RunSpec(prompt="hi", model="haiku"))[:5]
         ['claude', '-p', '--no-session-persistence', '--model', 'haiku']
     """
 
     models: ClassVar[dict[TModel, str]] = CLAUDE_MODELS
+    provider: ClassVar[ProviderName] = "claude"
     binary: ClassVar[str] = "claude"
     install_hint: ClassVar[str] = "curl -fsSL https://claude.ai/install.sh | bash"
 
-    inline_system_prompt: str = ""
-    verbose: bool = False
-
-    @classmethod
-    def cc_sentiment(cls, *, system_prompt: str, verbose: bool = False) -> ClaudeCliBackend:
-        """Build a backend preset for the sentiment/pushback scoring path.
-
-        Args:
-            system_prompt: System prompt that `build_argv` passes via
-                `--system-prompt`.
-            verbose: Whether `build_argv` appends `--verbose`.
-
-        Returns:
-            A `ClaudeCliBackend` for inline `-p` prompting; parse its stdout with `parse_result_envelope`.
-        """
-        return cls(inline_system_prompt=system_prompt, verbose=verbose)
-
-    def build_command(self, model: str, schema_path: str | None, agent: bool) -> list[str]:
+    def build_command(self, spec: RunSpec) -> list[str]:
         """Build the `claude -p` argv for one stdin-prompted invocation.
 
-        Every invocation runs without session persistence. Agent invocations
-        add `--permission-mode auto` and a $1 `--max-budget-usd` cap;
-        non-agent invocations empty the system prompt, disable setting
-        sources, and load no MCP servers. A schema adds `--json-schema` with
-        `--output-format json`.
-
         Args:
-            model: Claude model name or alias, e.g. `haiku`.
-            schema_path: Inline JSON schema passed to `--json-schema`, or `None`.
-            agent: Whether the invocation may use tools / agent capabilities.
+            spec: The configured run to translate into argv.
 
         Returns:
-            The argv list to execute.
+            The argv list to execute; the prompt is delivered over stdin.
         """
+        cfg = spec.config_for(ClaudeConfig) or ClaudeConfig()
+        explicit = (
+            cfg.permission_mode is not None
+            or cfg.mcp_config is not None
+            or cfg.append_system_prompt is not None
+            or cfg.system_prompt is not None
+            or cfg.settings is not None
+            or bool(cfg.disallowed_tools)
+            or cfg.strict_mcp
+        )
         return [
             "claude",
             "-p",
             "--no-session-persistence",
             "--model",
-            model,
+            spec.model,
             *(
-                ["--permission-mode", "auto", "--max-budget-usd", "1"]
-                if agent
+                [
+                    *(["--permission-mode", cfg.permission_mode] if cfg.permission_mode is not None else []),
+                    *(["--mcp-config", cfg.mcp_config] if cfg.mcp_config is not None else []),
+                    *(["--strict-mcp-config"] if cfg.strict_mcp else []),
+                    *(["--disallowedTools", *cfg.disallowed_tools] if cfg.disallowed_tools else []),
+                    *(
+                        ["--append-system-prompt", cfg.append_system_prompt]
+                        if cfg.append_system_prompt is not None
+                        else []
+                    ),
+                    *(["--settings", cfg.settings] if cfg.settings is not None else []),
+                    *(["--max-budget-usd", str(cfg.max_budget_usd)] if cfg.max_budget_usd is not None else []),
+                ]
+                if explicit
+                else ["--permission-mode", "auto", "--max-budget-usd", "1"]
+                if spec.agent
                 else ["--system-prompt", "", "--setting-sources", "", "--strict-mcp-config"]
             ),
-            *(["--json-schema", schema_path, "--output-format", "json"] if schema_path else []),
+            *(["--system-prompt", cfg.system_prompt] if cfg.system_prompt is not None else []),
+            *(["--max-turns", str(cfg.max_turns)] if cfg.max_turns is not None else []),
+            *(["--tools", cfg.tools] if cfg.tools is not None else []),
+            *(["--disable-slash-commands"] if cfg.disable_slash_commands else []),
+            *(
+                ["--json-schema", spec.schema, "--output-format", "json"]
+                if spec.schema
+                else ["--output-format", cfg.output_format]
+                if cfg.output_format
+                else []
+            ),
+            *(["--verbose"] if cfg.verbose else []),
         ]
 
     def schema_for(self, model: type[BaseModel]) -> str:
@@ -140,55 +151,3 @@ class ClaudeCliBackend(LlmBackend):
             ).returncode
             == 0
         )
-
-    def build_argv(self, content: str, *, model: str) -> list[str]:
-        """Build the inline `-p` argv for the sentiment/pushback scoring path.
-
-        The prompt travels inline as the `-p` argument instead of over stdin.
-        The invocation uses `inline_system_prompt` as the system prompt, JSON
-        output, a single turn, no tools, and no slash commands; `verbose`
-        appends `--verbose`.
-
-        Args:
-            content: Prompt text passed inline via `-p`.
-            model: Claude model name or alias, e.g. `haiku`.
-
-        Returns:
-            The argv list to execute; parse its stdout with `parse_result_envelope`.
-        """
-        argv = [
-            "claude",
-            "-p",
-            content,
-            "--model",
-            model,
-            "--system-prompt",
-            self.inline_system_prompt,
-            "--output-format",
-            "json",
-            "--max-turns",
-            "1",
-            "--tools",
-            "",
-            "--disable-slash-commands",
-        ]
-        if self.verbose:
-            argv.append("--verbose")
-        return argv
-
-    @staticmethod
-    def parse_result_envelope(stdout: bytes, *, argv: list[str], stderr: bytes) -> str:
-        """Parse the `{is_error, result}` JSON envelope from `claude -p --output-format json`.
-
-        Args:
-            stdout: Raw stdout bytes holding the JSON envelope.
-            argv: The argv that produced the output, recorded on the raised error.
-            stderr: Raw stderr bytes, recorded on the raised error.
-
-        Returns:
-            The envelope's `result` string.
-
-        Raises:
-            subprocess.CalledProcessError: If the envelope's `is_error` flag is set.
-        """
-        return parse_result_envelope(stdout, argv=argv, stderr=stderr)

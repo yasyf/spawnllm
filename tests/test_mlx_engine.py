@@ -22,7 +22,7 @@ class TestGenerateSorting:
         ]
         seen_chunks: list[list[str]] = []
 
-        def fake_chunk(self: MlxEngine, chunk: list[list[dict[str, str]]]) -> list[str]:
+        def fake_chunk(self: MlxEngine, chunk: list[list[dict[str, str]]], max_tokens: int) -> list[str]:
             seen_chunks.append([m[-1]["content"] for m in chunk])
             return [str(len(m[-1]["content"])) for m in chunk]
 
@@ -44,7 +44,7 @@ class TestGenerateSorting:
     async def test_preserves_original_order(self) -> None:
         message_lists = [[{"role": "user", "content": "x" * n}] for n in (50, 5, 200, 1, 30)]
 
-        def fake_chunk(self: MlxEngine, chunk: list[list[dict[str, str]]]) -> list[str]:
+        def fake_chunk(self: MlxEngine, chunk: list[list[dict[str, str]]], max_tokens: int) -> list[str]:
             return [str(len(m[-1]["content"])) for m in chunk]
 
         async def fake_submit(self: MlxEngine, fn, *args):
@@ -75,7 +75,7 @@ class TestGenerateChunk:
         engine.base_cache = object()
 
         with patch.dict(sys.modules, {"mlx_lm": mock_mlx_lm}):
-            out = engine._generate_chunk([[{"role": "user", "content": "a"}], [{"role": "user", "content": "b"}]])
+            out = engine._generate_chunk([[{"role": "user", "content": "a"}], [{"role": "user", "content": "b"}]], 1)
 
         assert out == ["3", "4"]
         args, kwargs = mock_mlx_lm.batch_generate.call_args
@@ -111,7 +111,7 @@ class TestThreadAffinity:
             )
             await engine.ensure_loaded()
             for _ in range(3):
-                await engine.submit(engine._generate_chunk, [[{"role": "user", "content": "hi"}]])
+                await engine.submit(engine._generate_chunk, [[{"role": "user", "content": "hi"}]], 1)
 
         assert len(set(observed)) == 1, f"MLX work spread across threads: {observed}"
         assert observed[0] != threading.get_ident()

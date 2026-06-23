@@ -53,7 +53,7 @@ def test_call_dispatches_to_backend(
         captured.update(prompt=prompt, backend=backend, model=model, agent=agent)
         return "RESULT"
 
-    monkeypatch.setattr("spawnllm.cli.call_backend", fake_call)
+    monkeypatch.setattr("spawnllm.cli.call_sync", fake_call)
     result = CliRunner().invoke(main, ["call", "--backend", name, "hello"])
     assert result.exit_code == 0
     assert result.output == "RESULT\n"

@@ -1,4 +1,4 @@
-"""LlmBackend for the OpenAI `codex` CLI."""
+"""CliBackend for the OpenAI `codex` CLI."""
 
 from __future__ import annotations
 
@@ -8,21 +8,31 @@ import subprocess
 import tempfile
 from typing import TYPE_CHECKING, ClassVar
 
-from spawnllm.backends.base import Invocation, LlmBackend
+from spawnllm.backends.base import CliBackend, Invocation
+from spawnllm.spec import CodexConfig
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-    from spawnllm.types import TModel
+    from spawnllm.spec import RunSpec
+    from spawnllm.types import ProviderName, TModel
 
 
-class CodexCliBackend(LlmBackend):
-    """`LlmBackend` for the OpenAI `codex` CLI.
+class CodexCliBackend(CliBackend):
+    """`CliBackend` for the OpenAI `codex` CLI.
 
-    Invokes `codex exec` with an ephemeral session and a read-only sandbox.
+    `build_command` translates a `RunSpec` into a `codex exec` argv that runs an
+    ephemeral session in a read-only sandbox; `invocation` resolves the schema to
+    a temp file and captures the final message to an `-o` file. An optional
+    `CodexConfig` overrides the sandbox and re-enables Codex hooks or MCP servers.
 
     Attributes:
         models: Mapping from abstract model size to an OpenAI model name.
+
+    Example:
+        >>> from spawnllm.spec import RunSpec
+        >>> CodexCliBackend().build_command(RunSpec(prompt="hi", model="gpt-5.5"))[:4]
+        ['codex', 'exec', '--ephemeral', '--sandbox']
     """
 
     models: ClassVar[dict[TModel, str]] = {
@@ -30,58 +40,69 @@ class CodexCliBackend(LlmBackend):
         "medium": "gpt-5.4-mini",
         "large": "gpt-5.5",
     }
+    provider: ClassVar[ProviderName] = "codex"
     binary: ClassVar[str] = "codex"
     install_hint: ClassVar[str] = "npm install -g @openai/codex"
 
-    def build_command(self, model: str, schema_path: str | None, agent: bool) -> list[str]:
+    def build_command(self, spec: RunSpec) -> list[str]:
         """Build the `codex exec` argv for one stdin-prompted invocation.
 
-        Every invocation runs an ephemeral session in a read-only sandbox.
-        Non-agent invocations disable Codex hooks and MCP servers. A schema
-        path adds `--output-schema`.
+        Resolves `spec.schema` to a temp file via `resolve_schema_path` and adds
+        `--output-schema` when present; `invocation` reuses that path and cleans
+        it up after the run.
 
         Args:
-            model: OpenAI model name, e.g. `gpt-5.5`.
-            schema_path: Path to a JSON schema file passed to
-                `--output-schema`, or `None`.
-            agent: Whether the invocation may use tools / agent capabilities.
+            spec: The configured run to translate into argv.
 
         Returns:
-            The argv list to execute.
+            The argv list to execute; the prompt is delivered over stdin.
         """
+        from spawnllm.structured import resolve_schema_path
+
+        return self.command_for(spec, resolve_schema_path(self, spec.schema))
+
+    def command_for(self, spec: RunSpec, schema_path: str | None) -> list[str]:
+        cfg = spec.config_for(CodexConfig) or CodexConfig()
         return [
             "codex",
             "exec",
             "--ephemeral",
             "--sandbox",
-            "read-only",
+            cfg.sandbox or "read-only",
             "--model",
-            model,
-            *([] if agent else ["-c", "features.codex_hooks=false", "-c", "features.mcp_servers=false"]),
+            spec.model,
+            *(
+                []
+                if spec.agent
+                else [
+                    *([] if cfg.enable_hooks else ["-c", "features.codex_hooks=false"]),
+                    *([] if cfg.enable_mcp else ["-c", "features.mcp_servers=false"]),
+                ]
+            ),
             *(["--output-schema", schema_path] if schema_path else []),
         ]
 
-    def invocation(self, prompt: str, *, model: str, schema_path: str | None, agent: bool) -> Invocation:
+    def invocation(self, spec: RunSpec) -> Invocation:
         """Build the `codex exec` invocation, capturing the final message to a file.
 
         `codex exec` streams an interactive log to stdout, so the result is read
-        from the `-o`/`--output-last-message` file instead. The result file and
-        the schema temp file (when present) are removed after the run.
+        from the `-o` file instead. The schema is resolved to a temp file once
+        here; that file and the result file are removed after the run.
 
         Args:
-            prompt: The prompt text, delivered over stdin.
-            model: OpenAI model name, e.g. `gpt-5.5`.
-            schema_path: Path to a JSON schema file passed to `--output-schema`, or `None`.
-            agent: Whether the invocation may use tools / agent capabilities.
+            spec: The configured run to translate into an invocation.
 
         Returns:
             An `Invocation` whose result is read from the `-o` file.
         """
+        from spawnllm.structured import resolve_schema_path
+
+        schema_path = resolve_schema_path(self, spec.schema)
         fd, result_path = tempfile.mkstemp(suffix=".json")
         os.close(fd)
         return Invocation(
-            self.build_command(model, schema_path, agent) + ["-o", result_path],
-            prompt,
+            [*self.command_for(spec, schema_path), "-o", result_path],
+            spec.prompt,
             result_path=result_path,
             cleanup_paths=(result_path, *((schema_path,) if schema_path else ())),
         )
@@ -108,7 +129,7 @@ class CodexCliBackend(LlmBackend):
         """Parse the final message `codex` wrote to its `-o` file into text or a validated model.
 
         Args:
-            raw: The final message read from the `-o`/`--output-last-message` file.
+            raw: The final message read from the `-o` file.
             response_model: Model to validate against, or `None` for raw text.
 
         Returns:

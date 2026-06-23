@@ -66,13 +66,14 @@ The `claude` backend resolves `small` to Haiku, `medium` to Sonnet, and `large` 
 
 ### From Python
 
-`call` runs one request and returns the response. With no `backend`, it auto-selects the
-first installed, authenticated CLI:
+`call_sync` runs one request and returns the response. With no `backend`, it auto-selects
+the first installed, authenticated CLI (its async companion `call` mirrors the same
+signature):
 
 ```python
-from spawnllm import call
+from spawnllm import call_sync
 
-print(call("Reply with just the word: pong"))
+print(call_sync("Reply with just the word: pong"))
 # pong
 ```
 
@@ -82,7 +83,7 @@ instead of text:
 ```python
 from pydantic import BaseModel
 
-from spawnllm import call, ClaudeCliBackend
+from spawnllm import call_sync, ClaudeCliBackend
 
 
 class Capital(BaseModel):
@@ -90,7 +91,7 @@ class Capital(BaseModel):
     capital: str
 
 
-result = call(
+result = call_sync(
     "What is the capital of France?",
     backend=ClaudeCliBackend(),
     model="large",
@@ -101,6 +102,27 @@ print(result.capital)  # Paris
 
 When you don't pin a backend, set `specialty=` to scope auto-selection by task. The
 `debugging` and `review` specialties route to Codex, and `general` routes to Claude.
+
+### Spec-driven runs
+
+For full control, build a `RunSpec` and execute it with `run_sync` (or its async companion
+`run`). A `RunSpec` takes a literal provider model id — no tier mapping — and per-provider
+flag passthrough via `provider_configs`. The call returns a `RunResult` with raw stdout,
+stderr, and exit code, retrying transient `529`/overloaded/rate-limit failures with backoff:
+
+```python
+from spawnllm import run_sync, RunSpec, ClaudeConfig, ClaudeCliBackend
+
+result = run_sync(
+    RunSpec(
+        prompt="What is 2+2? Reply with just the number.",
+        model="opus",
+        provider_configs={"claude": ClaudeConfig(permission_mode="bypassPermissions")},
+    ),
+    backend=ClaudeCliBackend(),
+)
+print(result.stdout)  # 4
+```
 
 ## What problems does this solve?
 

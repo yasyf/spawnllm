@@ -11,13 +11,15 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
-from spawnllm.backends.base import Invocation, LlmBackend
+from spawnllm.backends.base import CliBackend, Invocation
+from spawnllm.spec import GeminiConfig
 from spawnllm.structured import extract_json_block
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-    from spawnllm.types import TModel
+    from spawnllm.spec import RunSpec
+    from spawnllm.types import ProviderName, TModel
 
 SCHEMA_PROMPT = (
     "Respond with ONLY a single JSON object that conforms to this JSON Schema. "
@@ -25,7 +27,7 @@ SCHEMA_PROMPT = (
 )
 
 
-class GeminiFamilyBackend(LlmBackend, ABC):
+class GeminiFamilyBackend(CliBackend, ABC):
     """Shared logic for the Gemini-family CLIs (`gemini`, `agy`)."""
 
     api_key_envs: ClassVar[tuple[str, ...]]
@@ -45,10 +47,7 @@ class GeminiFamilyBackend(LlmBackend, ABC):
         """
         return self.has_cached_credentials() or any(os.environ.get(k) for k in self.api_key_envs)
 
-    def prompt_args(self, text: str) -> list[str]:
-        return ["-p", text]
-
-    def invocation(self, prompt: str, *, model: str, schema_path: str | None, agent: bool) -> Invocation:
+    def invocation(self, spec: RunSpec) -> Invocation:
         """Build the argv and inline prompt for a single invocation.
 
         The prompt travels inline via `-p`; structured output appends the JSON
@@ -56,16 +55,13 @@ class GeminiFamilyBackend(LlmBackend, ABC):
         forces the CLI into non-interactive mode, and the result is read from stdout.
 
         Args:
-            prompt: The prompt text to deliver inline.
-            model: Provider-specific model name.
-            schema_path: Inline JSON schema appended to the prompt, or `None`.
-            agent: Whether the invocation may use tools / agent capabilities.
+            spec: The configured run to translate into an invocation.
 
         Returns:
             An `Invocation` with an empty stdin that forces non-interactive output.
         """
-        text = prompt if schema_path is None else f"{prompt}\n\n{SCHEMA_PROMPT}\n{schema_path}"
-        return Invocation(self.build_command(model, None, agent) + self.prompt_args(text), "")
+        text = spec.prompt if spec.schema is None else f"{spec.prompt}\n\n{SCHEMA_PROMPT}\n{spec.schema}"
+        return Invocation(self.build_command(spec) + ["-p", text], "")
 
     def parse_response(self, raw: str, response_model: type[BaseModel] | None) -> str | BaseModel:
         """Parse Gemini-family stdout into text or a validated model.
@@ -81,9 +77,6 @@ class GeminiFamilyBackend(LlmBackend, ABC):
         if response_model is None:
             return text
         return response_model.model_validate_json(extract_json_block(text))
-
-    @abstractmethod
-    def build_command(self, model: str, schema_path: str | None, agent: bool) -> list[str]: ...
 
     @abstractmethod
     def extract_text(self, raw: str) -> str: ...
@@ -105,7 +98,7 @@ class GeminiCliBackend(GeminiFamilyBackend):
             OAuth credentials are cached.
 
     Example:
-        >>> GeminiCliBackend().build_command("gemini-2.5-flash", None, agent=False)[:5]
+        >>> GeminiCliBackend().build_command(RunSpec(prompt="hi", model="gemini-2.5-flash"))[:5]
         ['gemini', '--model', 'gemini-2.5-flash', '-o', 'json']
     """
 
@@ -114,37 +107,46 @@ class GeminiCliBackend(GeminiFamilyBackend):
         "medium": "gemini-2.5-flash",
         "large": "gemini-3-pro-preview",
     }
+    provider: ClassVar[ProviderName] = "gemini"
     binary: ClassVar[str] = "gemini"
     install_hint: ClassVar[str] = "npm install -g @google/gemini-cli"
     api_key_envs: ClassVar[tuple[str, ...]] = ("GEMINI_API_KEY", "GOOGLE_API_KEY")
 
-    def build_command(self, model: str, schema_path: str | None, agent: bool) -> list[str]:
+    def build_command(self, spec: RunSpec) -> list[str]:
         """Build the `gemini` argv for one inline-prompted invocation.
 
         Every invocation requests JSON output via `-o json`. Agent invocations
         auto-approve tool use with `--approval-mode yolo`; non-agent invocations
         keep the default approval mode and disable tool extensions with
-        `-e none`. The schema travels inline within the prompt, so `schema_path`
-        is unused here.
+        `-e none`. A `GeminiConfig` overrides the derived approval mode and
+        replaces the extension set.
 
         Args:
-            model: Gemini model name, e.g. `gemini-2.5-flash`.
-            schema_path: Unused; the schema is appended to the prompt instead.
-            agent: Whether the invocation may use tools / agent capabilities.
+            spec: The configured run to translate into argv.
 
         Returns:
             The argv list to execute.
         """
+        config = spec.config_for(GeminiConfig)
         return [
             "gemini",
             "--model",
-            model,
+            spec.model,
             "-o",
             "json",
             "--approval-mode",
-            "yolo" if agent else "default",
-            *([] if agent else ["-e", "none"]),
+            (config and config.approval_mode) or ("yolo" if spec.agent else "default"),
+            *self.extension_args(spec, config),
         ]
+
+    def extension_args(self, spec: RunSpec, config: GeminiConfig | None) -> list[str]:
+        match config and config.extensions:
+            case None if spec.agent:
+                return []
+            case None:
+                return ["-e", "none"]
+            case extensions:
+                return [arg for e in extensions for arg in ("-e", e)]
 
     def extract_text(self, raw: str) -> str:
         data = json.loads(raw)
@@ -172,7 +174,7 @@ class AntigravityCliBackend(GeminiFamilyBackend):
             cached login is present.
 
     Example:
-        >>> AntigravityCliBackend().build_command("gemini-3.5", None, agent=False)
+        >>> AntigravityCliBackend().build_command(RunSpec(prompt="hi", model="gemini-3.5"))
         ['agy', '--model', 'gemini-3.5', '--print-timeout', '120s']
     """
 
@@ -181,11 +183,12 @@ class AntigravityCliBackend(GeminiFamilyBackend):
         "medium": "gemini-3.5",
         "large": "gemini-3.5-pro",
     }
+    provider: ClassVar[ProviderName] = "antigravity"
     binary: ClassVar[str] = "agy"
     install_hint: ClassVar[str] = "curl -fsSL https://antigravity.google/cli/install.sh | bash"
     api_key_envs: ClassVar[tuple[str, ...]] = ("GEMINI_API_KEY", "ANTIGRAVITY_API_KEY")
 
-    def build_command(self, model: str, schema_path: str | None, agent: bool) -> list[str]:
+    def build_command(self, spec: RunSpec) -> list[str]:
         """Build the `agy` argv for one inline-prompted invocation.
 
         Agent invocations auto-approve tool use with
@@ -194,9 +197,7 @@ class AntigravityCliBackend(GeminiFamilyBackend):
         `--print-timeout 120s`.
 
         Args:
-            model: Antigravity model name, e.g. `gemini-3.5`.
-            schema_path: Unused; the schema is appended to the prompt instead.
-            agent: Whether the invocation may use tools / agent capabilities.
+            spec: The configured run to translate into argv.
 
         Returns:
             The argv list to execute.
@@ -204,8 +205,8 @@ class AntigravityCliBackend(GeminiFamilyBackend):
         return [
             "agy",
             "--model",
-            model,
-            *(["--dangerously-skip-permissions"] if agent else []),
+            spec.model,
+            *(["--dangerously-skip-permissions"] if spec.agent else []),
             "--print-timeout",
             "120s",
         ]

@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2030-01-02T08:00:00Z"
+exclude-newer = "2030-01-02T07:00:00Z"
 
 [[package]]
 name = "annotated-doc"
@@ -2077,7 +2077,7 @@ wheels = [
 
 [[package]]
 name = "spawnllm"
-version = "0.2.0"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },

@@ -6,6 +6,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-22
+
+### Added
+
+- `RunSpec` and `RunResult`: a spec-driven execution contract. `RunSpec` carries
+  the common fields spawnllm translates per backend (`prompt`, literal `model`,
+  `schema`, `agent`, `cwd`, `env`, `timeout`, `max_attempts`) plus
+  `provider_configs`, and `RunResult` returns raw `stdout`/`stderr`/`returncode`.
+- `ClaudeConfig`, `CodexConfig`, and `GeminiConfig`: typed provider configs that
+  the matching backend applies, exposing each CLI's real flags (Claude's
+  permission/mcp/system-prompt/settings/disallowed-tools/budget/turns zoo,
+  Codex's sandbox knobs, Gemini's approval mode and extensions).
+- `run`/`run_sync`: async-first raw entries that select a backend, retry the
+  transient `529 Overloaded` envelope with backoff, and return a `RunResult`.
+- `call`/`call_sync`: prompt-ergonomic entries that map tiers to literal models,
+  serialize the response schema, and parse the structured result.
+- `CliBackend`: the subprocess mid-class carrying the argv/`Invocation` machinery
+  and spec-driven `build_command`.
+- `MlxBackend`: an opt-in local backend adapting `MlxEngine` to the execution
+  contract. It is constructed explicitly and never auto-selected.
+
+### Changed
+
+- The backend contract is now spec-driven: `LlmBackend` exposes
+  `aexecute`/`execute` taking a `RunSpec`, and `CliBackend.build_command(spec)`
+  builds the invocation from the spec's common fields and provider config.
+- `call` is now `call`/`call_sync`: the canonical entry is async with the bare
+  name, and the sync companion takes the `_sync` suffix.
+
+### Removed
+
+- BREAKING: `ClaudeCliBackend.cc_sentiment`, `build_argv`, `inline_system_prompt`,
+  `verbose`, and the static `parse_result_envelope` are gone, along with the old
+  synchronous `call` signature. Drive the backend through `RunSpec` +
+  `ClaudeConfig` and `run`/`run_sync`/`call`/`call_sync` instead.
+
 ## [0.3.1] - 2026-06-19
 
 ### Added
@@ -102,7 +138,8 @@ First release, published to PyPI as `spawnllm`.
   generation.
 - Click CLI: `spawnllm backends` and `spawnllm call`.
 
-[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/yasyf/spawnllm/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/yasyf/spawnllm/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/yasyf/spawnllm/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yasyf/spawnllm/compare/v0.1.3...v0.2.0

@@ -7,9 +7,10 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
-from spawnllm import ClaudeCliBackend, CodexCliBackend, GeminiCliBackend, LlmBackend
+from spawnllm import ClaudeCliBackend, CodexCliBackend, GeminiCliBackend, LlmBackend, RunResult
 from spawnllm.structured import (
     extract_json_block,
+    is_transient,
     parse_result_envelope,
     parse_structured_output,
     resolve_schema_path,
@@ -109,6 +110,32 @@ class TestParseResultEnvelope:
         assert exc.value.cmd == ["claude", "-p"]
         assert exc.value.output == raw
         assert exc.value.stderr == b"e"
+
+
+class TestIsTransient:
+    @pytest.mark.parametrize(
+        "rr, expected",
+        [
+            (RunResult("", "API Error: 529 Overloaded", 1), True),
+            (RunResult('{"is_error": true, "result": "Overloaded"}', "", 0), True),
+            (RunResult(json.dumps([{"type": "result", "is_error": True, "result": "rate limit"}]), "", 0), True),
+            (RunResult('{"is_error": false, "result": "ok"}', "", 0), False),
+            (RunResult("", "529 Overloaded", 0), False),
+            (RunResult("plain failure", "boom", 1), False),
+            (RunResult("not json overloaded", "", 0), False),
+        ],
+        ids=[
+            "nonzero-exit-529-stderr",
+            "zero-exit-error-envelope-dict",
+            "zero-exit-error-envelope-array",
+            "success-envelope",
+            "transient-text-but-clean-exit",
+            "nonzero-exit-no-transient-text",
+            "transient-text-non-json-no-envelope",
+        ],
+    )
+    def test_classifies_both_shapes(self, rr: RunResult, expected: bool) -> None:
+        assert is_transient(rr) is expected
 
 
 class TestExtractJsonBlock:

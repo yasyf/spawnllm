@@ -15,16 +15,20 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from spawnllm.backends.base import LlmBackend
+    from spawnllm.proc import RunResult
 
 __all__ = [
+    "backoff",
     "extract_json_block",
     "extract_structured",
+    "is_transient",
     "parse_result_envelope",
     "parse_structured_output",
     "resolve_schema_path",
 ]
 
 JSON_FENCE = re.compile(r"```(?:json)?\s*\n?(.*?)\n?```", re.DOTALL)
+TRANSIENT = re.compile(r"\b529\b|overloaded|rate.?limit|\b5\d\d\b", re.I)
 
 
 def first_json_value(source: str) -> str | None:
@@ -118,3 +122,48 @@ def parse_result_envelope(stdout: bytes, *, argv: list[str], stderr: bytes) -> s
     if data["is_error"]:
         raise subprocess.CalledProcessError(0, argv, output=stdout, stderr=stderr)
     return data["result"]
+
+
+def envelope_is_error(stdout: str) -> bool:
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError:
+        return False
+    match data:
+        case dict():
+            return bool(data.get("is_error"))
+        case list():
+            return any(e.get("type") == "result" and e.get("is_error") for e in data)
+        case _:
+            return False
+
+
+def is_transient(rr: RunResult) -> bool:
+    """Report whether a run failed with a retryable transient error.
+
+    A run is transient iff the `TRANSIENT` pattern (529, overloaded, rate-limit,
+    or any `5xx`) matches its stdout or stderr **and** the run actually failed —
+    either a nonzero exit code or a `{is_error: true}` stdout envelope (a dict
+    or any `type=="result"` element of a JSON array).
+
+    Args:
+        rr: The captured outcome of a single backend run.
+
+    Returns:
+        `True` when the run should be retried.
+    """
+    return bool(TRANSIENT.search(rr.stdout) or TRANSIENT.search(rr.stderr)) and (
+        rr.returncode != 0 or envelope_is_error(rr.stdout)
+    )
+
+
+def backoff(attempt: int) -> float:
+    """Return the seconds to sleep before retry `attempt`, capped at 60.
+
+    Args:
+        attempt: The zero-based retry attempt number.
+
+    Returns:
+        `min(5 * 3**attempt, 60)` seconds.
+    """
+    return min(5 * 3**attempt, 60)

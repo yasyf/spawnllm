@@ -55,18 +55,31 @@ reference:
     desc: One-shot LLM calls and structured output.
     contents:
       - call.call
+      - call.call_sync
       - resolve_schema_path
       - extract_structured
       - parse_structured_output
       - parse_result_envelope
+  - title: Running
+    desc: Spec-driven execution with envelope-aware retry, async and sync.
+    contents:
+      - run.run
+      - run.run_sync
+      - RunSpec
+      - RunResult
+      - ClaudeConfig
+      - CodexConfig
+      - GeminiConfig
   - title: Backends
-    desc: CLI backends (Claude, Codex, and the Gemini family), the specialty registry, backend selection, and install/auth status checks.
+    desc: CLI backends (Claude, Codex, and the Gemini family), the MLX backend, the specialty registry, backend selection, and install/auth status checks.
     contents:
       - LlmBackend
+      - CliBackend
       - ClaudeCliBackend
       - CodexCliBackend
       - GeminiCliBackend
       - AntigravityCliBackend
+      - MlxBackend
       - LlmBackends
       - select_backend
       - BackendStatus

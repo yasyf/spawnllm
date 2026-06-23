@@ -14,7 +14,7 @@ from spawnllm.backends import (
     BackendUnavailable,
 )
 from spawnllm.backends.registry import BACKENDS_BY_NAME, PRIORITY, select_backend
-from spawnllm.call import call as call_backend
+from spawnllm.call import call_sync
 from spawnllm.types import TModel
 
 BACKEND_NAMES = tuple(BACKENDS_BY_NAME)
@@ -42,7 +42,7 @@ def backends() -> None:
 def call(backend: str, model: str, agent: bool, prompt: str | None) -> None:
     """Make a one-off LLM call (reads PROMPT or stdin) and print the response."""
     text = prompt if prompt is not None else sys.stdin.read()
-    result = call_backend(text, backend=BACKENDS_BY_NAME[backend], model=cast(TModel, model), agent=agent)
+    result = call_sync(text, backend=BACKENDS_BY_NAME[backend], model=cast(TModel, model), agent=agent)
     click.echo(result)
 
 

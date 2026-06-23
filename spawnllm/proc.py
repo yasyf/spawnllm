@@ -5,8 +5,24 @@ from __future__ import annotations
 import asyncio
 import subprocess
 from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
 
-__all__ = ["arun_cli", "collect_process", "map_concurrent", "run_cli"]
+__all__ = ["RunResult", "acapture_cli", "arun_cli", "capture_cli", "collect_process", "map_concurrent", "run_cli"]
+
+
+@dataclass(frozen=True, slots=True)
+class RunResult:
+    """The raw outcome of a CLI invocation.
+
+    Attributes:
+        stdout: The decoded stdout.
+        stderr: The decoded stderr.
+        returncode: The process exit code.
+    """
+
+    stdout: str
+    stderr: str
+    returncode: int
 
 
 def run_cli(
@@ -51,6 +67,44 @@ def run_cli(
         err.add_note(f"stdout: {result.stdout[-4096:]}")
         raise err
     return result.stdout
+
+
+def capture_cli(
+    argv: list[str],
+    *,
+    input: str | None = None,
+    timeout: int = 180,
+    env: dict[str, str] | None = None,
+    cwd: str | None = None,
+) -> RunResult:
+    """Run a CLI command to completion and capture its full outcome.
+
+    Unlike `run_cli`, a nonzero exit does not raise; the stdout, stderr, and exit
+    code come back intact so callers can inspect failures and 0-exit error envelopes.
+
+    Args:
+        argv: The command and its arguments.
+        input: Text delivered to the process over stdin.
+        timeout: Seconds to wait before the process is killed.
+        env: Environment for the process; `None` inherits the current environment.
+        cwd: Working directory for the process.
+
+    Returns:
+        The captured stdout, stderr, and exit code.
+
+    Raises:
+        subprocess.TimeoutExpired: When the process outlives `timeout`.
+    """
+    result = subprocess.run(
+        argv,
+        input=input,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=env,
+        cwd=cwd,
+    )
+    return RunResult(result.stdout, result.stderr, result.returncode)
 
 
 async def collect_process(
@@ -128,6 +182,50 @@ async def arun_cli(
     if rc != 0:
         raise subprocess.CalledProcessError(rc, argv, output=stdout, stderr=stderr)
     return stdout
+
+
+async def acapture_cli(
+    argv: list[str],
+    *,
+    input: str | None = None,
+    env: dict[str, str] | None = None,
+    cwd: str | None = None,
+    timeout: int | None = None,
+) -> RunResult:
+    """Run a CLI command asynchronously and capture its full outcome.
+
+    Unlike `arun_cli`, a nonzero exit does not raise; the stdout, stderr, and exit
+    code come back intact so callers can inspect failures and 0-exit error envelopes.
+
+    Args:
+        argv: The command and its arguments.
+        input: Text delivered to the process over stdin.
+        env: Environment for the process; `None` inherits the current environment.
+        cwd: Working directory for the process.
+        timeout: Seconds to wait before the wait is abandoned; `None` waits forever.
+
+    Returns:
+        The captured stdout, stderr, and exit code.
+
+    Raises:
+        TimeoutError: When the process outlives `timeout`.
+    """
+    proc = await asyncio.create_subprocess_exec(
+        *argv,
+        stdin=asyncio.subprocess.PIPE if input is not None else None,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=env,
+        cwd=cwd,
+    )
+    if input is not None:
+        assert proc.stdin is not None, "create_subprocess_exec was called with stdin=PIPE"
+        proc.stdin.write(input.encode())
+        await proc.stdin.drain()
+        proc.stdin.close()
+    collect = collect_process(proc)
+    stdout, stderr, rc = await (asyncio.wait_for(collect, timeout) if timeout is not None else collect)
+    return RunResult(stdout.decode(), stderr.decode(), rc)
 
 
 async def map_concurrent[T, R](
