@@ -287,6 +287,22 @@ class TestRegistry:
     def test_for_specialty(self, specialty: str, backend_cls: type) -> None:
         assert isinstance(LlmBackends.for_specialty(specialty), backend_cls)
 
+    def test_select_backend_never_auto_picks_gemini(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from spawnllm.backends import registry
+        from spawnllm.backends.base import BackendNotInstalled, BackendReady, BackendUnavailable
+
+        def absent(self: object, *, timeout: int = 10) -> BackendNotInstalled:
+            return BackendNotInstalled(binary=self.binary, install_hint="x")
+
+        for cls in (ClaudeCliBackend, CodexCliBackend, AntigravityCliBackend):
+            monkeypatch.setattr(cls, "check_status", absent)
+        monkeypatch.setattr(
+            GeminiCliBackend, "check_status", lambda self, *, timeout=10: BackendReady(binary="gemini")
+        )
+        # Gemini is the only "ready" backend, yet auto-selection refuses it.
+        with pytest.raises(BackendUnavailable):
+            registry.select_backend()
+
 
 class TestGeminiBackend:
     @pytest.mark.parametrize(

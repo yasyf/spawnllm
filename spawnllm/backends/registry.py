@@ -55,7 +55,9 @@ def select_backend(*, specialty: TSpecialty | None = None, timeout: int = 10) ->
     """Return the first installed, authenticated backend in priority order.
 
     A `specialty`, when given, promotes its registered backend to the front of
-    the chain; the chain otherwise follows `PRIORITY`. The first backend whose
+    the chain; the chain otherwise follows `PRIORITY`, minus `GeminiCliBackend`
+    (its Code Assist OAuth tier is retired, so it reports ready yet fails at call
+    time — reach it only via an explicit `backend=`). The first backend whose
     `check_status` reports `BackendReady` wins, short-circuiting the rest;
     backends that time out are skipped.
 
@@ -71,7 +73,8 @@ def select_backend(*, specialty: TSpecialty | None = None, timeout: int = 10) ->
     """
     preferred = [LlmBackends.LLM_BACKENDS[specialty]] if specialty else []
     seen = {type(b) for b in preferred}
-    for backend in (*preferred, *(b for b in PRIORITY if type(b) not in seen)):
+    auto = (b for b in PRIORITY if type(b) not in seen and not isinstance(b, GeminiCliBackend))
+    for backend in (*preferred, *auto):
         try:
             if isinstance(backend.check_status(timeout=timeout), BackendReady):
                 return backend
