@@ -76,7 +76,7 @@ class CodexCliBackend(CliBackend):
                 []
                 if spec.agent
                 else [
-                    *([] if cfg.enable_hooks else ["-c", "features.codex_hooks=false"]),
+                    *([] if cfg.enable_hooks else ["-c", "features.hooks=false"]),
                     *([] if cfg.enable_mcp else ["-c", "features.mcp_servers=false"]),
                 ]
             ),

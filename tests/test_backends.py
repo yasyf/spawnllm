@@ -198,7 +198,7 @@ class TestCodexArgv:
             "gpt-5.5",
             "--ignore-user-config",
             "-c",
-            "features.codex_hooks=false",
+            "features.hooks=false",
             "-c",
             "features.mcp_servers=false",
         ]
@@ -215,7 +215,7 @@ class TestCodexArgv:
             "--model",
             "gpt-5.5",
             "-c",
-            "features.codex_hooks=false",
+            "features.hooks=false",
             "-c",
             "features.mcp_servers=false",
         ]
