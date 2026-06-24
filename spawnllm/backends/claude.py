@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from spawnllm.backends.base import CliBackend
 from spawnllm.spec import ClaudeConfig
-from spawnllm.structured import parse_structured_output
+from spawnllm.structured import structured_value
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -17,6 +17,21 @@ if TYPE_CHECKING:
     from spawnllm.types import ProviderName, TModel
 
 CLAUDE_MODELS: dict[TModel, str] = {"small": "haiku", "medium": "sonnet", "large": "opus"}
+
+
+def result_event(raw: str) -> dict[str, object] | None:
+    """Return the `claude` result envelope: the dict itself, or the `type=="result"` stream-json event, else `None`."""
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    match data:
+        case {"is_error": _} | {"result": _}:
+            return data
+        case list():
+            return next((e for e in data if isinstance(e, dict) and e.get("type") == "result"), None)
+        case _:
+            return None
 
 
 class ClaudeCliBackend(CliBackend):
@@ -53,6 +68,7 @@ class ClaudeCliBackend(CliBackend):
             The argv list to execute; the prompt is delivered over stdin.
         """
         cfg = spec.config_for(ClaudeConfig) or ClaudeConfig()
+        schema = self.schema_arg(spec)
         explicit = (
             cfg.permission_mode is not None
             or cfg.mcp_config is not None
@@ -92,8 +108,8 @@ class ClaudeCliBackend(CliBackend):
             *(["--tools", cfg.tools] if cfg.tools is not None else []),
             *(["--disable-slash-commands"] if cfg.disable_slash_commands else []),
             *(
-                ["--json-schema", spec.schema, "--output-format", "json"]
-                if spec.schema
+                ["--json-schema", schema, "--output-format", "json"]
+                if schema
                 else ["--output-format", cfg.output_format]
                 if cfg.output_format
                 else []
@@ -118,17 +134,21 @@ class ClaudeCliBackend(CliBackend):
 
         return json.dumps(transform_schema(model))
 
-    def parse_response(self, raw: str, response_model: type[BaseModel] | None) -> str | BaseModel:
-        """Parse `claude` stdout into text or a validated model.
+    def result_text(self, raw: str) -> str:
+        """Return the `result` text from the `claude` envelope, falling back to `raw` for plain text."""
+        if (event := result_event(raw)) is not None and isinstance(text := event.get("result"), str):
+            return text
+        return raw
 
-        Args:
-            raw: Raw stdout from the `claude` CLI.
-            response_model: Model to validate against, or `None` for raw text.
+    def result_value(self, raw: str) -> object:
+        """Return the `structured_output` from the `claude` stream-json result event, else `raw` parsed as JSON."""
+        return structured_value(raw)
 
-        Returns:
-            `raw` for text calls; otherwise the validated `structured_output` from the result event, else `raw` as JSON.
-        """
-        return parse_structured_output(raw, response_model)
+    def envelope_error(self, raw: str) -> str | None:
+        """Return the error message when the `claude` result event marks the run as an error, else `None`."""
+        if (event := result_event(raw)) is not None and event.get("is_error"):
+            return event["result"] if isinstance(event.get("result"), str) else "claude reported an error"
+        return None
 
     def env(self) -> dict[str, str]:
         """Return no extra environment variables; the `claude` CLI runs with the inherited environment."""

@@ -6,14 +6,12 @@ import asyncio
 from typing import TYPE_CHECKING, ClassVar
 
 from spawnllm.backends.base import BackendReady, LlmBackend
-from spawnllm.proc import RunResult
-from spawnllm.structured import parse_structured_output
+from spawnllm.structured import structured_value
 
 if TYPE_CHECKING:
-    from pydantic import BaseModel
-
     from spawnllm.backends.base import BackendStatus
     from spawnllm.mlx import MlxEngine
+    from spawnllm.response import Response
     from spawnllm.spec import RunSpec
     from spawnllm.types import ProviderName, TModel
 
@@ -38,20 +36,21 @@ class MlxBackend(LlmBackend):
         self.engine = engine
         self.max_tokens = max_tokens
 
-    async def aexecute(self, spec: RunSpec) -> RunResult:
+    async def aexecute(self, spec: RunSpec) -> Response:
         await self.engine.ensure_loaded()
         texts = await self.engine.generate(
             [[{"role": "user", "content": spec.prompt}]],
             lambda _: None,
             max_tokens=self.max_tokens,
         )
-        return RunResult(texts[0], "", 0)
+        return self.to_response(texts[0], returncode=0, stderr="", spec=spec)
 
-    def execute(self, spec: RunSpec) -> RunResult:
+    def execute(self, spec: RunSpec) -> Response:
         return asyncio.run(self.aexecute(spec))
 
-    def parse_response(self, raw: str, response_model: type[BaseModel] | None) -> str | BaseModel:
-        return parse_structured_output(raw, response_model)
+    def result_value(self, raw: str) -> object:
+        """Return the `structured_output` from a stream-json result event, else `raw` parsed as JSON."""
+        return structured_value(raw)
 
     def env(self) -> dict[str, str]:
         """Return no extra environment variables; MLX runs in-process."""

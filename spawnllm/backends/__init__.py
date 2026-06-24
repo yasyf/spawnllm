@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from spawnllm.backends.base import (
+    BackendCallError,
     BackendNotAuthenticated,
     BackendNotInstalled,
     BackendReady,
     BackendStatus,
     BackendUnavailable,
     CliBackend,
-    Invocation,
     LlmBackend,
 )
 from spawnllm.backends.claude import ClaudeCliBackend
@@ -20,6 +20,7 @@ from spawnllm.backends.registry import LlmBackends, select_backend
 
 __all__ = [
     "AntigravityCliBackend",
+    "BackendCallError",
     "BackendNotAuthenticated",
     "BackendNotInstalled",
     "BackendReady",
@@ -29,7 +30,6 @@ __all__ = [
     "CliBackend",
     "CodexCliBackend",
     "GeminiCliBackend",
-    "Invocation",
     "LlmBackend",
     "LlmBackends",
     "MlxBackend",

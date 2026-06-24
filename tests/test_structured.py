@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
 
-from spawnllm import ClaudeCliBackend, CodexCliBackend, GeminiCliBackend, LlmBackend, RunResult
+from spawnllm import ClaudeCliBackend, CodexCliBackend, GeminiCliBackend, LlmBackend, Response
 from spawnllm.structured import (
     extract_json_block,
     is_transient,
-    parse_result_envelope,
-    parse_structured_output,
     resolve_schema_path,
+    structured_value,
 )
 
 
@@ -69,20 +67,10 @@ class TestResolveSchemaPath:
         assert Path(path).read_text() == '{"x":1}'
 
 
-class TestParseStructuredOutput:
-    def test_text_passthrough_when_no_model(self) -> None:
-        assert parse_structured_output("hello", None) == "hello"
-
+class TestStructuredValue:
     def test_event_list_structured_output(self) -> None:
         events = json.dumps([{"type": "result", "structured_output": {"should_block": True, "reason": "x"}}])
-        result = parse_structured_output(events, Verdict)
-        assert isinstance(result, Verdict)
-        assert result.should_block is True
-
-    def test_falls_back_to_model_validate_json(self) -> None:
-        result = parse_structured_output('{"should_block": false, "reason": "ok"}', Verdict)
-        assert isinstance(result, Verdict)
-        assert result.should_block is False
+        assert structured_value(events) == {"should_block": True, "reason": "x"}
 
     def test_single_result_envelope_structured_output(self) -> None:
         envelope = json.dumps(
@@ -93,49 +81,39 @@ class TestParseStructuredOutput:
                 "structured_output": {"should_block": True, "reason": "x"},
             }
         )
-        result = parse_structured_output(envelope, Verdict)
-        assert isinstance(result, Verdict)
+        assert structured_value(envelope) == {"should_block": True, "reason": "x"}
+
+    def test_falls_back_to_parsed_json(self) -> None:
+        assert structured_value('{"should_block": false, "reason": "ok"}') == {"should_block": False, "reason": "ok"}
+
+    def test_validates_through_model(self) -> None:
+        events = json.dumps([{"type": "result", "structured_output": {"should_block": True, "reason": "x"}}])
+        result = Verdict.model_validate(structured_value(events))
         assert result.should_block is True
-
-
-class TestParseResultEnvelope:
-    def test_returns_result(self) -> None:
-        assert parse_result_envelope(b'{"is_error": false, "result": "4"}', argv=["claude"], stderr=b"") == "4"
-
-    def test_raises_zero_returncode_with_bytes(self) -> None:
-        raw = b'{"is_error": true, "result": "x"}'
-        with pytest.raises(subprocess.CalledProcessError) as exc:
-            parse_result_envelope(raw, argv=["claude", "-p"], stderr=b"e")
-        assert exc.value.returncode == 0
-        assert exc.value.cmd == ["claude", "-p"]
-        assert exc.value.output == raw
-        assert exc.value.stderr == b"e"
 
 
 class TestIsTransient:
     @pytest.mark.parametrize(
-        "rr, expected",
+        "resp, expected",
         [
-            (RunResult("", "API Error: 529 Overloaded", 1), True),
-            (RunResult('{"is_error": true, "result": "Overloaded"}', "", 0), True),
-            (RunResult(json.dumps([{"type": "result", "is_error": True, "result": "rate limit"}]), "", 0), True),
-            (RunResult('{"is_error": false, "result": "ok"}', "", 0), False),
-            (RunResult("", "529 Overloaded", 0), False),
-            (RunResult("plain failure", "boom", 1), False),
-            (RunResult("not json overloaded", "", 0), False),
+            (Response(error="codex exited 1: API Error: 529 Overloaded", result=None), True),
+            (Response(error="claude reported an error: Overloaded", result=None), True),
+            (Response(error="gemini call failed: rate limit", result=None), True),
+            (Response(error=None, result="ok"), False),
+            (Response(error="codex exited 127: codex: not found", result=None), False),
+            (Response(error="boom", result=None), False),
         ],
         ids=[
-            "nonzero-exit-529-stderr",
-            "zero-exit-error-envelope-dict",
-            "zero-exit-error-envelope-array",
-            "success-envelope",
-            "transient-text-but-clean-exit",
-            "nonzero-exit-no-transient-text",
-            "transient-text-non-json-no-envelope",
+            "exit-529-error",
+            "overloaded-error",
+            "rate-limit-error",
+            "no-error",
+            "nonzero-no-transient-text",
+            "plain-error",
         ],
     )
-    def test_classifies_both_shapes(self, rr: RunResult, expected: bool) -> None:
-        assert is_transient(rr) is expected
+    def test_classifies_by_error_text(self, resp: Response, expected: bool) -> None:
+        assert is_transient(resp) is expected
 
 
 class TestExtractJsonBlock:

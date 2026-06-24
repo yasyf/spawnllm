@@ -16,8 +16,6 @@ from spawnllm.spec import GeminiConfig
 from spawnllm.structured import extract_json_block
 
 if TYPE_CHECKING:
-    from pydantic import BaseModel
-
     from spawnllm.spec import RunSpec
     from spawnllm.types import ProviderName, TModel
 
@@ -33,7 +31,7 @@ class GeminiFamilyBackend(CliBackend, ABC):
     api_key_envs: ClassVar[tuple[str, ...]]
 
     def env(self) -> dict[str, str]:
-        """Return no extra environment variables; Gemini-family CLIs authenticate via OAuth, never an injected API key."""
+        """Return no extra environment variables; Gemini-family CLIs authenticate via OAuth, not an injected key."""
         return {}
 
     def is_authenticated(self, *, timeout: int) -> bool:
@@ -60,23 +58,17 @@ class GeminiFamilyBackend(CliBackend, ABC):
         Returns:
             An `Invocation` with an empty stdin that forces non-interactive output.
         """
-        text = spec.prompt if spec.schema is None else f"{spec.prompt}\n\n{SCHEMA_PROMPT}\n{spec.schema}"
+        schema = self.schema_arg(spec)
+        text = spec.prompt if schema is None else f"{spec.prompt}\n\n{SCHEMA_PROMPT}\n{schema}"
         return Invocation(self.build_command(spec) + ["-p", text], "")
 
-    def parse_response(self, raw: str, response_model: type[BaseModel] | None) -> str | BaseModel:
-        """Parse Gemini-family stdout into text or a validated model.
+    def result_text(self, raw: str) -> str:
+        """Return the model's text output, extracted from this CLI's stdout envelope."""
+        return self.extract_text(raw)
 
-        Args:
-            raw: Raw stdout from the CLI.
-            response_model: Model to validate against, or `None` for raw text.
-
-        Returns:
-            The extracted text when `response_model` is `None`; otherwise the JSON block validated against it.
-        """
-        text = self.extract_text(raw)
-        if response_model is None:
-            return text
-        return response_model.model_validate_json(extract_json_block(text))
+    def result_value(self, raw: str) -> object:
+        """Return the JSON block parsed from the model's text output."""
+        return json.loads(extract_json_block(self.result_text(raw)))
 
     @abstractmethod
     def extract_text(self, raw: str) -> str: ...
@@ -149,13 +141,19 @@ class GeminiCliBackend(GeminiFamilyBackend):
                 return [arg for e in extensions for arg in ("-e", e)]
 
     def extract_text(self, raw: str) -> str:
+        return json.loads(raw)["response"]
+
+    def envelope_error(self, raw: str) -> str | None:
+        """Return the raw failure payload when `gemini` reports `totalErrors` or an empty response, else `None`.
+
+        The whole payload tail is folded into the message so any transient marker the CLI emits
+        (529/overloaded/rate-limit) lands in `Response.error` and `is_transient` can fire a retry.
+        """
         data = json.loads(raw)
-        if (
-            sum(m["api"]["totalErrors"] for m in data.get("stats", {}).get("models", {}).values()) > 0
-            or not data.get("response")
-        ):
-            raise RuntimeError(f"gemini call failed: {data.get('stats', {}).get('models')}")
-        return data["response"]
+        models = data.get("stats", {}).get("models", {})
+        if sum(m["api"]["totalErrors"] for m in models.values()) > 0 or not data.get("response"):
+            return f"gemini call failed: {raw.strip()[-2000:]}"
+        return None
 
     def has_cached_credentials(self) -> bool:
         return (Path.home() / ".gemini" / "oauth_creds.json").exists()

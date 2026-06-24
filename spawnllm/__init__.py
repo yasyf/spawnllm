@@ -1,14 +1,17 @@
 """Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools.
 
-The top-level namespace exposes the CLI backends, subprocess transport, and
-structured-output helpers. The MLX engine lives under `spawnllm.mlx`, whose
-imports are lazy so that `import spawnllm` never pulls `mlx_lm`/`zstandard`.
+The top-level namespace exposes the three primitives — `run`/`call`/`extract`
+and their `_sync` companions — over a `Backend` family that fully encapsulates
+execution and returns one shared `Response`. The MLX engine lives under
+`spawnllm.mlx`, whose imports are lazy so that `import spawnllm` never pulls
+`mlx_lm`/`zstandard`.
 """
 
 from __future__ import annotations
 
 from spawnllm.backends import (
     AntigravityCliBackend,
+    BackendCallError,
     BackendNotAuthenticated,
     BackendNotInstalled,
     BackendReady,
@@ -18,26 +21,21 @@ from spawnllm.backends import (
     CliBackend,
     CodexCliBackend,
     GeminiCliBackend,
-    Invocation,
     LlmBackend,
     LlmBackends,
     MlxBackend,
     select_backend,
 )
 from spawnllm.call import call, call_sync
-from spawnllm.proc import RunResult, arun_cli, collect_process, map_concurrent, run_cli
+from spawnllm.extract import extract, extract_sync
+from spawnllm.response import Response
 from spawnllm.run import run, run_sync
 from spawnllm.spec import ClaudeConfig, CodexConfig, GeminiConfig, RunSpec
-from spawnllm.structured import (
-    extract_structured,
-    parse_result_envelope,
-    parse_structured_output,
-    resolve_schema_path,
-)
 from spawnllm.types import ProviderName, TModel, TSpecialty
 
 __all__ = [
     "AntigravityCliBackend",
+    "BackendCallError",
     "BackendNotAuthenticated",
     "BackendNotInstalled",
     "BackendReady",
@@ -50,26 +48,19 @@ __all__ = [
     "CodexConfig",
     "GeminiCliBackend",
     "GeminiConfig",
-    "Invocation",
     "LlmBackend",
     "LlmBackends",
     "MlxBackend",
     "ProviderName",
-    "RunResult",
+    "Response",
     "RunSpec",
     "TModel",
     "TSpecialty",
-    "arun_cli",
     "call",
     "call_sync",
-    "collect_process",
-    "extract_structured",
-    "map_concurrent",
-    "parse_result_envelope",
-    "parse_structured_output",
-    "resolve_schema_path",
+    "extract",
+    "extract_sync",
     "run",
-    "run_cli",
     "run_sync",
     "select_backend",
 ]

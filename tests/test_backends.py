@@ -15,8 +15,10 @@ from spawnllm import (
     GeminiCliBackend,
     GeminiConfig,
     LlmBackends,
+    Response,
     RunSpec,
 )
+from spawnllm.structured import is_transient
 
 
 class M(BaseModel):
@@ -38,9 +40,10 @@ class TestClaudeArgv:
             "--strict-mcp-config",
         ]
 
-    def test_agent_with_schema(self) -> None:
+    def test_agent_with_schema(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(ClaudeCliBackend, "schema_for", lambda self, model: '{"a":1}')
         assert ClaudeCliBackend().build_command(
-            RunSpec(prompt="hi", model="opus", schema='{"a":1}', agent=True)
+            RunSpec(prompt="hi", model="opus", response_model=M, agent=True)
         ) == [
             "claude",
             "-p",
@@ -141,8 +144,24 @@ class TestClaudeArgv:
         assert inv.stdin == "hi"
         assert inv.result_path is None
 
-    def test_parse_response_passthrough_without_model(self) -> None:
-        assert ClaudeCliBackend().parse_response("raw text", None) == "raw text"
+    def test_result_text_passthrough_for_plain_text(self) -> None:
+        assert ClaudeCliBackend().result_text("raw text") == "raw text"
+
+    def test_result_text_reads_envelope_result(self) -> None:
+        raw = json.dumps({"type": "result", "is_error": False, "result": "hello"})
+        assert ClaudeCliBackend().result_text(raw) == "hello"
+
+    def test_envelope_error_surfaces_message(self) -> None:
+        raw = json.dumps({"type": "result", "is_error": True, "result": "Overloaded"})
+        assert ClaudeCliBackend().envelope_error(raw) == "Overloaded"
+
+    def test_envelope_error_none_on_success(self) -> None:
+        raw = json.dumps({"type": "result", "is_error": False, "result": "ok"})
+        assert ClaudeCliBackend().envelope_error(raw) is None
+
+    def test_result_value_extracts_structured_output(self) -> None:
+        raw = json.dumps([{"type": "result", "structured_output": {"x": 7}}])
+        assert ClaudeCliBackend().result_value(raw) == {"x": 7}
 
 
 class TestCodexArgv:
@@ -195,18 +214,12 @@ class TestCodexArgv:
             "large": "gpt-5.5",
         }
 
-    def test_parse_response_validates_model(self) -> None:
-        class Verdict(BaseModel):
-            block: bool
-            reason: str
+    def test_result_value_parses_raw_json(self) -> None:
+        assert CodexCliBackend().result_value('{"block": true, "reason": "bad"}') == {"block": True, "reason": "bad"}
 
-        result = CodexCliBackend().parse_response('{"block": true, "reason": "bad"}', Verdict)
-        assert isinstance(result, Verdict)
-        assert result.block is True
-        assert result.reason == "bad"
-
-    def test_invocation_adds_output_file_with_schema(self) -> None:
-        inv = CodexCliBackend().invocation(RunSpec(prompt="hi", model="gpt-5.5", schema='{"type":"object"}'))
+    def test_invocation_adds_output_file_with_schema(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(CodexCliBackend, "schema_for", lambda self, model: '{"type":"object"}')
+        inv = CodexCliBackend().invocation(RunSpec(prompt="hi", model="gpt-5.5", response_model=M))
         assert inv.argv[-2:] == ["-o", inv.result_path]
         assert "--output-schema" in inv.argv
         assert inv.stdin == "hi"
@@ -276,28 +289,37 @@ class TestGeminiBackend:
         assert inv.stdin == ""
         assert inv.result_path is None
 
-    def test_invocation_injects_schema_into_prompt(self) -> None:
-        inv = GeminiCliBackend().invocation(
-            RunSpec(prompt="hi", model="gemini-2.5-flash", schema='{"type":"object"}')
-        )
+    def test_invocation_injects_schema_into_prompt(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(GeminiCliBackend, "schema_for", lambda self, model: '{"type":"object"}')
+        inv = GeminiCliBackend().invocation(RunSpec(prompt="hi", model="gemini-2.5-flash", response_model=M))
         assert inv.argv[-2] == "-p"
         assert "hi" in inv.argv[-1]
         assert '{"type":"object"}' in inv.argv[-1]
         assert inv.stdin == ""
 
-    def test_parse_response_extracts_envelope_text(self) -> None:
+    def test_result_text_extracts_envelope_text(self) -> None:
         raw = json.dumps({"response": "hello", "stats": {"models": {"gemini-2.5-flash": {"api": {"totalErrors": 0}}}}})
-        assert GeminiCliBackend().parse_response(raw, None) == "hello"
+        assert GeminiCliBackend().result_text(raw) == "hello"
 
-    def test_parse_response_raises_on_error_envelope(self) -> None:
+    def test_envelope_error_returns_message_on_total_errors(self) -> None:
         raw = json.dumps({"response": "", "stats": {"models": {"gemini-2.5-flash": {"api": {"totalErrors": 1}}}}})
-        with pytest.raises(RuntimeError):
-            GeminiCliBackend().parse_response(raw, None)
+        assert "gemini call failed" in GeminiCliBackend().envelope_error(raw)
 
-    def test_parse_response_validates_structured_from_envelope(self) -> None:
+    def test_envelope_error_none_on_success(self) -> None:
+        raw = json.dumps({"response": "hi", "stats": {"models": {"g": {"api": {"totalErrors": 0}}}}})
+        assert GeminiCliBackend().envelope_error(raw) is None
+
+    def test_envelope_error_surfaces_transient_marker_for_retry(self) -> None:
+        raw = json.dumps(
+            {"response": "", "error": "503 model overloaded", "stats": {"models": {"g": {"api": {"totalErrors": 1}}}}}
+        )
+        msg = GeminiCliBackend().envelope_error(raw)
+        assert msg is not None and is_transient(Response(error=msg, result=None))
+
+    def test_result_value_extracts_json_block_from_envelope(self) -> None:
         stats = {"models": {"g": {"api": {"totalErrors": 0}}}}
         raw = json.dumps({"response": '```json\n{"x": 1}\n```', "stats": stats})
-        assert GeminiCliBackend().parse_response(raw, M) == M(x=1)
+        assert M.model_validate(GeminiCliBackend().result_value(raw)) == M(x=1)
 
 
 class TestAntigravityBackend:
@@ -313,8 +335,8 @@ class TestAntigravityBackend:
     def test_extract_text_strips_whitespace(self) -> None:
         assert AntigravityCliBackend().extract_text("  ok  \n") == "ok"
 
-    def test_parse_response_passthrough(self) -> None:
-        assert AntigravityCliBackend().parse_response("ok", None) == "ok"
+    def test_result_text_strips_whitespace(self) -> None:
+        assert AntigravityCliBackend().result_text("  ok  \n") == "ok"
 
-    def test_parse_response_validates_structured(self) -> None:
-        assert AntigravityCliBackend().parse_response('```json\n{"x": 2}\n```', M) == M(x=2)
+    def test_result_value_validates_structured(self) -> None:
+        assert M.model_validate(AntigravityCliBackend().result_value('```json\n{"x": 2}\n```')) == M(x=2)

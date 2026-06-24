@@ -47,9 +47,9 @@ class CodexCliBackend(CliBackend):
     def build_command(self, spec: RunSpec) -> list[str]:
         """Build the `codex exec` argv for one stdin-prompted invocation.
 
-        Resolves `spec.schema` to a temp file via `resolve_schema_path` and adds
-        `--output-schema` when present; `invocation` reuses that path and cleans
-        it up after the run.
+        Derives the schema from `spec.response_model`, writes it to a temp file
+        via `resolve_schema_path`, and adds `--output-schema` when present;
+        `invocation` reuses that path and cleans it up after the run.
 
         Args:
             spec: The configured run to translate into argv.
@@ -59,7 +59,7 @@ class CodexCliBackend(CliBackend):
         """
         from spawnllm.structured import resolve_schema_path
 
-        return self.command_for(spec, resolve_schema_path(self, spec.schema))
+        return self.command_for(spec, resolve_schema_path(self, self.schema_arg(spec)))
 
     def command_for(self, spec: RunSpec, schema_path: str | None) -> list[str]:
         cfg = spec.config_for(CodexConfig) or CodexConfig()
@@ -97,7 +97,7 @@ class CodexCliBackend(CliBackend):
         """
         from spawnllm.structured import resolve_schema_path
 
-        schema_path = resolve_schema_path(self, spec.schema)
+        schema_path = resolve_schema_path(self, self.schema_arg(spec))
         fd, result_path = tempfile.mkstemp(suffix=".json")
         os.close(fd)
         return Invocation(
@@ -124,18 +124,6 @@ class CodexCliBackend(CliBackend):
         from openai.lib._pydantic import to_strict_json_schema
 
         return json.dumps(to_strict_json_schema(model))
-
-    def parse_response(self, raw: str, response_model: type[BaseModel] | None) -> str | BaseModel:
-        """Parse the final message `codex` wrote to its `-o` file into text or a validated model.
-
-        Args:
-            raw: The final message read from the `-o` file.
-            response_model: Model to validate against, or `None` for raw text.
-
-        Returns:
-            `raw` when `response_model` is `None`; otherwise `raw` validated as JSON against `response_model`.
-        """
-        return raw if not response_model else response_model.model_validate_json(raw)
 
     def env(self) -> dict[str, str]:
         """Return no extra environment variables; the `codex` CLI runs with the inherited environment."""

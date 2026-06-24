@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pydantic import BaseModel
+
     from spawnllm.types import ProviderName
 
 
@@ -81,7 +83,7 @@ class RunSpec:
 
     prompt: str
     model: str
-    schema: str | None = None
+    response_model: type[BaseModel] | None = None
     agent: bool = False
     cwd: str | None = None
     env: dict[str, str] | None = None

@@ -6,43 +6,38 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from spawnllm import RunResult, RunSpec, run, run_sync
+from spawnllm import Response, RunSpec, run, run_sync
 from spawnllm.backends.base import LlmBackend
 from spawnllm.proc import arun_cli, map_concurrent, run_cli
 
 if TYPE_CHECKING:
-    from pydantic import BaseModel
-
     from spawnllm.backends.base import BackendStatus
 
 RUN_MODULE = importlib.import_module("spawnllm.run")
 
-NONZERO_OVERLOADED = RunResult(stdout="", stderr="API Error: 529 Overloaded", returncode=1)
-ENVELOPE_OVERLOADED = RunResult(stdout='{"is_error": true, "result": "Overloaded"}', stderr="", returncode=0)
-SUCCESS = RunResult(stdout='{"is_error": false, "result": "ok"}', stderr="", returncode=0)
+TRANSIENT = Response(error="codex exited 1: API Error: 529 Overloaded", result=None)
+TRANSIENT_2 = Response(error="claude reported an error: rate limit", result=None)
+SUCCESS = Response(error=None, result="ok")
 
 
 class ScriptedBackend(LlmBackend):
     models = {}
     provider = "claude"
 
-    def __init__(self, results: list[RunResult]) -> None:
+    def __init__(self, results: list[Response]) -> None:
         self.results = results
         self.attempts = 0
 
-    def _next(self) -> RunResult:
+    def _next(self) -> Response:
         result = self.results[self.attempts]
         self.attempts += 1
         return result
 
-    async def aexecute(self, spec: RunSpec) -> RunResult:
+    async def aexecute(self, spec: RunSpec) -> Response:
         return self._next()
 
-    def execute(self, spec: RunSpec) -> RunResult:
+    def execute(self, spec: RunSpec) -> Response:
         return self._next()
-
-    def parse_response(self, raw: str, response_model: type[BaseModel] | None) -> str | BaseModel:
-        return raw
 
     def env(self) -> dict[str, str]:
         return {}
@@ -115,11 +110,11 @@ SPEC = RunSpec(prompt="hi", model="haiku", max_attempts=3)
 class TestRetry:
     @pytest.mark.parametrize(
         "transient",
-        [NONZERO_OVERLOADED, ENVELOPE_OVERLOADED],
-        ids=["nonzero-exit-stderr", "zero-exit-error-envelope"],
+        [TRANSIENT, TRANSIENT_2],
+        ids=["exit-529-error", "rate-limit-error"],
     )
     async def test_async_retries_then_succeeds(
-        self, monkeypatch: pytest.MonkeyPatch, transient: RunResult
+        self, monkeypatch: pytest.MonkeyPatch, transient: Response
     ) -> None:
         slept: list[float] = []
 
@@ -134,10 +129,10 @@ class TestRetry:
 
     @pytest.mark.parametrize(
         "transient",
-        [NONZERO_OVERLOADED, ENVELOPE_OVERLOADED],
-        ids=["nonzero-exit-stderr", "zero-exit-error-envelope"],
+        [TRANSIENT, TRANSIENT_2],
+        ids=["exit-529-error", "rate-limit-error"],
     )
-    def test_sync_retries_then_succeeds(self, monkeypatch: pytest.MonkeyPatch, transient: RunResult) -> None:
+    def test_sync_retries_then_succeeds(self, monkeypatch: pytest.MonkeyPatch, transient: Response) -> None:
         slept: list[float] = []
         monkeypatch.setattr(RUN_MODULE.time, "sleep", slept.append)
         backend = ScriptedBackend([transient, SUCCESS])
@@ -150,15 +145,15 @@ class TestRetry:
             return None
 
         monkeypatch.setattr(RUN_MODULE.asyncio, "sleep", fake_sleep)
-        last = RunResult(stdout="", stderr="529 Overloaded again", returncode=1)
-        backend = ScriptedBackend([NONZERO_OVERLOADED, ENVELOPE_OVERLOADED, last])
+        last = Response(error="codex exited 1: 529 Overloaded again", result=None)
+        backend = ScriptedBackend([TRANSIENT, TRANSIENT_2, last])
         assert await run(SPEC, backend=backend) is last
         assert backend.attempts == 3
 
     def test_sync_all_fail_returns_last_without_raising(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(RUN_MODULE.time, "sleep", lambda _: None)
-        last = RunResult(stdout="", stderr="529 Overloaded again", returncode=1)
-        backend = ScriptedBackend([NONZERO_OVERLOADED, ENVELOPE_OVERLOADED, last])
+        last = Response(error="codex exited 1: 529 Overloaded again", result=None)
+        backend = ScriptedBackend([TRANSIENT, TRANSIENT_2, last])
         assert run_sync(SPEC, backend=backend) is last
         assert backend.attempts == 3
 
@@ -180,5 +175,5 @@ class TestMlxBackend:
 
         engine = FakeEngine()
         result = await MlxBackend(engine, max_tokens=64).aexecute(RunSpec(prompt="ping", model="local"))
-        assert result == RunResult("pong", "", 0)
+        assert result == Response(error=None, result="pong")
         assert engine.calls == ["loaded", ([[{"role": "user", "content": "ping"}]], 64)]

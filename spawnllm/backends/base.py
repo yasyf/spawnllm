@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
-from spawnllm.proc import RunResult, acapture_cli, capture_cli
+from spawnllm.proc import acapture_cli, capture_cli
+from spawnllm.response import Response
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -62,6 +63,18 @@ class BackendUnavailable(RuntimeError):
     """Raised when no backend is ready (installed and authenticated)."""
 
 
+class BackendCallError(RuntimeError):
+    """Raised by `call`/`extract` when a backend returns a provider error.
+
+    Carries the backend's error string (a nonzero exit with stderr, or an error
+    envelope), attached both as the message and as a note for tracebacks.
+    """
+
+    def __init__(self, error: str) -> None:
+        super().__init__(error)
+        self.add_note(error)
+
+
 @dataclass(frozen=True)
 class Invocation:
     """A built CLI invocation: argv, optional stdin, and where to read the result.
@@ -95,37 +108,28 @@ class LlmBackend(ABC):
     provider: ClassVar[ProviderName]
 
     @abstractmethod
-    async def aexecute(self, spec: RunSpec) -> RunResult:
-        """Execute a single run asynchronously and capture its raw outcome.
+    async def aexecute(self, spec: RunSpec) -> Response:
+        """Execute a single run asynchronously and resolve it to a `Response`.
+
+        The backend runs the process, reads its output wherever the provider
+        writes it, detects failure, and validates against `spec.response_model`.
 
         Args:
             spec: The configured run to execute.
 
         Returns:
-            The captured stdout, stderr, and exit code.
+            The resolved `Response`.
         """
 
     @abstractmethod
-    def execute(self, spec: RunSpec) -> RunResult:
-        """Execute a single run synchronously and capture its raw outcome.
+    def execute(self, spec: RunSpec) -> Response:
+        """Execute a single run synchronously and resolve it to a `Response`.
 
         Args:
             spec: The configured run to execute.
 
         Returns:
-            The captured stdout, stderr, and exit code.
-        """
-
-    @abstractmethod
-    def parse_response(self, raw: str, response_model: type[BaseModel] | None) -> str | BaseModel:
-        """Parse raw stdout into text or a validated model.
-
-        Args:
-            raw: Raw stdout from the backend.
-            response_model: Model to validate against, or `None` for raw text.
-
-        Returns:
-            `raw` when `response_model` is `None`, else a validated instance.
+            The resolved `Response`.
         """
 
     @abstractmethod
@@ -172,6 +176,49 @@ class LlmBackend(ABC):
         """
         return json.dumps(model.model_json_schema())
 
+    def schema_arg(self, spec: RunSpec) -> str | None:
+        """Return the JSON-schema string for `spec`'s `response_model`, or `None` when absent."""
+        return self.schema_for(spec.response_model) if spec.response_model is not None else None
+
+    def to_response(self, raw: str, *, returncode: int, stderr: str, spec: RunSpec) -> Response:
+        """Resolve a raw capture into a `Response`: detect failure, extract text, validate.
+
+        A nonzero exit or an error envelope becomes `Response.error`; otherwise
+        the text comes from `result_text` and, when `spec.response_model` is set,
+        the validated model from `result_value`. A `pydantic.ValidationError`
+        from a non-conforming model propagates.
+
+        Args:
+            raw: The raw output read wherever the provider wrote it.
+            returncode: The process exit code.
+            stderr: The captured stderr.
+            spec: The configured run, carrying the optional `response_model`.
+
+        Returns:
+            The resolved `Response`.
+        """
+        if returncode != 0:
+            return Response(error=f"{self.provider} exited {returncode}: {stderr.strip()[-2000:]}", result=None)
+        if (err := self.envelope_error(raw)) is not None:
+            return Response(error=err, result=None)
+        if spec.response_model is None:
+            return Response(error=None, result=self.result_text(raw))
+        return Response(
+            error=None, result=self.result_text(raw), parsed=spec.response_model.model_validate(self.result_value(raw))
+        )
+
+    def result_text(self, raw: str) -> str:
+        """Return the final text output from a raw capture; the default is `raw` unchanged."""
+        return raw
+
+    def result_value(self, raw: str) -> object:
+        """Return the JSON value to validate from a raw capture; the default parses `raw` as JSON."""
+        return json.loads(raw)
+
+    def envelope_error(self, raw: str) -> str | None:
+        """Return the provider's error message from an error envelope, or `None` on success."""
+        return None
+
 
 class CliBackend(LlmBackend):
     """Execution contract for the subprocess-backed LLM family.
@@ -214,7 +261,7 @@ class CliBackend(LlmBackend):
         """
         return Invocation(self.build_command(spec), spec.prompt)
 
-    async def aexecute(self, spec: RunSpec) -> RunResult:
+    async def aexecute(self, spec: RunSpec) -> Response:
         inv = self.invocation(spec)
         try:
             rr = await acapture_cli(
@@ -224,13 +271,13 @@ class CliBackend(LlmBackend):
                 cwd=spec.cwd,
                 timeout=spec.timeout,
             )
-            stdout = Path(inv.result_path).read_text() if inv.result_path else rr.stdout
+            raw = Path(inv.result_path).read_text() if inv.result_path else rr.stdout
         finally:
             for path in inv.cleanup_paths:
                 Path(path).unlink(missing_ok=True)
-        return RunResult(stdout, rr.stderr, rr.returncode)
+        return self.to_response(raw, returncode=rr.returncode, stderr=rr.stderr, spec=spec)
 
-    def execute(self, spec: RunSpec) -> RunResult:
+    def execute(self, spec: RunSpec) -> Response:
         inv = self.invocation(spec)
         try:
             rr = capture_cli(
@@ -240,11 +287,11 @@ class CliBackend(LlmBackend):
                 cwd=spec.cwd,
                 timeout=spec.timeout,
             )
-            stdout = Path(inv.result_path).read_text() if inv.result_path else rr.stdout
+            raw = Path(inv.result_path).read_text() if inv.result_path else rr.stdout
         finally:
             for path in inv.cleanup_paths:
                 Path(path).unlink(missing_ok=True)
-        return RunResult(stdout, rr.stderr, rr.returncode)
+        return self.to_response(raw, returncode=rr.returncode, stderr=rr.stderr, spec=spec)
 
     def check_status(self, *, timeout: int = 10) -> BackendStatus:
         """Check whether this backend's CLI is installed and authenticated.

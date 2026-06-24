@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from pydantic import BaseModel
+import pytest
+from pydantic import BaseModel, ValidationError
 
-from spawnllm import ClaudeCliBackend, CodexCliBackend, RunResult, call_sync
+from spawnllm import BackendCallError, ClaudeCliBackend, CodexCliBackend, call_sync, extract_sync
 from spawnllm.backends import base
-
-if TYPE_CHECKING:
-    import pytest
+from spawnllm.proc import RunResult
 
 
 class M(BaseModel):
@@ -26,11 +24,11 @@ def test_codex_text_call_reads_final_message_not_log(monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr(base, "capture_cli", fake_capture_cli)
 
-    assert call_sync("hi", backend=CodexCliBackend(), response_model=None) == "the final answer"
+    assert call_sync("hi", backend=CodexCliBackend()) == "the final answer"
     assert not Path(captured["result"]).exists()
 
 
-def test_codex_structured_call_reads_file_and_cleans_schema_and_result(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_codex_structured_extract_reads_file_and_cleans_schema_and_result(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(CodexCliBackend, "schema_for", lambda self, model: '{"type": "object"}')
     captured: dict[str, str] = {}
 
@@ -42,14 +40,14 @@ def test_codex_structured_call_reads_file_and_cleans_schema_and_result(monkeypat
 
     monkeypatch.setattr(base, "capture_cli", fake_capture_cli)
 
-    assert call_sync("hi", backend=CodexCliBackend(), response_model=M) == M(x=7)
+    assert extract_sync("hi", M, backend=CodexCliBackend()) == M(x=7)
     assert not Path(captured["schema"]).exists()
     assert not Path(captured["result"]).exists()
 
 
 def test_call_sync_text_passthrough(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(base, "capture_cli", lambda argv, **_: RunResult("plain answer", "", 0))
-    assert call_sync("hi", backend=ClaudeCliBackend(), response_model=None) == "plain answer"
+    assert call_sync("hi", backend=ClaudeCliBackend()) == "plain answer"
 
 
 def test_call_sync_threads_cwd_and_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -77,3 +75,43 @@ def test_call_sync_maps_tier_to_literal_model(monkeypatch: pytest.MonkeyPatch) -
 
     assert call_sync("hi", backend=ClaudeCliBackend(), model="large") == "ok"
     assert captured["argv"][captured["argv"].index("--model") + 1] == "opus"
+
+
+def test_failed_codex_surfaces_stderr_not_eof_on_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(base, "capture_cli", lambda argv, **_: RunResult("", "codex: not found", 127))
+
+    with pytest.raises(BackendCallError) as exc:
+        call_sync("hi", backend=CodexCliBackend())
+
+    assert "codex: not found" in str(exc.value)
+    assert "127" in str(exc.value)
+    assert "EOF while parsing" not in str(exc.value)
+
+
+def test_failed_codex_surfaces_stderr_not_eof_on_extract(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(CodexCliBackend, "schema_for", lambda self, model: '{"type": "object"}')
+
+    def fake_capture_cli(argv: list[str], **_: object) -> RunResult:
+        # The -o file was created empty by mkstemp and codex died before writing.
+        return RunResult("", "codex: not found", 127)
+
+    monkeypatch.setattr(base, "capture_cli", fake_capture_cli)
+
+    with pytest.raises(BackendCallError) as exc:
+        extract_sync("hi", M, backend=CodexCliBackend())
+
+    assert "codex: not found" in str(exc.value)
+    assert "EOF while parsing" not in str(exc.value)
+
+
+def test_malformed_json_raises_validation_error_out_of_extract(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(CodexCliBackend, "schema_for", lambda self, model: '{"type": "object"}')
+
+    def fake_capture_cli(argv: list[str], **_: object) -> RunResult:
+        Path(argv[argv.index("-o") + 1]).write_text('{"x": "not an int"}')
+        return RunResult("log", "", 0)
+
+    monkeypatch.setattr(base, "capture_cli", fake_capture_cli)
+
+    with pytest.raises(ValidationError):
+        extract_sync("hi", M, backend=CodexCliBackend())
