@@ -31,7 +31,12 @@ class GeminiFamilyBackend(CliBackend, ABC):
     api_key_envs: ClassVar[tuple[str, ...]]
 
     def env(self) -> dict[str, str]:
-        """Return no extra environment variables; Gemini-family CLIs authenticate via OAuth, not an injected key."""
+        """Return no extra environment variables.
+
+        Gemini-family CLIs read settings and OAuth from the same config home (`~/.gemini`,
+        `~/.gemini/antigravity-cli`), with no isolation flag and no way to relocate config
+        without stranding auth, so isolated runs read the real config — the no-flag exception.
+        """
         return {}
 
     def is_authenticated(self, *, timeout: int) -> bool:

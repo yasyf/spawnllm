@@ -75,7 +75,9 @@ class RunSpec:
     Common fields are interpreted by every backend; `provider_configs` carries
     optional per-provider flag passthrough that only the matching backend reads.
     `model` is a literal provider model id (`opus`, `sonnet`, …) passed straight
-    through with no tier mapping.
+    through with no tier mapping. `isolated` (default `True`) runs the backend
+    against a fresh, host-free config home so a spawned CLI ignores ambient
+    settings, MCP servers, and hooks.
 
     Example:
         >>> RunSpec(prompt="ping", model="opus")
@@ -85,6 +87,7 @@ class RunSpec:
     model: str
     response_model: type[BaseModel] | None = None
     agent: bool = False
+    isolated: bool = True
     cwd: str | None = None
     env: dict[str, str] | None = None
     timeout: int = 180

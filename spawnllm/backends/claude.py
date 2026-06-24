@@ -84,11 +84,12 @@ class ClaudeCliBackend(CliBackend):
             "--no-session-persistence",
             "--model",
             spec.model,
+            *(["--setting-sources", ""] if spec.isolated else []),
+            *(["--strict-mcp-config"] if spec.isolated or cfg.strict_mcp else []),
             *(
                 [
                     *(["--permission-mode", cfg.permission_mode] if cfg.permission_mode is not None else []),
                     *(["--mcp-config", cfg.mcp_config] if cfg.mcp_config is not None else []),
-                    *(["--strict-mcp-config"] if cfg.strict_mcp else []),
                     *(["--disallowedTools", *cfg.disallowed_tools] if cfg.disallowed_tools else []),
                     *(
                         ["--append-system-prompt", cfg.append_system_prompt]
@@ -101,7 +102,7 @@ class ClaudeCliBackend(CliBackend):
                 if explicit
                 else ["--permission-mode", "auto", "--max-budget-usd", "1"]
                 if spec.agent
-                else ["--system-prompt", "", "--setting-sources", "", "--strict-mcp-config"]
+                else ["--system-prompt", ""]
             ),
             *(["--system-prompt", cfg.system_prompt] if cfg.system_prompt is not None else []),
             *(["--max-turns", str(cfg.max_turns)] if cfg.max_turns is not None else []),
@@ -151,9 +152,13 @@ class ClaudeCliBackend(CliBackend):
         return None
 
     def env(self) -> dict[str, str]:
-        """Return no extra environment variables; the `claude` CLI runs with the inherited environment."""
-        # CLAUDE_CODE_SIMPLE=1 breaks claude.ai keychain auth ("Not logged in")
-        # on current CLIs; --setting-sources ""/--strict-mcp-config already trim startup.
+        """Return no extra environment variables; the `claude` CLI runs with the inherited environment.
+
+        Isolation is flag-only (`--setting-sources ""`/`--strict-mcp-config`). A fresh
+        `CLAUDE_CONFIG_DIR` would log the CLI out: the keychain token is keyed to the
+        `oauthAccount` recorded in `~/.claude.json`, absent from a relocated dir.
+        (`CLAUDE_CODE_SIMPLE=1` likewise breaks claude.ai keychain auth.)
+        """
         return {}
 
     def is_authenticated(self, *, timeout: int) -> bool:

@@ -53,7 +53,7 @@ class MlxBackend(LlmBackend):
         return structured_value(raw)
 
     def env(self) -> dict[str, str]:
-        """Return no extra environment variables; MLX runs in-process."""
+        """Return no extra environment variables; MLX runs in-process with nothing to isolate."""
         return {}
 
     def is_authenticated(self, *, timeout: int) -> bool:

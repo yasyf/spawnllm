@@ -71,6 +71,7 @@ class CodexCliBackend(CliBackend):
             cfg.sandbox or "read-only",
             "--model",
             spec.model,
+            *(["--ignore-user-config"] if spec.isolated else []),
             *(
                 []
                 if spec.agent
@@ -126,7 +127,12 @@ class CodexCliBackend(CliBackend):
         return json.dumps(to_strict_json_schema(model))
 
     def env(self) -> dict[str, str]:
-        """Return no extra environment variables; the `codex` CLI runs with the inherited environment."""
+        """Return no extra environment variables; `--ignore-user-config` isolates config while `CODEX_HOME` keeps auth.
+
+        `codex` keeps `auth.json` in `CODEX_HOME`, so relocating it would strand a
+        single-use OAuth refresh token; the `--ignore-user-config` flag isolates
+        `config.toml` without touching auth.
+        """
         return {}
 
     def is_authenticated(self, *, timeout: int) -> bool:

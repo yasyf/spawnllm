@@ -33,11 +33,25 @@ class TestClaudeArgv:
             "--no-session-persistence",
             "--model",
             "haiku",
-            "--system-prompt",
-            "",
             "--setting-sources",
             "",
             "--strict-mcp-config",
+            "--system-prompt",
+            "",
+        ]
+
+    def test_isolated_false_drops_isolation_flags(self) -> None:
+        argv = ClaudeCliBackend().build_command(RunSpec(prompt="hi", model="haiku", isolated=False))
+        assert "--setting-sources" not in argv
+        assert "--strict-mcp-config" not in argv
+        assert argv == [
+            "claude",
+            "-p",
+            "--no-session-persistence",
+            "--model",
+            "haiku",
+            "--system-prompt",
+            "",
         ]
 
     def test_agent_with_schema(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -50,6 +64,9 @@ class TestClaudeArgv:
             "--no-session-persistence",
             "--model",
             "opus",
+            "--setting-sources",
+            "",
+            "--strict-mcp-config",
             "--permission-mode",
             "auto",
             "--max-budget-usd",
@@ -81,11 +98,13 @@ class TestClaudeArgv:
             "--no-session-persistence",
             "--model",
             "opus",
+            "--setting-sources",
+            "",
+            "--strict-mcp-config",
             "--permission-mode",
             "bypassPermissions",
             "--mcp-config",
             "{mcp}",
-            "--strict-mcp-config",
             "--disallowedTools",
             "Bash",
             "Write",
@@ -115,6 +134,9 @@ class TestClaudeArgv:
             "--no-session-persistence",
             "--model",
             "haiku",
+            "--setting-sources",
+            "",
+            "--strict-mcp-config",
             "--system-prompt",
             "SP",
             "--max-turns",
@@ -137,7 +159,7 @@ class TestClaudeArgv:
     def test_models_and_env(self) -> None:
         backend = ClaudeCliBackend()
         assert backend.models == {"small": "haiku", "medium": "sonnet", "large": "opus"}
-        assert backend.env() == {}  # CLAUDE_CODE_SIMPLE breaks claude.ai keychain auth
+        assert backend.env() == {}  # isolation is flag-only; a fresh CLAUDE_CONFIG_DIR would break keychain auth
 
     def test_invocation_delivers_prompt_over_stdin(self) -> None:
         inv = ClaudeCliBackend().invocation(RunSpec(prompt="hi", model="haiku"))
@@ -174,13 +196,31 @@ class TestCodexArgv:
             "read-only",
             "--model",
             "gpt-5.5",
+            "--ignore-user-config",
             "-c",
             "features.codex_hooks=false",
             "-c",
             "features.mcp_servers=false",
         ]
 
-    def test_agent_omits_feature_toggles(self) -> None:
+    def test_isolated_false_drops_ignore_user_config(self) -> None:
+        argv = CodexCliBackend().build_command(RunSpec(prompt="hi", model="gpt-5.5", isolated=False))
+        assert "--ignore-user-config" not in argv
+        assert argv == [
+            "codex",
+            "exec",
+            "--ephemeral",
+            "--sandbox",
+            "read-only",
+            "--model",
+            "gpt-5.5",
+            "-c",
+            "features.codex_hooks=false",
+            "-c",
+            "features.mcp_servers=false",
+        ]
+
+    def test_agent_keeps_isolation_omits_feature_toggles(self) -> None:
         assert CodexCliBackend().build_command(RunSpec(prompt="hi", model="gpt-5.4-mini", agent=True)) == [
             "codex",
             "exec",
@@ -189,6 +229,7 @@ class TestCodexArgv:
             "read-only",
             "--model",
             "gpt-5.4-mini",
+            "--ignore-user-config",
         ]
 
     def test_config_overrides_sandbox_and_reenables_features(self) -> None:
@@ -205,6 +246,7 @@ class TestCodexArgv:
             "workspace-write",
             "--model",
             "gpt-5.5",
+            "--ignore-user-config",
         ]
 
     def test_models(self) -> None:
@@ -321,6 +363,10 @@ class TestGeminiBackend:
         raw = json.dumps({"response": '```json\n{"x": 1}\n```', "stats": stats})
         assert M.model_validate(GeminiCliBackend().result_value(raw)) == M(x=1)
 
+    def test_env_never_isolates(self) -> None:
+        # Gemini reads settings + OAuth from one config home with no isolation flag, so it can't be isolated.
+        assert GeminiCliBackend().env() == {}
+
 
 class TestAntigravityBackend:
     def test_build_command_agent_skips_permissions_with_timeout(self) -> None:
@@ -340,3 +386,7 @@ class TestAntigravityBackend:
 
     def test_result_value_validates_structured(self) -> None:
         assert M.model_validate(AntigravityCliBackend().result_value('```json\n{"x": 2}\n```')) == M(x=2)
+
+    def test_env_never_isolates(self) -> None:
+        # agy has no config-home override and entangles auth/onboarding with its config dir, so it never relocates.
+        assert AntigravityCliBackend().env() == {}
