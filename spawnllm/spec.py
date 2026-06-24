@@ -77,7 +77,10 @@ class RunSpec:
     `model` is a literal provider model id (`opus`, `sonnet`, …) passed straight
     through with no tier mapping. `isolated` (default `True`) runs the backend
     against a fresh, host-free config home so a spawned CLI ignores ambient
-    settings, MCP servers, and hooks.
+    settings, MCP servers, and hooks. Structured output comes from either a
+    `response_model` (validated to a model) or a raw `schema` (a JSON-Schema dict
+    or pre-serialized string, passed to the provider verbatim, with nothing to
+    validate); setting both raises `ValueError`.
 
     Example:
         >>> RunSpec(prompt="ping", model="opus")
@@ -86,6 +89,7 @@ class RunSpec:
     prompt: str
     model: str
     response_model: type[BaseModel] | None = None
+    schema: dict[str, object] | str | None = None
     agent: bool = False
     isolated: bool = True
     cwd: str | None = None
@@ -93,6 +97,10 @@ class RunSpec:
     timeout: int = 180
     max_attempts: int = 5
     provider_configs: dict[ProviderName, ProviderConfig] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.response_model is not None and self.schema is not None:
+            raise ValueError("RunSpec accepts either response_model or schema, not both")
 
     def config_for[T: ProviderConfig](self, kind: type[T]) -> T | None:
         """Return the first provider config that is an instance of `kind`, or None."""

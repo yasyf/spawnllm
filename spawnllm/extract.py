@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
-from spawnllm.backends.base import BackendCallError
 from spawnllm.backends.registry import select_backend
 from spawnllm.run import run, run_sync
 from spawnllm.spec import RunSpec
@@ -66,8 +65,8 @@ async def extract[T: BaseModel](
     )
     resp = await run(spec, backend=backend)
     if resp.error is not None:
-        raise BackendCallError(resp.error)
-    return cast(T, resp.parsed)
+        raise resp.error.ex
+    return cast(T, resp.result.parsed)
 
 
 def extract_sync[T: BaseModel](
@@ -118,5 +117,5 @@ def extract_sync[T: BaseModel](
     )
     resp = run_sync(spec, backend=backend)
     if resp.error is not None:
-        raise BackendCallError(resp.error)
-    return cast(T, resp.parsed)
+        raise resp.error.ex
+    return cast(T, resp.result.parsed)

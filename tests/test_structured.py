@@ -6,13 +6,33 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
-from spawnllm import ClaudeCliBackend, CodexCliBackend, GeminiCliBackend, LlmBackend, Response
+from spawnllm import (
+    ClaudeCliBackend,
+    CodexCliBackend,
+    Error,
+    GeminiCliBackend,
+    LlmBackend,
+    Output,
+    Response,
+    Result,
+    RunSpec,
+)
 from spawnllm.structured import (
     extract_json_block,
     is_transient,
     resolve_schema_path,
     structured_value,
 )
+
+SPEC = RunSpec(prompt="hi", model="haiku")
+
+
+def err_response(msg: str) -> Response:
+    return Response(spec=SPEC, output=Output(msg), error=Error(msg, RuntimeError(msg)))
+
+
+def ok_response(text: str) -> Response:
+    return Response(spec=SPEC, output=Output(text), result=Result(raw=text))
 
 
 class Verdict(BaseModel):
@@ -96,12 +116,12 @@ class TestIsTransient:
     @pytest.mark.parametrize(
         "resp, expected",
         [
-            (Response(error="codex exited 1: API Error: 529 Overloaded", result=None), True),
-            (Response(error="claude reported an error: Overloaded", result=None), True),
-            (Response(error="gemini call failed: rate limit", result=None), True),
-            (Response(error=None, result="ok"), False),
-            (Response(error="codex exited 127: codex: not found", result=None), False),
-            (Response(error="boom", result=None), False),
+            (err_response("codex exited 1: API Error: 529 Overloaded"), True),
+            (err_response("claude reported an error: Overloaded"), True),
+            (err_response("gemini call failed: rate limit"), True),
+            (ok_response("ok"), False),
+            (err_response("codex exited 127: codex: not found"), False),
+            (err_response("boom"), False),
         ],
         ids=[
             "exit-529-error",

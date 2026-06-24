@@ -1,17 +1,113 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from spawnllm import BackendCallError, ClaudeCliBackend, CodexCliBackend, call_sync, extract_sync
+from spawnllm import (
+    BackendCallError,
+    ClaudeCliBackend,
+    CodexCliBackend,
+    Output,
+    Response,
+    Result,
+    RunSpec,
+    call,
+    call_sync,
+    extract_sync,
+    run,
+    run_sync,
+)
 from spawnllm.backends import base
 from spawnllm.proc import RunResult
+
+CLAUDE_STREAM = json.dumps({"type": "result", "is_error": False, "result": "the extracted text"})
 
 
 class M(BaseModel):
     x: int
+
+
+def test_run_sync_success_shape_output_differs_from_result() -> None:
+    spec = RunSpec(prompt="hi", model="haiku")
+
+    class FakeClaude(ClaudeCliBackend):
+        def execute(self, spec: RunSpec) -> Response:
+            return self.to_response(CLAUDE_STREAM, returncode=0, stderr="", spec=spec)
+
+    resp = run_sync(spec, backend=FakeClaude())
+    assert resp == Response(spec=spec, output=Output(CLAUDE_STREAM), result=Result(raw="the extracted text"))
+    assert resp.error is None
+    assert resp.output.raw == CLAUDE_STREAM
+    assert resp.result.raw == "the extracted text"
+    assert resp.output.raw != resp.result.raw
+
+
+async def test_run_success_shape_carries_parsed_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(ClaudeCliBackend, "schema_for", lambda self, model: '{"type":"object"}')
+
+    async def fake_acapture(argv: list[str], **_: object) -> RunResult:
+        return RunResult(json.dumps([{"type": "result", "structured_output": {"x": 9}, "result": "txt"}]), "", 0)
+
+    monkeypatch.setattr(base, "acapture_cli", fake_acapture)
+    resp = await run(RunSpec(prompt="hi", model="haiku", response_model=M), backend=ClaudeCliBackend())
+    assert resp.error is None
+    assert resp.result.parsed == M(x=9)
+
+
+def test_run_sync_timeout_routes_through_error_as_timeouterror(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(argv: list[str], **_: object) -> RunResult:
+        raise subprocess.TimeoutExpired(argv, 180)
+
+    monkeypatch.setattr(base, "capture_cli", boom)
+    resp = run_sync(RunSpec(prompt="hi", model="haiku", timeout=180), backend=ClaudeCliBackend())
+    assert resp.result is None
+    assert isinstance(resp.error.ex, TimeoutError)
+    assert "claude timed out after 180s" in resp.error.msg
+
+
+async def test_run_timeout_routes_through_error_as_timeouterror(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def boom(argv: list[str], **_: object) -> RunResult:
+        raise TimeoutError
+
+    monkeypatch.setattr(base, "acapture_cli", boom)
+    resp = await run(RunSpec(prompt="hi", model="haiku", timeout=180), backend=ClaudeCliBackend())
+    assert resp.result is None
+    assert isinstance(resp.error.ex, TimeoutError)
+
+
+def test_call_sync_reraises_timeout_as_timeouterror(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(argv: list[str], **_: object) -> RunResult:
+        raise subprocess.TimeoutExpired(argv, 180)
+
+    monkeypatch.setattr(base, "capture_cli", boom)
+    with pytest.raises(TimeoutError):
+        call_sync("hi", backend=ClaudeCliBackend())
+
+
+async def test_call_reraises_timeout_as_timeouterror(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def boom(argv: list[str], **_: object) -> RunResult:
+        raise TimeoutError
+
+    monkeypatch.setattr(base, "acapture_cli", boom)
+    with pytest.raises(TimeoutError):
+        await call("hi", backend=ClaudeCliBackend())
+
+
+def test_raw_schema_yields_result_with_no_parsed_model() -> None:
+    spec = RunSpec(prompt="hi", model="haiku", schema={"type": "object"})
+
+    class FakeClaude(ClaudeCliBackend):
+        def execute(self, spec: RunSpec) -> Response:
+            return self.to_response(CLAUDE_STREAM, returncode=0, stderr="", spec=spec)
+
+    resp = run_sync(spec, backend=FakeClaude())
+    assert resp.error is None
+    assert resp.result.raw == "the extracted text"
+    assert resp.result.parsed is None
 
 
 def test_codex_text_call_reads_final_message_not_log(monkeypatch: pytest.MonkeyPatch) -> None:

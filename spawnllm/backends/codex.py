@@ -36,9 +36,9 @@ class CodexCliBackend(CliBackend):
     """
 
     models: ClassVar[dict[TModel, str]] = {
-        "small": "gpt-5.3-codex-spark",
-        "medium": "gpt-5.4-mini",
-        "large": "gpt-5.5",
+        "small": "gpt-5.4-mini:low",
+        "medium": "gpt-5.4-mini:medium",
+        "large": "gpt-5.5:medium",
     }
     provider: ClassVar[ProviderName] = "codex"
     binary: ClassVar[str] = "codex"
@@ -63,6 +63,7 @@ class CodexCliBackend(CliBackend):
 
     def command_for(self, spec: RunSpec, schema_path: str | None) -> list[str]:
         cfg = spec.config_for(CodexConfig) or CodexConfig()
+        model, _, effort = spec.model.partition(":")
         return [
             "codex",
             "exec",
@@ -70,7 +71,8 @@ class CodexCliBackend(CliBackend):
             "--sandbox",
             cfg.sandbox or "read-only",
             "--model",
-            spec.model,
+            model,
+            *(["-c", f"model_reasoning_effort={effort}"] if effort else []),
             *(["--ignore-user-config"] if spec.isolated else []),
             *(
                 []

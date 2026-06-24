@@ -5,13 +5,14 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from spawnllm.proc import acapture_cli, capture_cli
-from spawnllm.response import Response
+from spawnllm.response import Error, Output, Response, Result
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -66,13 +67,8 @@ class BackendUnavailable(RuntimeError):
 class BackendCallError(RuntimeError):
     """Raised by `call`/`extract` when a backend returns a provider error.
 
-    Carries the backend's error string (a nonzero exit with stderr, or an error
-    envelope), attached both as the message and as a note for tracebacks.
+    Carries the backend's error string: a nonzero exit with stderr, or an error envelope.
     """
-
-    def __init__(self, error: str) -> None:
-        super().__init__(error)
-        self.add_note(error)
 
 
 @dataclass(frozen=True)
@@ -177,35 +173,59 @@ class LlmBackend(ABC):
         return json.dumps(model.model_json_schema())
 
     def schema_arg(self, spec: RunSpec) -> str | None:
-        """Return the JSON-schema string for `spec`'s `response_model`, or `None` when absent."""
-        return self.schema_for(spec.response_model) if spec.response_model is not None else None
+        """Return the JSON-schema string for `spec`, from a `response_model` or a raw `schema`.
+
+        A `response_model` is run through `schema_for` (the provider's
+        strict-schema transform); a raw `schema` passes verbatim — a dict is
+        `json.dumps`'d, a string is returned unchanged. Returns `None` when
+        neither is set.
+
+        Args:
+            spec: The configured run, carrying the optional `response_model` or `schema`.
+
+        Returns:
+            The JSON-schema string for this backend's structured-output argument, or `None`.
+        """
+        if spec.response_model is not None:
+            return self.schema_for(spec.response_model)
+        if spec.schema is not None:
+            return json.dumps(spec.schema) if isinstance(spec.schema, dict) else spec.schema
+        return None
 
     def to_response(self, raw: str, *, returncode: int, stderr: str, spec: RunSpec) -> Response:
-        """Resolve a raw capture into a `Response`: detect failure, extract text, validate.
+        """Resolve a raw capture into a structured `Response`: detect failure, extract text, validate.
 
-        A nonzero exit or an error envelope becomes `Response.error`; otherwise
-        the text comes from `result_text` and, when `spec.response_model` is set,
-        the validated model from `result_value`. A `pydantic.ValidationError`
-        from a non-conforming model propagates.
+        `output` always carries the full raw stream. A nonzero exit, an error
+        envelope, or a `pydantic.ValidationError` from a non-conforming model all
+        route through `error` (with the underlying exception preserved in
+        `error.ex`) and leave `result` as `None`; a success yields `result` (text
+        from `result_text`, plus the validated model from `result_value` when
+        `spec.response_model` is set) and `error` as `None`.
 
         Args:
             raw: The raw output read wherever the provider wrote it.
             returncode: The process exit code.
             stderr: The captured stderr.
-            spec: The configured run, carrying the optional `response_model`.
+            spec: The configured run, carrying the optional `response_model` or `schema`.
 
         Returns:
             The resolved `Response`.
         """
+        import pydantic
+
+        output = Output(raw)
         if returncode != 0:
-            return Response(error=f"{self.provider} exited {returncode}: {stderr.strip()[-2000:]}", result=None)
+            msg = f"{self.provider} exited {returncode}: {stderr.strip()[-2000:]}"
+            return Response(spec=spec, output=output, error=Error(msg, BackendCallError(msg)))
         if (err := self.envelope_error(raw)) is not None:
-            return Response(error=err, result=None)
+            return Response(spec=spec, output=output, error=Error(err, BackendCallError(err)))
         if spec.response_model is None:
-            return Response(error=None, result=self.result_text(raw))
-        return Response(
-            error=None, result=self.result_text(raw), parsed=spec.response_model.model_validate(self.result_value(raw))
-        )
+            return Response(spec=spec, output=output, result=Result(raw=self.result_text(raw)))
+        try:
+            parsed = spec.response_model.model_validate(self.result_value(raw))
+        except pydantic.ValidationError as e:
+            return Response(spec=spec, output=output, error=Error(str(e), e))
+        return Response(spec=spec, output=output, result=Result(raw=self.result_text(raw), parsed=parsed))
 
     def result_text(self, raw: str) -> str:
         """Return the final text output from a raw capture; the default is `raw` unchanged."""
@@ -261,16 +281,23 @@ class CliBackend(LlmBackend):
         """
         return Invocation(self.build_command(spec), spec.prompt)
 
+    def timed_out(self, spec: RunSpec) -> Response:
+        msg = f"{self.provider} timed out after {spec.timeout}s"
+        return Response(spec=spec, output=Output(""), error=Error(msg, TimeoutError(msg)))
+
     async def aexecute(self, spec: RunSpec) -> Response:
         inv = self.invocation(spec)
         try:
-            rr = await acapture_cli(
-                inv.argv,
-                input=inv.stdin,
-                env=os.environ | self.env() | (spec.env or {}),
-                cwd=spec.cwd,
-                timeout=spec.timeout,
-            )
+            try:
+                rr = await acapture_cli(
+                    inv.argv,
+                    input=inv.stdin,
+                    env=os.environ | self.env() | (spec.env or {}),
+                    cwd=spec.cwd,
+                    timeout=spec.timeout,
+                )
+            except TimeoutError:
+                return self.timed_out(spec)
             raw = Path(inv.result_path).read_text() if inv.result_path else rr.stdout
         finally:
             for path in inv.cleanup_paths:
@@ -280,13 +307,16 @@ class CliBackend(LlmBackend):
     def execute(self, spec: RunSpec) -> Response:
         inv = self.invocation(spec)
         try:
-            rr = capture_cli(
-                inv.argv,
-                input=inv.stdin,
-                env=os.environ | self.env() | (spec.env or {}),
-                cwd=spec.cwd,
-                timeout=spec.timeout,
-            )
+            try:
+                rr = capture_cli(
+                    inv.argv,
+                    input=inv.stdin,
+                    env=os.environ | self.env() | (spec.env or {}),
+                    cwd=spec.cwd,
+                    timeout=spec.timeout,
+                )
+            except subprocess.TimeoutExpired:
+                return self.timed_out(spec)
             raw = Path(inv.result_path).read_text() if inv.result_path else rr.stdout
         finally:
             for path in inv.cleanup_paths:

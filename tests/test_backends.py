@@ -12,9 +12,11 @@ from spawnllm import (
     ClaudeConfig,
     CodexCliBackend,
     CodexConfig,
+    Error,
     GeminiCliBackend,
     GeminiConfig,
     LlmBackends,
+    Output,
     Response,
     RunSpec,
 )
@@ -251,10 +253,19 @@ class TestCodexArgv:
 
     def test_models(self) -> None:
         assert CodexCliBackend().models == {
-            "small": "gpt-5.3-codex-spark",
-            "medium": "gpt-5.4-mini",
-            "large": "gpt-5.5",
+            "small": "gpt-5.4-mini:low",
+            "medium": "gpt-5.4-mini:medium",
+            "large": "gpt-5.5:medium",
         }
+
+    def test_reasoning_effort_split_from_model(self) -> None:
+        argv = CodexCliBackend().build_command(RunSpec(prompt="hi", model="gpt-5.4-mini:medium"))
+        assert argv[argv.index("--model") + 1] == "gpt-5.4-mini"
+        assert "model_reasoning_effort=medium" in argv
+
+    def test_bare_model_has_no_effort_flag(self) -> None:
+        argv = CodexCliBackend().build_command(RunSpec(prompt="hi", model="gpt-5.5"))
+        assert not any(a.startswith("model_reasoning_effort") for a in argv)
 
     def test_result_value_parses_raw_json(self) -> None:
         assert CodexCliBackend().result_value('{"block": true, "reason": "bad"}') == {"block": True, "reason": "bad"}
@@ -372,7 +383,10 @@ class TestGeminiBackend:
             {"response": "", "error": "503 model overloaded", "stats": {"models": {"g": {"api": {"totalErrors": 1}}}}}
         )
         msg = GeminiCliBackend().envelope_error(raw)
-        assert msg is not None and is_transient(Response(error=msg, result=None))
+        spec = RunSpec(prompt="hi", model="gemini-2.5-flash")
+        assert msg is not None and is_transient(
+            Response(spec=spec, output=Output(raw), error=Error(msg, RuntimeError(msg)))
+        )
 
     def test_result_value_extracts_json_block_from_envelope(self) -> None:
         stats = {"models": {"g": {"api": {"totalErrors": 0}}}}
@@ -406,3 +420,33 @@ class TestAntigravityBackend:
     def test_env_never_isolates(self) -> None:
         # agy has no config-home override and entangles auth/onboarding with its config dir, so it never relocates.
         assert AntigravityCliBackend().env() == {}
+
+
+class TestSchemaOrModel:
+    def test_raw_schema_dict_dumped_into_claude_argv_verbatim(self) -> None:
+        spec = RunSpec(prompt="hi", model="haiku", schema={"type": "object", "x": 1})
+        argv = ClaudeCliBackend().build_command(spec)
+        i = argv.index("--json-schema")
+        assert json.loads(argv[i + 1]) == {"type": "object", "x": 1}
+        assert argv[i + 2 : i + 4] == ["--output-format", "json"]
+
+    def test_raw_schema_string_passes_through_verbatim(self) -> None:
+        spec = RunSpec(prompt="hi", model="haiku", schema='{"raw":true}')
+        argv = ClaudeCliBackend().build_command(spec)
+        assert argv[argv.index("--json-schema") + 1] == '{"raw":true}'
+
+    def test_raw_schema_goes_into_codex_output_schema_file(self) -> None:
+        spec = RunSpec(prompt="hi", model="gpt-5.5", schema={"type": "object"})
+        inv = CodexCliBackend().invocation(spec)
+        schema_path = inv.argv[inv.argv.index("--output-schema") + 1]
+        assert json.loads(Path(schema_path).read_text()) == {"type": "object"}
+        for path in inv.cleanup_paths:
+            Path(path).unlink()
+
+    def test_raw_schema_injected_into_gemini_prompt(self) -> None:
+        inv = GeminiCliBackend().invocation(RunSpec(prompt="hi", model="gemini-2.5-flash", schema={"type": "object"}))
+        assert '{"type": "object"}' in inv.argv[-1]
+
+    def test_schema_and_response_model_together_raise(self) -> None:
+        with pytest.raises(ValueError, match="either response_model or schema"):
+            RunSpec(prompt="hi", model="haiku", schema={"type": "object"}, response_model=M)

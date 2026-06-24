@@ -23,8 +23,9 @@ async def run(spec: RunSpec, *, backend: LlmBackend | None = None) -> Response:
     Each attempt runs through `backend.aexecute`; a transient `Response.error`
     (a 529, overloaded, rate-limit, or `5xx`) triggers a capped exponential
     backoff and another attempt, up to `spec.max_attempts`. The final `Response`
-    — success or last transient failure — is returned without raising. A
-    `pydantic.ValidationError` from the backend's validate propagates.
+    — success or last failure — is returned without raising; every operational
+    failure (nonzero exit, error envelope, timeout, validation) lives in
+    `resp.error`.
 
     Args:
         spec: The configured run to execute.

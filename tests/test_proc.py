@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from spawnllm import Response, RunSpec, run, run_sync
+from spawnllm import Error, Output, Response, Result, RunSpec, run, run_sync
 from spawnllm.backends.base import LlmBackend
 from spawnllm.proc import arun_cli, map_concurrent, run_cli
 
@@ -15,9 +15,14 @@ if TYPE_CHECKING:
 
 RUN_MODULE = importlib.import_module("spawnllm.run")
 
-TRANSIENT = Response(error="codex exited 1: API Error: 529 Overloaded", result=None)
-TRANSIENT_2 = Response(error="claude reported an error: rate limit", result=None)
-SUCCESS = Response(error=None, result="ok")
+SPEC = RunSpec(prompt="hi", model="haiku", max_attempts=3)
+TRANSIENT = Response(
+    spec=SPEC, output=Output("529"), error=Error("codex exited 1: API Error: 529 Overloaded", RuntimeError("529"))
+)
+TRANSIENT_2 = Response(
+    spec=SPEC, output=Output("rl"), error=Error("claude reported an error: rate limit", RuntimeError("rl"))
+)
+SUCCESS = Response(spec=SPEC, output=Output("ok"), result=Result(raw="ok"))
 
 
 class ScriptedBackend(LlmBackend):
@@ -104,9 +109,6 @@ class TestMapConcurrent:
         assert done == [1, 1, 1, 1]
 
 
-SPEC = RunSpec(prompt="hi", model="haiku", max_attempts=3)
-
-
 class TestRetry:
     @pytest.mark.parametrize(
         "transient",
@@ -145,14 +147,18 @@ class TestRetry:
             return None
 
         monkeypatch.setattr(RUN_MODULE.asyncio, "sleep", fake_sleep)
-        last = Response(error="codex exited 1: 529 Overloaded again", result=None)
+        last = Response(
+            spec=SPEC, output=Output("529"), error=Error("codex exited 1: 529 Overloaded again", RuntimeError("529"))
+        )
         backend = ScriptedBackend([TRANSIENT, TRANSIENT_2, last])
         assert await run(SPEC, backend=backend) is last
         assert backend.attempts == 3
 
     def test_sync_all_fail_returns_last_without_raising(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(RUN_MODULE.time, "sleep", lambda _: None)
-        last = Response(error="codex exited 1: 529 Overloaded again", result=None)
+        last = Response(
+            spec=SPEC, output=Output("529"), error=Error("codex exited 1: 529 Overloaded again", RuntimeError("529"))
+        )
         backend = ScriptedBackend([TRANSIENT, TRANSIENT_2, last])
         assert run_sync(SPEC, backend=backend) is last
         assert backend.attempts == 3
@@ -174,6 +180,7 @@ class TestMlxBackend:
                 return ["pong"]
 
         engine = FakeEngine()
-        result = await MlxBackend(engine, max_tokens=64).aexecute(RunSpec(prompt="ping", model="local"))
-        assert result == Response(error=None, result="pong")
+        spec = RunSpec(prompt="ping", model="local")
+        result = await MlxBackend(engine, max_tokens=64).aexecute(spec)
+        assert result == Response(spec=spec, output=Output("pong"), result=Result(raw="pong"))
         assert engine.calls == ["loaded", ([[{"role": "user", "content": "ping"}]], 64)]

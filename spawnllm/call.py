@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from spawnllm.backends.base import BackendCallError
 from spawnllm.backends.registry import select_backend
 from spawnllm.run import run, run_sync
 from spawnllm.spec import RunSpec
@@ -54,8 +53,8 @@ async def call(
         RunSpec(prompt=prompt, model=backend.models[model], agent=agent, cwd=cwd, timeout=timeout), backend=backend
     )
     if resp.error is not None:
-        raise BackendCallError(resp.error)
-    return resp.result
+        raise resp.error.ex
+    return resp.result.raw
 
 
 def call_sync(
@@ -96,5 +95,5 @@ def call_sync(
         RunSpec(prompt=prompt, model=backend.models[model], agent=agent, cwd=cwd, timeout=timeout), backend=backend
     )
     if resp.error is not None:
-        raise BackendCallError(resp.error)
-    return resp.result
+        raise resp.error.ex
+    return resp.result.raw

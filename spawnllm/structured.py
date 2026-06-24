@@ -92,7 +92,7 @@ def structured_value(raw: str) -> object:
 def is_transient(resp: Response) -> bool:
     """Report whether a response failed with a retryable transient error.
 
-    A response is transient iff it carries an `error` whose text matches the
+    A response is transient iff it carries an `error` whose message matches the
     `TRANSIENT` pattern (529, overloaded, rate-limit, or any `5xx`).
 
     Args:
@@ -101,7 +101,7 @@ def is_transient(resp: Response) -> bool:
     Returns:
         `True` when the response should be retried.
     """
-    return resp.error is not None and bool(TRANSIENT.search(resp.error))
+    return resp.error is not None and bool(TRANSIENT.search(resp.error.msg))
 
 
 def backoff(attempt: int) -> float:
