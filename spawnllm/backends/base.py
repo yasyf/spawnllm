@@ -129,8 +129,13 @@ class LlmBackend(ABC):
         """
 
     @abstractmethod
-    def env(self) -> dict[str, str]:
-        """Return extra environment variables for the invocation, merged over the inherited environment."""
+    def env(self, spec: RunSpec) -> dict[str, str]:
+        """Return extra environment variables for the invocation, merged over the inherited environment.
+
+        Args:
+            spec: The configured run, so a backend can scope env overrides to
+                `spec.isolated` (e.g. a fresh config home only when isolating).
+        """
 
     @abstractmethod
     def is_authenticated(self, *, timeout: int) -> bool:
@@ -292,7 +297,7 @@ class CliBackend(LlmBackend):
                 rr = await acapture_cli(
                     inv.argv,
                     input=inv.stdin,
-                    env=os.environ | self.env() | (spec.env or {}),
+                    env=os.environ | self.env(spec) | (spec.env or {}),
                     cwd=spec.cwd,
                     timeout=spec.timeout,
                 )
@@ -311,7 +316,7 @@ class CliBackend(LlmBackend):
                 rr = capture_cli(
                     inv.argv,
                     input=inv.stdin,
-                    env=os.environ | self.env() | (spec.env or {}),
+                    env=os.environ | self.env(spec) | (spec.env or {}),
                     cwd=spec.cwd,
                     timeout=spec.timeout,
                 )

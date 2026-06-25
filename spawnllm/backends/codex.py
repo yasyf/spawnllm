@@ -128,7 +128,7 @@ class CodexCliBackend(CliBackend):
 
         return json.dumps(to_strict_json_schema(model))
 
-    def env(self) -> dict[str, str]:
+    def env(self, _spec: RunSpec) -> dict[str, str]:
         """Return no extra environment variables; `--ignore-user-config` isolates config while `CODEX_HOME` keeps auth.
 
         `codex` keeps `auth.json` in `CODEX_HOME`, so relocating it would strand a

@@ -30,7 +30,7 @@ class GeminiFamilyBackend(CliBackend, ABC):
 
     api_key_envs: ClassVar[tuple[str, ...]]
 
-    def env(self) -> dict[str, str]:
+    def env(self, _spec: RunSpec) -> dict[str, str]:
         """Return no extra environment variables.
 
         Gemini-family CLIs read settings and OAuth from the same config home (`~/.gemini`,

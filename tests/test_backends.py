@@ -158,10 +158,29 @@ class TestClaudeArgv:
         )
         assert ClaudeCliBackend().build_command(spec)[-1] == "--verbose"
 
-    def test_models_and_env(self) -> None:
+    def test_models(self) -> None:
+        assert ClaudeCliBackend().models == {"small": "haiku", "medium": "sonnet", "large": "opus"}
+
+    def test_env_isolates_config_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        (tmp_path / ".claude.json").write_text(
+            json.dumps({"oauthAccount": {"accountUuid": "a"}, "mcpServers": {"semble": {}}})
+        )
+        (tmp_path / ".claude").mkdir()
+        (tmp_path / ".claude" / ".credentials.json").write_text('{"claudeAiOauth": {"accessToken": "tok"}}')
         backend = ClaudeCliBackend()
-        assert backend.models == {"small": "haiku", "medium": "sonnet", "large": "opus"}
-        assert backend.env() == {}  # isolation is flag-only; a fresh CLAUDE_CONFIG_DIR would break keychain auth
+        env = backend.env(RunSpec(prompt="hi", model="haiku"))
+        config_dir = Path(env["CLAUDE_CONFIG_DIR"])
+        assert config_dir.is_dir()
+        # The dir is created once and cached on the instance, not regenerated per call.
+        assert backend.env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"] == str(config_dir)
+        # The account pointer is seeded sans host mcpServers; settings/plugins/hooks never leak.
+        assert json.loads((config_dir / ".claude.json").read_text()) == {"oauthAccount": {"accountUuid": "a"}}
+        # The OAuth token is seeded so the relocated home stays logged in.
+        assert json.loads((config_dir / ".credentials.json").read_text()) == {"claudeAiOauth": {"accessToken": "tok"}}
+
+    def test_env_non_isolated_adds_nothing(self) -> None:
+        assert ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku", isolated=False)) == {}
 
     def test_invocation_delivers_prompt_over_stdin(self) -> None:
         inv = ClaudeCliBackend().invocation(RunSpec(prompt="hi", model="haiku"))
@@ -395,7 +414,7 @@ class TestGeminiBackend:
 
     def test_env_never_isolates(self) -> None:
         # Gemini reads settings + OAuth from one config home with no isolation flag, so it can't be isolated.
-        assert GeminiCliBackend().env() == {}
+        assert GeminiCliBackend().env(RunSpec(prompt="hi", model="gemini-2.5-flash")) == {}
 
 
 class TestAntigravityBackend:
@@ -419,7 +438,7 @@ class TestAntigravityBackend:
 
     def test_env_never_isolates(self) -> None:
         # agy has no config-home override and entangles auth/onboarding with its config dir, so it never relocates.
-        assert AntigravityCliBackend().env() == {}
+        assert AntigravityCliBackend().env(RunSpec(prompt="hi", model="gemini-3.5")) == {}
 
 
 class TestSchemaOrModel:

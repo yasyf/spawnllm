@@ -52,7 +52,7 @@ class MlxBackend(LlmBackend):
         """Return the `structured_output` from a stream-json result event, else `raw` parsed as JSON."""
         return structured_value(raw)
 
-    def env(self) -> dict[str, str]:
+    def env(self, _spec: RunSpec) -> dict[str, str]:
         """Return no extra environment variables; MLX runs in-process with nothing to isolate."""
         return {}
 

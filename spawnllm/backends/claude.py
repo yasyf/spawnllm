@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import atexit
 import json
+import shutil
 import subprocess
+import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from spawnllm.backends.base import CliBackend
@@ -57,6 +61,8 @@ class ClaudeCliBackend(CliBackend):
     provider: ClassVar[ProviderName] = "claude"
     binary: ClassVar[str] = "claude"
     install_hint: ClassVar[str] = "curl -fsSL https://claude.ai/install.sh | bash"
+
+    _isolated_config_dir: str | None = None
 
     def build_command(self, spec: RunSpec) -> list[str]:
         """Build the `claude -p` argv for one stdin-prompted invocation.
@@ -151,15 +157,50 @@ class ClaudeCliBackend(CliBackend):
             return event["result"] if isinstance(event.get("result"), str) else "claude reported an error"
         return None
 
-    def env(self) -> dict[str, str]:
-        """Return no extra environment variables; the `claude` CLI runs with the inherited environment.
+    def env(self, spec: RunSpec) -> dict[str, str]:
+        """Point an isolated run at a fresh, host-free `CLAUDE_CONFIG_DIR`; otherwise add nothing.
 
-        Isolation is flag-only (`--setting-sources ""`/`--strict-mcp-config`). A fresh
-        `CLAUDE_CONFIG_DIR` would log the CLI out: the keychain token is keyed to the
-        `oauthAccount` recorded in `~/.claude.json`, absent from a relocated dir.
-        (`CLAUDE_CODE_SIMPLE=1` likewise breaks claude.ai keychain auth.)
+        Defense in depth behind the argv flags: a config home seeded with nothing
+        but the account pointer and OAuth token means plugin and
+        `~/.claude.json`-driven loading finds no host settings, plugins, or hooks
+        even if a flag is ever dropped.
+
+        Args:
+            spec: The configured run; `spec.isolated` gates the override.
+
+        Returns:
+            `{"CLAUDE_CONFIG_DIR": <isolated dir>}` for an isolated run, else `{}`.
         """
-        return {}
+        if not spec.isolated:
+            return {}
+        return {"CLAUDE_CONFIG_DIR": self._isolated_dir()}
+
+    def _isolated_dir(self) -> str:
+        """Return the process-lifetime isolated config home, creating and seeding it once.
+
+        The home is a fresh temp dir seeded with only the two auth-bearing files:
+        `~/.claude.json` minus its `mcpServers` block (the active-account pointer,
+        with no host MCP servers leaking even absent `--strict-mcp-config`) and
+        `~/.claude/.credentials.json` (the claude.ai OAuth token, which lives in
+        the config home — relocating it without this copy logs the run out). Host
+        `settings.json`, plugins, and hooks are never copied. The dir is cached on
+        the backend and removed at interpreter exit.
+        """
+        if self._isolated_config_dir is not None:
+            return self._isolated_config_dir
+        config_dir = Path(tempfile.mkdtemp(prefix="spawnllm-claude-config-"))
+        home = Path.home()
+        account_path = home / ".claude.json"
+        if account_path.exists():
+            account = json.loads(account_path.read_text())
+            account.pop("mcpServers", None)
+            (config_dir / ".claude.json").write_text(json.dumps(account))
+        credentials_path = home / ".claude" / ".credentials.json"
+        if credentials_path.exists():
+            shutil.copyfile(credentials_path, config_dir / ".credentials.json")
+        atexit.register(shutil.rmtree, config_dir, ignore_errors=True)
+        self._isolated_config_dir = str(config_dir)
+        return self._isolated_config_dir
 
     def is_authenticated(self, *, timeout: int) -> bool:
         """Report whether `claude auth status` exits cleanly, i.e. a claude.ai login is stored.
