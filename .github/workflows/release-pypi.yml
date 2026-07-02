@@ -10,45 +10,16 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
+    uses: yasyf/homebrew-tap/.github/workflows/release-pypi-build.yml@pypi-v1
+    secrets: inherit
+    with:
+      dist-name: spawnllm
+      python-version: "3.14"
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
-        with:
-          python-version: "3.14"
-          cache-dependency-glob: uv.lock
-
-      - name: Tag must exceed the latest published version
-        run: |
-          uv run --no-project --with packaging python - "$GITHUB_REF_NAME" "$PKG" <<'PY'
-          import sys, json, urllib.request
-          from packaging.version import Version
-          tag = sys.argv[1].removeprefix("v"); pkg = sys.argv[2]
-          try:
-              latest = json.load(urllib.request.urlopen(f"https://pypi.org/pypi/{pkg}/json"))["info"]["version"]
-          except Exception:
-              latest = "0.0.0"  # first release / never published
-          if Version(tag) <= Version(latest):
-              sys.exit(f"::error::tag {tag} ({pkg}) is not greater than latest published {latest}")
-          print(f"OK: {tag} > {latest}")
-          PY
-        env:
-          PKG: spawnllm
-
-      - name: Set version from tag
-        run: uv version --frozen "${GITHUB_REF_NAME#v}"
-
-      - name: Build sdist + wheel
-        run: uv build
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: dist
-          path: dist/*
-          if-no-files-found: error
-
+  # PyPI Trusted Publishing must run in THIS repo's workflow — it authenticates via the OIDC
+  # job_workflow_ref claim, which inside a reusable workflow points at homebrew-tap, not here
+  # (and PyPI does not support reusable workflows for Trusted Publishing). Running publish here
+  # makes job_workflow_ref this repo's release-pypi.yml, matching the existing trusted publisher.
   publish:
     needs: build
     runs-on: ubuntu-latest
@@ -58,28 +29,29 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: dist
+          pattern: dist*
           path: dist
-
+          merge-multiple: true
       - uses: pypa/gh-action-pypi-publish@release/v1
 
   github-release:
-    needs: publish
+    needs: [build, publish]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: dist
+          pattern: dist*
           path: dist
-
+          merge-multiple: true
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.build.outputs.tag }}
         run: >
-          gh release create "${GITHUB_REF_NAME}"
-          --title "${GITHUB_REF_NAME}"
+          gh release create "$TAG"
+          --title "$TAG"
           --generate-notes
           --latest
           --repo "${{ github.repository }}"
