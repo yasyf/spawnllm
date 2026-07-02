@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-07-02
+
+### Fixed
+- Isolated `claude` runs seed auth from the caller's effective config home
+  (`$CLAUDE_CONFIG_DIR` when set, else `~/.claude`) instead of hard-coded `~/.claude`
+  paths, and fall back to the home's macOS Keychain item
+  (`Claude Code-credentials-<sha256(home)[:8]>`) when the home has no
+  `.credentials.json` file. Sessions under a relocated config home (cc-pool) no longer
+  run isolated spawns with stale or missing credentials.
+
 ## [0.4.0] - 2026-06-22
 
 ### Added

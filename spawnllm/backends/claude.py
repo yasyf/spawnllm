@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import atexit
+import hashlib
 import json
+import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
@@ -36,6 +39,21 @@ def result_event(raw: str) -> dict[str, object] | None:
             return next((e for e in data if isinstance(e, dict) and e.get("type") == "result"), None)
         case _:
             return None
+
+
+def keychain_credentials(home: Path) -> str | None:
+    """Return the claude.ai OAuth credentials for `home` from the macOS Keychain, or `None` off darwin / on a miss."""
+    if sys.platform != "darwin":
+        return None
+    service = f"Claude Code-credentials-{hashlib.sha256(str(home).encode()).hexdigest()[:8]}"
+    proc = subprocess.run(
+        ["security", "find-generic-password", "-s", service, "-w"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    return proc.stdout if proc.returncode == 0 else None
 
 
 class ClaudeCliBackend(CliBackend):
@@ -178,26 +196,33 @@ class ClaudeCliBackend(CliBackend):
     def _isolated_dir(self) -> str:
         """Return the process-lifetime isolated config home, creating and seeding it once.
 
-        The home is a fresh temp dir seeded with only the two auth-bearing files:
-        `~/.claude.json` minus its `mcpServers` block (the active-account pointer,
-        with no host MCP servers leaking even absent `--strict-mcp-config`) and
-        `~/.claude/.credentials.json` (the claude.ai OAuth token, which lives in
-        the config home — relocating it without this copy logs the run out). Host
-        `settings.json`, plugins, and hooks are never copied. The dir is cached on
-        the backend and removed at interpreter exit.
+        The home is a fresh temp dir seeded with only the two auth-bearing files,
+        sourced from the caller's effective config home (`$CLAUDE_CONFIG_DIR` when
+        set, else `~/.claude`): the active-account pointer
+        (`$CLAUDE_CONFIG_DIR/.claude.json`, or `~/.claude.json` under the default
+        home — the CLI's own lookup rule) minus its `mcpServers` block, so no host
+        MCP servers leak even absent `--strict-mcp-config`, and the claude.ai
+        OAuth token — the home's `.credentials.json` when present, else on darwin
+        the `Claude Code-credentials-<sha256(home)[:8]>` Keychain item, written
+        out with mode 0600. When neither exists nothing is seeded and the run
+        fails with the CLI's own not-logged-in error. Host `settings.json`,
+        plugins, and hooks are never copied. The dir is cached on the backend and
+        removed at interpreter exit.
         """
         if self._isolated_config_dir is not None:
             return self._isolated_config_dir
         config_dir = Path(tempfile.mkdtemp(prefix="spawnllm-claude-config-"))
-        home = Path.home()
-        account_path = home / ".claude.json"
+        home = Path(env_home) if (env_home := os.environ.get("CLAUDE_CONFIG_DIR")) else Path.home() / ".claude"
+        account_path = home / ".claude.json" if env_home else Path.home() / ".claude.json"
         if account_path.exists():
             account = json.loads(account_path.read_text())
             account.pop("mcpServers", None)
             (config_dir / ".claude.json").write_text(json.dumps(account))
-        credentials_path = home / ".claude" / ".credentials.json"
-        if credentials_path.exists():
+        if (credentials_path := home / ".credentials.json").exists():
             shutil.copyfile(credentials_path, config_dir / ".credentials.json")
+        elif (token := keychain_credentials(home)) is not None:
+            (seeded := config_dir / ".credentials.json").write_text(token)
+            seeded.chmod(0o600)
         atexit.register(shutil.rmtree, config_dir, ignore_errors=True)
         self._isolated_config_dir = str(config_dir)
         return self._isolated_config_dir

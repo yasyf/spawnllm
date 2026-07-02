@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -58,9 +61,7 @@ class TestClaudeArgv:
 
     def test_agent_with_schema(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(ClaudeCliBackend, "schema_for", lambda self, model: '{"a":1}')
-        assert ClaudeCliBackend().build_command(
-            RunSpec(prompt="hi", model="opus", response_model=M, agent=True)
-        ) == [
+        assert ClaudeCliBackend().build_command(RunSpec(prompt="hi", model="opus", response_model=M, agent=True)) == [
             "claude",
             "-p",
             "--no-session-persistence",
@@ -162,6 +163,7 @@ class TestClaudeArgv:
         assert ClaudeCliBackend().models == {"small": "haiku", "medium": "sonnet", "large": "opus"}
 
     def test_env_isolates_config_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
         (tmp_path / ".claude.json").write_text(
             json.dumps({"oauthAccount": {"accountUuid": "a"}, "mcpServers": {"semble": {}}})
@@ -178,6 +180,58 @@ class TestClaudeArgv:
         assert json.loads((config_dir / ".claude.json").read_text()) == {"oauthAccount": {"accountUuid": "a"}}
         # The OAuth token is seeded so the relocated home stays logged in.
         assert json.loads((config_dir / ".credentials.json").read_text()) == {"claudeAiOauth": {"accessToken": "tok"}}
+
+    def test_env_isolated_seeds_from_claude_config_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A non-default config home (e.g. cc-pool accounts) holds its own pointer + token; ~ is never read.
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
+        (account_home := tmp_path / "acct").mkdir()
+        monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(account_home))
+        (account_home / ".claude.json").write_text(
+            json.dumps({"oauthAccount": {"accountUuid": "b"}, "mcpServers": {"semble": {}}})
+        )
+        (account_home / ".credentials.json").write_text('{"claudeAiOauth": {"accessToken": "acct-tok"}}')
+        config_dir = Path(ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"])
+        assert json.loads((config_dir / ".claude.json").read_text()) == {"oauthAccount": {"accountUuid": "b"}}
+        assert json.loads((config_dir / ".credentials.json").read_text()) == {
+            "claudeAiOauth": {"accessToken": "acct-tok"}
+        }
+
+    def test_env_isolated_falls_back_to_keychain(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        (account_home := tmp_path / "acct").mkdir()
+        monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(account_home))
+        (account_home / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": "c"}}))
+        monkeypatch.setattr(sys, "platform", "darwin")
+        calls: list[list[str]] = []
+
+        def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+            calls.append(argv)
+            return subprocess.CompletedProcess(
+                args=argv, returncode=0, stdout='{"claudeAiOauth": {"accessToken": "kc-tok"}}\n'
+            )
+
+        monkeypatch.setattr("spawnllm.backends.claude.subprocess.run", fake_run)
+        config_dir = Path(ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"])
+        # The service name hashes the effective home path, matching the CLI's Keychain item.
+        digest = hashlib.sha256(str(account_home).encode()).hexdigest()[:8]
+        assert calls == [["security", "find-generic-password", "-s", f"Claude Code-credentials-{digest}", "-w"]]
+        credentials = config_dir / ".credentials.json"
+        assert json.loads(credentials.read_text()) == {"claudeAiOauth": {"accessToken": "kc-tok"}}
+        assert credentials.stat().st_mode & 0o777 == 0o600
+
+    def test_env_isolated_keychain_miss_seeds_no_credentials(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (account_home := tmp_path / "acct").mkdir()
+        monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(account_home))
+        (account_home / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": "d"}}))
+        monkeypatch.setattr(sys, "platform", "darwin")
+        monkeypatch.setattr(
+            "spawnllm.backends.claude.subprocess.run",
+            lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=44, stdout="", stderr="not found"),
+        )
+        config_dir = Path(ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"])
+        # A Keychain miss seeds nothing; the CLI itself then fails loudly as not logged in.
+        assert not (config_dir / ".credentials.json").exists()
 
     def test_env_non_isolated_adds_nothing(self) -> None:
         assert ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku", isolated=False)) == {}
@@ -326,9 +380,7 @@ class TestRegistry:
 
         for cls in (ClaudeCliBackend, CodexCliBackend, AntigravityCliBackend):
             monkeypatch.setattr(cls, "check_status", absent)
-        monkeypatch.setattr(
-            GeminiCliBackend, "check_status", lambda self, *, timeout=10: BackendReady(binary="gemini")
-        )
+        monkeypatch.setattr(GeminiCliBackend, "check_status", lambda self, *, timeout=10: BackendReady(binary="gemini"))
         # Gemini is the only "ready" backend, yet auto-selection refuses it.
         with pytest.raises(BackendUnavailable):
             registry.select_backend()
