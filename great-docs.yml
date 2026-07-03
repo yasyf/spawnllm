@@ -24,7 +24,7 @@ keyboard_nav: true
 
 hero:
   name: spawnllm
-  tagline: "Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools."
+  tagline: "Delete your subprocess wrappers around claude, codex, and gemini."
 
 # Narrative doc sections are optional — dynamic mode generates the API reference
 # from docstrings without them. Uncomment and point at docs/ dirs as they appear.
@@ -52,21 +52,25 @@ authors:
 # sidesteps the module/function name collision that breaks auto-discovery.
 reference:
   - title: Calling
-    desc: One-shot LLM calls and structured output.
+    desc: One-shot LLM calls, text and structured.
     contents:
       - call.call
       - call.call_sync
-      - resolve_schema_path
-      - extract_structured
-      - parse_structured_output
-      - parse_result_envelope
+      - extract.extract
+      - extract.extract_sync
+      - structured.resolve_schema_path
+      - structured.extract_json_block
+      - structured.structured_value
   - title: Running
     desc: Spec-driven execution with envelope-aware retry, async and sync.
     contents:
       - run.run
       - run.run_sync
       - RunSpec
-      - RunResult
+      - Response
+      - Result
+      - Output
+      - Error
       - ClaudeConfig
       - CodexConfig
       - GeminiConfig
@@ -90,10 +94,13 @@ reference:
   - title: Transport
     desc: Subprocess plumbing shared by the CLI backends.
     contents:
-      - run_cli
-      - arun_cli
-      - collect_process
-      - map_concurrent
+      - proc.run_cli
+      - proc.arun_cli
+      - proc.capture_cli
+      - proc.acapture_cli
+      - proc.collect_process
+      - proc.map_concurrent
+      - proc.RunResult
   - title: Types
     desc: Shared type aliases.
     contents:

@@ -1,78 +1,53 @@
-# spawnllm
+# ![spawnllm](https://github.com/yasyf/spawnllm/raw/main/docs/assets/readme-banner.webp)
 
-![spawnllm banner](https://github.com/yasyf/spawnllm/raw/main/docs/assets/readme-banner.webp)
+**Delete your subprocess wrappers around claude, codex, and gemini.** spawnllm subshells all three CLIs plus local MLX and returns one Pydantic-validated Response, so the per-model plumbing you hand-rolled goes away.
 
-[![PyPI](https://img.shields.io/pypi/v/spawnllm.svg)](https://pypi.org/project/spawnllm/)
-[![Python](https://img.shields.io/pypi/pyversions/spawnllm.svg)](https://pypi.org/project/spawnllm/)
-[![Docs](https://img.shields.io/github/actions/workflow/status/yasyf/spawnllm/docs.yml?branch=main&label=docs)](https://yasyf.github.io/spawnllm/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/yasyf/spawnllm/blob/main/LICENSE)
+[![CI](https://github.com/yasyf/spawnllm/actions/workflows/ci.yml/badge.svg)](https://github.com/yasyf/spawnllm/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/spawnllm)](https://pypi.org/project/spawnllm/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/yasyf/spawnllm/blob/main/LICENSE)
 
-Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools.
-
-spawnllm centralizes the LLM-calling plumbing that small tools keep re-inventing: driving the
-`claude` and `codex` CLIs as subshells — with structured Pydantic output, model tiers, and
-faithful error capture — and running local Apple-Silicon MLX models with adapter fusion,
-prompt-cache reuse, and batched generation. Depend on it once and each tool keeps only its
-domain logic instead of its own copy of the backends.
-
-## Install
-
-Run the CLI with [uvx](https://docs.astral.sh/uv/):
-
-```bash
-uvx spawnllm --help
-```
-
-For the local MLX engine (Apple Silicon only), pull the extra: `uv add "spawnllm[mlx]"`.
-
-## Quickstart
-
-See which backends are installed and authenticated, and which one auto-selection picks:
+## Get started
 
 ```bash
 uvx spawnllm status
 ```
 
-```
-claude: ready
-codex: ready
-selected: claude
-```
+<img src="https://github.com/yasyf/spawnllm/raw/main/docs/assets/demo.png" alt="Terminal running 'uvx spawnllm status' — every backend reports ready and auto-selection picks claude" width="700">
 
-Make a request by passing a prompt as the argument, or piping it over stdin:
+Driving with an agent? Paste this:
 
-```bash
-uvx spawnllm call --backend claude "What is 2+2? Reply with just the number."
-```
-
-```
-4
+```text
+Run `uv add spawnllm` in this project.
+Replace our hand-rolled claude/codex subprocess code with spawnllm's `call_sync`,
+or `extract_sync` with a Pydantic response model for structured output.
+Verify available backends with `uvx spawnllm status`.
+Docs: https://yasyf.github.io/spawnllm/
 ```
 
-`--model small|medium|large` swaps the tier, which each backend maps to a concrete model — the
-`claude` backend resolves `small` to Haiku, `medium` to Sonnet, and `large` to Opus. Add
-`--agent` to let the call use tools. Run `uvx spawnllm --help` for the full flag list.
+---
 
-### From Python
+## Use cases
 
-`call_sync` runs one request and returns the response. With no `backend`, it auto-selects
-the first installed, authenticated CLI (its async companion `call` mirrors the same
-signature):
+### Delete your hand-rolled claude/codex subprocess plumbing
+
+Every small tool grows its own `subprocess.run(["claude", "-p", ...])` — argv quirks, stdin piping, exit-code guesswork — and each copy drifts. One call replaces all of it:
 
 ```python
 from spawnllm import call_sync
 
 print(call_sync("Reply with just the word: pong"))
-# pong
 ```
 
-Pin a backend and tier explicitly, or pass a Pydantic model to get a validated object back
-instead of text:
+Prints `pong`. With no `backend=`, spawnllm auto-selects the first installed, authenticated CLI, pipes the prompt over stdin, and retries transient 529/overloaded/rate-limit failures with capped backoff.
+
+### Get a validated Pydantic object back, not a string to parse
+
+Scraping JSON out of a model's stdout means regexes, code fences, and silent schema drift. `extract_sync` validates instead:
 
 ```python
 from pydantic import BaseModel
 
-from spawnllm import call_sync, ClaudeCliBackend
+from spawnllm import extract_sync
 
 
 class Capital(BaseModel):
@@ -80,48 +55,28 @@ class Capital(BaseModel):
     capital: str
 
 
-result = call_sync(
-    "What is the capital of France?",
-    backend=ClaudeCliBackend(),
-    model="large",
-    response_model=Capital,
-)
+result = extract_sync("What is the capital of France?", Capital)
 print(result.capital)  # Paris
 ```
 
-When you don't pin a backend, set `specialty=` to scope auto-selection by task. The
-`debugging` and `review` specialties route to Codex, and `general` routes to Claude.
+The backend turns `Capital` into a JSON-schema constraint on the call itself, and a non-conforming reply raises `pydantic.ValidationError` instead of sneaking downstream.
 
-### Spec-driven runs
+### Run Apple-Silicon MLX models with fused adapters and prompt-cache reuse
 
-For full control, build a `RunSpec` and execute it with `run_sync` (or its async companion
-`run`). A `RunSpec` takes a literal provider model id — no tier mapping — and per-provider
-flag passthrough via `provider_configs`. The call returns a `RunResult` with raw stdout,
-stderr, and exit code, retrying transient `529`/overloaded/rate-limit failures with backoff:
+Shipping a LoRA-tuned local model means hand-rolling adapter fusion, model caching, and worker-thread lifecycle. The MLX extra owns all three:
 
-```python
-from spawnllm import run_sync, RunSpec, ClaudeConfig, ClaudeCliBackend
-
-result = run_sync(
-    RunSpec(
-        prompt="What is 2+2? Reply with just the number.",
-        model="opus",
-        provider_configs={"claude": ClaudeConfig(permission_mode="bypassPermissions")},
-    ),
-    backend=ClaudeCliBackend(),
-)
-print(result.stdout)  # 4
+```bash
+uv add "spawnllm[mlx]"
 ```
 
-## How it works
+`AdapterFuser.ensure_fused` fuses your compressed adapter into the base model once and caches the result in the Hugging Face hub layout; `MlxEngine` loads it on a dedicated worker thread, precomputes a prompt cache for your shared prefix messages, and batches generation. Wrap the engine in an `MlxBackend` and the same `run_sync` call works.
 
-Each backend holds plumbing that consumers would otherwise rebuild: the CLI backends own argv
-construction, stdin/stdout piping, stderr teeing, and turning non-zero exits into useful errors,
-and they turn a Pydantic model into a JSON-schema constraint plus a parsed, validated result. The
-MLX engine wraps adapter fusion, prompt-cache reuse, worker-thread lifecycle, and batched
-single-token generation. Tools that share the layer stay byte-for-byte consistent instead of
-drifting across diverging copies.
+## More in the docs
 
-## Docs
+- **Spec-driven runs** — a literal model id, per-provider flag passthrough, and envelope-aware retry via `RunSpec` — [Running reference](https://yasyf.github.io/spawnllm/reference/#running)
+- **Backend selection** — the priority chain, plus `specialty=` routing (`debugging` and `review` go to Codex, `general` to Claude) — [Backends reference](https://yasyf.github.io/spawnllm/reference/#backends)
+- **Transport helpers** — `run_cli`, `collect_process`, and `map_concurrent`, the subprocess plumbing shared by every CLI backend — [Transport reference](https://yasyf.github.io/spawnllm/reference/#transport)
+- **The CLI** — `spawnllm call`, `status`, and `backends` from any shell — [CLI reference](https://yasyf.github.io/spawnllm/reference/cli/)
+- **MLX internals** — the adapter codec, fuser, and runtime patches behind the local engine — [MLX reference](https://yasyf.github.io/spawnllm/reference/#mlx)
 
-[Read the docs](https://yasyf.github.io/spawnllm/) for the full guide and API reference.
+Read the [docs](https://yasyf.github.io/spawnllm/) for the full guide and API reference. Licensed under [MIT](https://github.com/yasyf/spawnllm/blob/main/LICENSE).

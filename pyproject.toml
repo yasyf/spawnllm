@@ -2,7 +2,7 @@
 name = "spawnllm"
 # Inert sentinel: the real version is set from the release tag (uv version --frozen).
 version = "0.0.0"
-description = "Subshell + MLX LLM-calling backends (Claude/Codex CLI, local MLX) shared across tools."
+description = "Delete your subprocess wrappers around claude, codex, and gemini."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
