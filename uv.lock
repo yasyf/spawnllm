@@ -427,8 +427,8 @@ wheels = [
 
 [[package]]
 name = "great-docs"
-version = "0.13.1.dev14+ga7c275fe6"
-source = { git = "https://github.com/posit-dev/great-docs?rev=main#a7c275fe67aa2d66284cbf01b3e5b47ae9dc9e3f" }
+version = "0.14.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "griffe" },
@@ -438,6 +438,10 @@ dependencies = [
     { name = "pygments" },
     { name = "requests" },
     { name = "ruff" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e4/1f/8e56546184763f3bca4d45a1d3455201b1a41c6cdbc6656e04078fa3958a/great_docs-0.14.1.tar.gz", hash = "sha256:891f0461b13143f35515202d06df8abd2a22b2e25a19f04728868bb8f182069e", size = 30994450, upload-time = "2026-06-25T20:59:53.338Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/60/68/ea67105323646c2c595172a6ec89267fc22a9d5a957ff7ec3f117eb8b6d6/great_docs-0.14.1-py3-none-any.whl", hash = "sha256:b91b569fa3173819b34b2c0fdff4277686ae3ddbe235c8d840445095d0e5fddb", size = 961301, upload-time = "2026-06-25T20:59:50.784Z" },
 ]
 
 [[package]]
@@ -2142,7 +2146,7 @@ provides-extras = ["dev", "adapter", "mlx"]
 
 [package.metadata.requires-dev]
 docs = [
-    { name = "great-docs", git = "https://github.com/posit-dev/great-docs?rev=main" },
+    { name = "great-docs", specifier = ">=0.14" },
     { name = "griffelib", specifier = ">=2.0" },
 ]
 
