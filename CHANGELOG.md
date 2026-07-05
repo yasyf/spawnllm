@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-07-05
+
+### Fixed
+- The `codex` backend passes `--skip-git-repo-check`, so `codex exec` no longer
+  refuses to run when `cwd` is an untrusted or non-git directory (it exited with
+  "Not inside a trusted directory and `--skip-git-repo-check` was not specified").
+  The read-only sandbox already confines the run, so the trust gate added nothing
+  and only silenced structured verdicts made from scratch directories.
+
 ## [0.5.4] - 2026-07-02
 
 ### Fixed

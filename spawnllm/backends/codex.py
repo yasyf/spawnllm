@@ -23,7 +23,9 @@ class CodexCliBackend(CliBackend):
 
     `build_command` translates a `RunSpec` into a `codex exec` argv that runs an
     ephemeral session in a read-only sandbox; `invocation` resolves the schema to
-    a temp file and captures the final message to an `-o` file. An optional
+    a temp file and captures the final message to an `-o` file. The argv carries
+    `--skip-git-repo-check` so a run in an untrusted or non-git `cwd` is not refused —
+    the sandbox already confines it, so the trust gate adds nothing here. An optional
     `CodexConfig` overrides the sandbox and re-enables Codex hooks or MCP servers.
 
     Attributes:
@@ -70,6 +72,7 @@ class CodexCliBackend(CliBackend):
             "--ephemeral",
             "--sandbox",
             cfg.sandbox or "read-only",
+            "--skip-git-repo-check",
             "--model",
             model,
             *(["-c", f"model_reasoning_effort={effort}"] if effort else []),
