@@ -9,13 +9,12 @@
     "ENABLE_LSP_TOOL": "1",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1",
+    "JJ_CONFIG": ".claude/jj-config.toml",
     "TY_OUTPUT_FORMAT": "concise",
-    "TY_CONFIG_FILE": ".claude/ty-quiet.toml",
-    "JJ_CONFIG": ".claude/jj-config.toml"
+    "TY_CONFIG_FILE": ".claude/ty-quiet.toml"
   },
   "permissions": {
     "allow": [
-      "Bash(.venv/bin/python:*)",
       "Bash(cat:*)",
       "Bash(find:*)",
       "Bash(gh api:*)",
@@ -27,11 +26,12 @@
       "Bash(jq:*)",
       "Bash(ls:*)",
       "Bash(rg:*)",
+      "Bash(wc:*)",
+      "Bash(.venv/bin/python:*)",
       "Bash(uv build:*)",
       "Bash(uv lock:*)",
       "Bash(uv run:*)",
-      "Bash(uv sync:*)",
-      "Bash(wc:*)"
+      "Bash(uv sync:*)"
     ],
     "defaultMode": "auto"
   },
@@ -42,12 +42,6 @@
         "repo": "yasyf/cc-skills"
       },
       "autoUpdate": true
-    },
-    "captain-hook": {
-      "source": {
-        "source": "github",
-        "repo": "yasyf/captain-hook"
-      }
     },
     "cc-notes": {
       "source": {
@@ -60,23 +54,40 @@
         "source": "github",
         "repo": "yasyf/cc-context"
       }
+    },
+    "captain-hook": {
+      "source": {
+        "source": "github",
+        "repo": "yasyf/captain-hook"
+      }
     }
   },
   "enabledPlugins": {
-    "cc-context@cc-context": true,
     "codex@skills": true,
     "slop-cop@skills": true,
     "llm-prompts@skills": true,
-    "captain-hook@captain-hook": true,
-    "cc-notes@cc-notes": true
+    "writing-docs@skills": true,
+    "cc-context@cc-context": true,
+    "cc-notes@cc-notes": true,
+    "captain-hook@captain-hook": true
   },
   "hooks": {
-    "PermissionRequest": [
+    "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "uvx capt-hook run PermissionRequest"
+            "command": "uvx capt-hook run UserPromptSubmit"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uvx capt-hook run PreToolUse"
           }
         ]
       }
@@ -101,12 +112,22 @@
         ]
       }
     ],
-    "PreToolUse": [
+    "Stop": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "uvx capt-hook run PreToolUse"
+            "command": "uvx capt-hook run Stop"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uvx capt-hook run PermissionRequest"
           }
         ]
       }
@@ -133,32 +154,12 @@
         ]
       }
     ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uvx capt-hook run Stop"
-          }
-        ]
-      }
-    ],
     "SubagentStop": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "uvx capt-hook run SubagentStop"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uvx capt-hook run UserPromptSubmit"
           }
         ]
       }
