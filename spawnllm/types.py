@@ -12,5 +12,5 @@ TSpecialty = Literal["debugging", "review", "general"]
 TModel = Literal["small", "medium", "large"]
 """Abstract model tier; each backend maps it to a provider-specific model name."""
 
-ProviderName = Literal["claude", "codex", "gemini", "antigravity", "mlx"]
+ProviderName = Literal["claude", "codex", "gemini", "antigravity", "mlx", "openai_endpoint"]
 """Backend provider identifier; keys the per-backend `provider_configs` on a `RunSpec`."""

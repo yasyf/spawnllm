@@ -16,6 +16,7 @@ from spawnllm.backends.claude import ClaudeCliBackend
 from spawnllm.backends.codex import CodexCliBackend
 from spawnllm.backends.gemini import AntigravityCliBackend, GeminiCliBackend
 from spawnllm.backends.mlx import MlxBackend
+from spawnllm.backends.openai_endpoint import OpenAiEndpointBackend
 from spawnllm.backends.registry import LlmBackends, select_backend
 
 __all__ = [
@@ -33,5 +34,6 @@ __all__ = [
     "LlmBackend",
     "LlmBackends",
     "MlxBackend",
+    "OpenAiEndpointBackend",
     "select_backend",
 ]

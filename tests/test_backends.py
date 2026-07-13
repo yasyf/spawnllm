@@ -4,13 +4,16 @@ import hashlib
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
+import httpx
 import pytest
 from pydantic import BaseModel
 
 from spawnllm import (
     AntigravityCliBackend,
+    BackendReady,
     ClaudeCliBackend,
     ClaudeConfig,
     CodexCliBackend,
@@ -19,11 +22,16 @@ from spawnllm import (
     GeminiCliBackend,
     GeminiConfig,
     LlmBackends,
+    OpenAiEndpointBackend,
     Output,
     Response,
     RunSpec,
+    call_sync,
+    extract_sync,
 )
 from spawnllm.structured import is_transient
+
+ENDPOINT = "http://local.test/v1"
 
 
 class M(BaseModel):
@@ -525,3 +533,131 @@ class TestSchemaOrModel:
     def test_schema_and_response_model_together_raise(self) -> None:
         with pytest.raises(ValueError, match="either response_model or schema"):
             RunSpec(prompt="hi", model="haiku", schema={"type": "object"}, response_model=M)
+
+
+def completion(content: str) -> dict[str, object]:
+    return {"choices": [{"message": {"role": "assistant", "content": content}}]}
+
+
+def mock_transport(monkeypatch: pytest.MonkeyPatch, handler: Callable[[httpx.Request], httpx.Response]) -> None:
+    client, aclient = httpx.Client, httpx.AsyncClient
+    override = {"transport": httpx.MockTransport(handler)}
+    monkeypatch.setattr(httpx, "Client", lambda **kw: client(**(kw | override)))
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: aclient(**(kw | override)))
+
+
+class TestOpenAiEndpointBackend:
+    def test_models_map_every_tier_to_pinned_model(self) -> None:
+        assert OpenAiEndpointBackend(ENDPOINT, "m").models == {"small": "m", "medium": "m", "large": "m"}
+
+    def test_provider_and_url_strip_trailing_slash(self) -> None:
+        backend = OpenAiEndpointBackend(ENDPOINT + "/", "qwen3")
+        assert backend.provider == "openai_endpoint"
+        assert backend.url == "http://local.test/v1/chat/completions"
+
+    def test_headers_carry_bearer_api_key(self) -> None:
+        assert OpenAiEndpointBackend(ENDPOINT, "qwen3", api_key="sk-x").headers() == {"Authorization": "Bearer sk-x"}
+
+    def test_payload_text_has_no_response_format(self) -> None:
+        payload = OpenAiEndpointBackend(ENDPOINT, "qwen3").payload(RunSpec(prompt="ping", model="ignored"))
+        assert payload == {"model": "qwen3", "messages": [{"role": "user", "content": "ping"}]}
+
+    def test_payload_structured_embeds_strict_json_schema(self) -> None:
+        payload = OpenAiEndpointBackend(ENDPOINT, "qwen3").payload(RunSpec(prompt="hi", model="q", response_model=M))
+        response_format = payload["response_format"]
+        assert response_format["type"] == "json_schema"
+        assert response_format["json_schema"]["strict"] is True
+        assert response_format["json_schema"]["schema"]["additionalProperties"] is False
+        assert response_format["json_schema"]["schema"]["required"] == ["x"]
+
+    def test_result_text_reads_message_content(self) -> None:
+        assert OpenAiEndpointBackend(ENDPOINT, "q").result_text(json.dumps(completion("pong"))) == "pong"
+
+    def test_result_value_tolerates_fenced_json(self) -> None:
+        raw = json.dumps(completion('```json\n{"x": 3}\n```'))
+        assert OpenAiEndpointBackend(ENDPOINT, "q").result_value(raw) == {"x": 3}
+
+    def test_envelope_error_surfaces_message_on_2xx_error_body(self) -> None:
+        raw = json.dumps({"error": {"message": "bad model"}})
+        assert OpenAiEndpointBackend(ENDPOINT, "q").envelope_error(raw) == "bad model"
+
+    def test_envelope_error_none_on_success(self) -> None:
+        assert OpenAiEndpointBackend(ENDPOINT, "q").envelope_error(json.dumps(completion("hi"))) is None
+
+    def test_env_adds_nothing(self) -> None:
+        assert OpenAiEndpointBackend(ENDPOINT, "q").env(RunSpec(prompt="p", model="q")) == {}
+
+    def test_is_authenticated_and_check_status_ready(self) -> None:
+        backend = OpenAiEndpointBackend(ENDPOINT, "q")
+        assert backend.is_authenticated(timeout=1) is True
+        assert backend.check_status() == BackendReady(binary="openai_endpoint")
+
+    def test_execute_posts_to_chat_completions_and_reads_content(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        seen: dict[str, object] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["url"] = str(request.url)
+            seen["auth"] = request.headers["authorization"]
+            seen["body"] = json.loads(request.content)
+            return httpx.Response(200, json=completion("pong"))
+
+        mock_transport(monkeypatch, handler)
+        resp = OpenAiEndpointBackend(ENDPOINT, "qwen3").execute(RunSpec(prompt="ping", model="ignored"))
+        assert seen["url"] == "http://local.test/v1/chat/completions"
+        assert seen["auth"] == "Bearer local"
+        assert seen["body"]["messages"] == [{"role": "user", "content": "ping"}]
+        assert resp.error is None
+        assert resp.result.raw == "pong"
+        assert resp.result.parsed is None
+
+    async def test_aexecute_posts_and_reads_content(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_transport(monkeypatch, lambda _request: httpx.Response(200, json=completion("pong")))
+        resp = await OpenAiEndpointBackend(ENDPOINT, "qwen3").aexecute(RunSpec(prompt="ping", model="q"))
+        assert resp.result.raw == "pong"
+
+    async def test_aexecute_routes_through_injected_transport(self) -> None:
+        seen: dict[str, object] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["url"] = str(request.url)
+            return httpx.Response(200, json=completion("pong"))
+
+        backend = OpenAiEndpointBackend(ENDPOINT, "qwen3", transport=httpx.MockTransport(handler))
+        resp = await backend.aexecute(RunSpec(prompt="ping", model="q"))
+        assert seen["url"] == "http://local.test/v1/chat/completions"
+        assert resp.result.raw == "pong"
+
+    def test_execute_structured_validates_response_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert json.loads(request.content)["response_format"]["type"] == "json_schema"
+            return httpx.Response(200, json=completion(json.dumps({"x": 7})))
+
+        mock_transport(monkeypatch, handler)
+        resp = OpenAiEndpointBackend(ENDPOINT, "q").execute(RunSpec(prompt="hi", model="q", response_model=M))
+        assert resp.error is None
+        assert resp.result.parsed == M(x=7)
+
+    def test_http_error_routes_through_error_and_is_transient(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_transport(monkeypatch, lambda _request: httpx.Response(503, text="overloaded"))
+        resp = OpenAiEndpointBackend(ENDPOINT, "q").execute(RunSpec(prompt="p", model="q"))
+        assert resp.result is None
+        assert "503" in resp.error.msg
+        assert is_transient(resp) is True
+
+    def test_error_body_on_200_routes_through_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_transport(monkeypatch, lambda _request: httpx.Response(200, json={"error": {"message": "no such model"}}))
+        resp = OpenAiEndpointBackend(ENDPOINT, "q").execute(RunSpec(prompt="p", model="q"))
+        assert resp.result is None
+        assert resp.error.msg == "no such model"
+
+    def test_call_sync_drives_text_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert json.loads(request.content)["model"] == "qwen3"
+            return httpx.Response(200, json=completion("hello"))
+
+        mock_transport(monkeypatch, handler)
+        assert call_sync("hi", backend=OpenAiEndpointBackend(ENDPOINT, "qwen3")) == "hello"
+
+    def test_extract_sync_drives_structured_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_transport(monkeypatch, lambda _request: httpx.Response(200, json=completion(json.dumps({"x": 9}))))
+        assert extract_sync("hi", M, backend=OpenAiEndpointBackend(ENDPOINT, "qwen3")) == M(x=9)

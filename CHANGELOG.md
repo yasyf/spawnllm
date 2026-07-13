@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-07-13
+
+### Added
+- `OpenAiEndpointBackend` — an `LlmBackend` that POSTs to any OpenAI-compatible
+  `/chat/completions` endpoint over raw `httpx` (no subprocess), with structured
+  output via a strict `response_format` json_schema. Constructed explicitly with
+  a `base_url` + literal `model`; never auto-selected. Its `transport` param
+  injects an `httpx.AsyncBaseTransport` into the async client, so a caller can
+  supply a record/replay caching transport.
+
 ## [0.5.5] - 2026-07-05
 
 ### Fixed

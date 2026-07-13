@@ -24,6 +24,7 @@ from spawnllm.backends import (
     LlmBackend,
     LlmBackends,
     MlxBackend,
+    OpenAiEndpointBackend,
     select_backend,
 )
 from spawnllm.call import call, call_sync
@@ -53,6 +54,7 @@ __all__ = [
     "LlmBackend",
     "LlmBackends",
     "MlxBackend",
+    "OpenAiEndpointBackend",
     "Output",
     "ProviderName",
     "Response",

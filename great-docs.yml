@@ -76,7 +76,7 @@ reference:
       - CodexConfig
       - GeminiConfig
   - title: Backends
-    desc: CLI backends (Claude, Codex, and the Gemini family), the MLX backend, the specialty registry, backend selection, and install/auth status checks.
+    desc: CLI backends (Claude, Codex, and the Gemini family), the MLX and OpenAI-endpoint backends, the specialty registry, backend selection, and install/auth status checks.
     contents:
       - LlmBackend
       - CliBackend
@@ -85,6 +85,7 @@ reference:
       - GeminiCliBackend
       - AntigravityCliBackend
       - MlxBackend
+      - OpenAiEndpointBackend
       - LlmBackends
       - select_backend
       - BackendStatus

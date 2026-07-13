@@ -2083,6 +2083,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "click" },
+    { name = "httpx" },
     { name = "loguru" },
     { name = "openai" },
     { name = "pydantic" },
@@ -2124,6 +2125,7 @@ requires-dist = [
     { name = "anyio", marker = "extra == 'dev'", specifier = ">=4" },
     { name = "anyio", marker = "extra == 'mlx'", specifier = ">=4.4" },
     { name = "click", specifier = ">=8" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "huggingface-hub", marker = "extra == 'mlx'", specifier = ">=0.25" },
     { name = "loguru", specifier = ">=0.7" },
     { name = "mlx-lm", marker = "platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'mlx'", specifier = ">=0.31.3" },
