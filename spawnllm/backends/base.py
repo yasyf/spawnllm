@@ -80,12 +80,16 @@ class Invocation:
         stdin: Prompt text delivered over stdin, or `None` when delivered inline.
         result_path: File the backend writes its final message to; when set, the
             result is read from this file instead of stdout.
+        stdout_path: File the capture machinery redirects the child's stdout to;
+            when set, stdout goes to this regular file instead of a pipe and is
+            read back as the capture, dodging a Node child's async-pipe truncation.
         cleanup_paths: Temp files to remove once the invocation completes.
     """
 
     argv: list[str]
     stdin: str | None = None
     result_path: str | None = None
+    stdout_path: str | None = None
     cleanup_paths: tuple[str, ...] = ()
 
 
@@ -244,6 +248,21 @@ class LlmBackend(ABC):
         """Return the provider's error message from an error envelope, or `None` on success."""
         return None
 
+    def accounting(self, raw: str) -> tuple[float | None, dict[str, object] | None]:
+        """Return the `(cost_usd, usage)` an attempt's output reports, or `(None, None)` when it carries neither.
+
+        The retry loop calls this on each transient failure it discards, so a
+        caller reconciling spend can still see the cost. The default parses
+        nothing; a backend whose envelope records spend overrides it.
+
+        Args:
+            raw: The raw output read wherever the provider wrote it.
+
+        Returns:
+            A `(cost_usd, usage)` pair, each `None` when the output does not carry it.
+        """
+        return None, None
+
 
 class CliBackend(LlmBackend):
     """Execution contract for the subprocess-backed LLM family.
@@ -300,6 +319,7 @@ class CliBackend(LlmBackend):
                     env=os.environ | self.env(spec) | (spec.env or {}),
                     cwd=spec.cwd,
                     timeout=spec.timeout,
+                    stdout_path=inv.stdout_path,
                 )
             except TimeoutError:
                 return self.timed_out(spec)
@@ -319,6 +339,7 @@ class CliBackend(LlmBackend):
                     env=os.environ | self.env(spec) | (spec.env or {}),
                     cwd=spec.cwd,
                     timeout=spec.timeout,
+                    stdout_path=inv.stdout_path,
                 )
             except subprocess.TimeoutExpired:
                 return self.timed_out(spec)

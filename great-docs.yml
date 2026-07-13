@@ -71,6 +71,7 @@ reference:
       - Result
       - Output
       - Error
+      - DiscardedAttempt
       - ClaudeConfig
       - CodexConfig
       - GeminiConfig

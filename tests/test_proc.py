@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import importlib
+import json
+import os
 import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
 
-from spawnllm import Error, Output, Response, Result, RunSpec, run, run_sync
+from spawnllm import ClaudeCliBackend, DiscardedAttempt, Error, Output, Response, Result, RunSpec, run, run_sync
 from spawnllm.backends.base import LlmBackend
-from spawnllm.proc import arun_cli, map_concurrent, run_cli
+from spawnllm.proc import acapture_cli, arun_cli, capture_cli, map_concurrent, run_cli
 
 if TYPE_CHECKING:
     from spawnllm.backends.base import BackendStatus
@@ -23,6 +26,20 @@ TRANSIENT_2 = Response(
     spec=SPEC, output=Output("rl"), error=Error("claude reported an error: rate limit", RuntimeError("rl"))
 )
 SUCCESS = Response(spec=SPEC, output=Output("ok"), result=Result(raw="ok"))
+CLAUDE_COST_ENVELOPE = json.dumps(
+    {
+        "type": "result",
+        "is_error": True,
+        "result": "rate limit exceeded",
+        "total_cost_usd": 0.02,
+        "usage": {"input_tokens": 10, "output_tokens": 2},
+    }
+)
+TRANSIENT_WITH_COST = Response(
+    spec=SPEC,
+    output=Output(CLAUDE_COST_ENVELOPE),
+    error=Error("claude reported an error: rate limit exceeded", RuntimeError("rl")),
+)
 
 
 class ScriptedBackend(LlmBackend):
@@ -109,15 +126,118 @@ class TestMapConcurrent:
         assert done == [1, 1, 1, 1]
 
 
+class TestFileBackedStdout:
+    LARGE = 100_000  # a single write past the 64 KiB pipe-drain boundary
+
+    async def test_acapture_captures_full_large_single_write(self, tmp_path) -> None:
+        # The child tags its output by fd-1 kind, so a regression to PIPE capture fails loudly.
+        payload = "x" * self.LARGE
+        script = (
+            "import os, stat, sys; "
+            f"sys.stdout.write(('REG:' if stat.S_ISREG(os.fstat(1).st_mode) else 'PIPE:') + {payload!r}); "
+            "sys.stdout.flush()"
+        )
+        rr = await acapture_cli([sys.executable, "-c", script], stdout_path=str(tmp_path / "out"))
+        assert rr.returncode == 0
+        assert rr.stdout == "REG:" + payload
+
+    def test_capture_captures_full_large_single_write(self, tmp_path) -> None:
+        payload = "y" * self.LARGE
+        script = (
+            "import os, stat, sys; "
+            f"sys.stdout.write(('REG:' if stat.S_ISREG(os.fstat(1).st_mode) else 'PIPE:') + {payload!r}); "
+            "sys.stdout.flush()"
+        )
+        rr = capture_cli([sys.executable, "-c", script], stdout_path=str(tmp_path / "out"))
+        assert rr.returncode == 0
+        assert rr.stdout == "REG:" + payload
+
+    async def test_acapture_still_captures_stderr_with_file_backed_stdout(self, tmp_path) -> None:
+        script = "import sys; sys.stdout.write('out'); sys.stderr.write('err'); sys.exit(3)"
+        rr = await acapture_cli([sys.executable, "-c", script], stdout_path=str(tmp_path / "out"))
+        assert rr.stdout == "out"
+        assert rr.stderr == "err"
+        assert rr.returncode == 3
+
+    async def test_claude_aexecute_file_backs_large_stdout(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        payload = "z" * self.LARGE
+        backend = ClaudeCliBackend()
+        script = f"import sys; sys.stdout.write({payload!r}); sys.stdout.flush()"
+        monkeypatch.setattr(backend, "build_command", lambda spec: [sys.executable, "-c", script])
+        resp = await backend.aexecute(RunSpec(prompt="hi", model="haiku", isolated=False))
+        assert resp.error is None
+        assert resp.output.raw == payload
+
+    def test_claude_execute_file_backs_large_stdout(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        payload = "w" * self.LARGE
+        backend = ClaudeCliBackend()
+        script = f"import sys; sys.stdout.write({payload!r}); sys.stdout.flush()"
+        monkeypatch.setattr(backend, "build_command", lambda spec: [sys.executable, "-c", script])
+        resp = backend.execute(RunSpec(prompt="hi", model="haiku", isolated=False))
+        assert resp.error is None
+        assert resp.output.raw == payload
+
+
+class TestTimeoutTermination:
+    SLEEPER = "import os, time; open({path!r}, 'w').write(str(os.getpid())); time.sleep(30)"
+
+    async def test_acapture_timeout_terminates_and_reaps_child(self, tmp_path) -> None:
+        pid_file = tmp_path / "pid"
+        script = self.SLEEPER.format(path=str(pid_file))
+        with pytest.raises(TimeoutError):
+            await acapture_cli([sys.executable, "-c", script], timeout=1, stdout_path=str(tmp_path / "out"))
+        pid = int(pid_file.read_text())
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+
+    def test_capture_sync_timeout_terminates_and_reaps_child(self, tmp_path) -> None:
+        # subprocess.run already kills+reaps on timeout; this locks that in for the file-backed path.
+        pid_file = tmp_path / "pid"
+        script = self.SLEEPER.format(path=str(pid_file))
+        with pytest.raises(subprocess.TimeoutExpired):
+            capture_cli([sys.executable, "-c", script], timeout=1, stdout_path=str(tmp_path / "out"))
+        pid = int(pid_file.read_text())
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+
+    async def test_claude_aexecute_timeout_kills_child_and_cleans_tempfile(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        pid_file = tmp_path / "pid"
+        backend = ClaudeCliBackend()
+        script = self.SLEEPER.format(path=str(pid_file))
+        monkeypatch.setattr(backend, "build_command", lambda spec: [sys.executable, "-c", script])
+        captured: dict[str, str] = {}
+        real_invocation = backend.invocation
+
+        def spy(spec):
+            inv = real_invocation(spec)
+            captured["stdout_path"] = inv.stdout_path
+            return inv
+
+        monkeypatch.setattr(backend, "invocation", spy)
+        resp = await backend.aexecute(RunSpec(prompt="hi", model="haiku", isolated=False, timeout=1))
+        assert isinstance(resp.error.ex, TimeoutError)
+        pid = int(pid_file.read_text())
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+        assert not os.path.exists(captured["stdout_path"])
+
+
+class ScriptedClaudeBackend(ScriptedBackend):
+    """A scripted backend that parses discarded-attempt cost the way `claude` does."""
+
+    def accounting(self, raw: str) -> tuple[float | None, dict[str, object] | None]:
+        return ClaudeCliBackend().accounting(raw)
+
+
 class TestRetry:
     @pytest.mark.parametrize(
         "transient",
         [TRANSIENT, TRANSIENT_2],
         ids=["exit-529-error", "rate-limit-error"],
     )
-    async def test_async_retries_then_succeeds(
-        self, monkeypatch: pytest.MonkeyPatch, transient: Response
-    ) -> None:
+    async def test_async_retries_then_succeeds(self, monkeypatch: pytest.MonkeyPatch, transient: Response) -> None:
         slept: list[float] = []
 
         async def fake_sleep(seconds: float) -> None:
@@ -125,9 +245,15 @@ class TestRetry:
 
         monkeypatch.setattr(RUN_MODULE.asyncio, "sleep", fake_sleep)
         backend = ScriptedBackend([transient, SUCCESS])
-        assert await run(SPEC, backend=backend) is SUCCESS
+        resp = await run(SPEC, backend=backend)
+        assert resp.result is SUCCESS.result
+        assert resp.output is SUCCESS.output
+        assert resp.error is None
         assert backend.attempts == 2
         assert slept == [5.0]
+        assert [(d.attempt, d.error, d.raw_bytes) for d in resp.discarded_attempts] == [
+            (0, "RuntimeError", len(transient.output.raw.encode()))
+        ]
 
     @pytest.mark.parametrize(
         "transient",
@@ -138,11 +264,68 @@ class TestRetry:
         slept: list[float] = []
         monkeypatch.setattr(RUN_MODULE.time, "sleep", slept.append)
         backend = ScriptedBackend([transient, SUCCESS])
-        assert run_sync(SPEC, backend=backend) is SUCCESS
+        resp = run_sync(SPEC, backend=backend)
+        assert resp.result is SUCCESS.result
+        assert resp.output is SUCCESS.output
+        assert resp.error is None
         assert backend.attempts == 2
         assert slept == [5.0]
+        assert [d.attempt for d in resp.discarded_attempts] == [0]
 
-    async def test_async_all_fail_returns_last_without_raising(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_async_discarded_attempt_carries_cost_and_usage(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def fake_sleep(seconds: float) -> None:
+            return None
+
+        monkeypatch.setattr(RUN_MODULE.asyncio, "sleep", fake_sleep)
+        backend = ScriptedClaudeBackend([TRANSIENT_WITH_COST, SUCCESS])
+        resp = await run(SPEC, backend=backend)
+        assert resp.result is SUCCESS.result
+        assert resp.discarded_attempts == (
+            DiscardedAttempt(
+                attempt=0,
+                error="RuntimeError",
+                cost_usd=0.02,
+                usage={"input_tokens": 10, "output_tokens": 2},
+                raw_bytes=len(CLAUDE_COST_ENVELOPE.encode()),
+            ),
+        )
+
+    async def test_async_accounting_failure_degrades_not_aborts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def fake_sleep(seconds: float) -> None:
+            return None
+
+        monkeypatch.setattr(RUN_MODULE.asyncio, "sleep", fake_sleep)
+
+        class BoomBackend(ScriptedBackend):
+            def accounting(self, raw: str) -> tuple[float | None, dict[str, object] | None]:
+                raise ValueError("malformed envelope")
+
+        backend = BoomBackend([TRANSIENT, SUCCESS])
+        resp = await run(SPEC, backend=backend)
+        assert resp.result is SUCCESS.result
+        assert len(resp.discarded_attempts) == 1
+        d = resp.discarded_attempts[0]
+        assert d.cost_usd is None
+        assert d.usage is None
+        assert d.raw_bytes == len(TRANSIENT.output.raw.encode())
+
+    async def test_async_discarded_raw_bytes_counts_utf8_not_code_points(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def fake_sleep(seconds: float) -> None:
+            return None
+
+        monkeypatch.setattr(RUN_MODULE.asyncio, "sleep", fake_sleep)
+        multibyte = Response(
+            spec=SPEC,
+            output=Output("café"),  # 4 code points, 5 UTF-8 bytes
+            error=Error("claude reported an error: rate limit", RuntimeError("rl")),
+        )
+        backend = ScriptedBackend([multibyte, SUCCESS])
+        resp = await run(SPEC, backend=backend)
+        assert resp.discarded_attempts[0].raw_bytes == 5
+
+    async def test_async_all_fail_returns_last_with_earlier_attempts_discarded(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         async def fake_sleep(seconds: float) -> None:
             return None
 
@@ -151,17 +334,23 @@ class TestRetry:
             spec=SPEC, output=Output("529"), error=Error("codex exited 1: 529 Overloaded again", RuntimeError("529"))
         )
         backend = ScriptedBackend([TRANSIENT, TRANSIENT_2, last])
-        assert await run(SPEC, backend=backend) is last
+        resp = await run(SPEC, backend=backend)
+        assert resp.error is last.error
+        assert resp.output is last.output
+        assert resp.result is None
         assert backend.attempts == 3
+        assert [d.attempt for d in resp.discarded_attempts] == [0, 1]
 
-    def test_sync_all_fail_returns_last_without_raising(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_sync_all_fail_returns_last_with_earlier_attempts_discarded(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(RUN_MODULE.time, "sleep", lambda _: None)
         last = Response(
             spec=SPEC, output=Output("529"), error=Error("codex exited 1: 529 Overloaded again", RuntimeError("529"))
         )
         backend = ScriptedBackend([TRANSIENT, TRANSIENT_2, last])
-        assert run_sync(SPEC, backend=backend) is last
+        resp = run_sync(SPEC, backend=backend)
+        assert resp.error is last.error
         assert backend.attempts == 3
+        assert [d.attempt for d in resp.discarded_attempts] == [0, 1]
 
 
 class TestMlxBackend:

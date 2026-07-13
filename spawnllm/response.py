@@ -58,6 +58,28 @@ class Output:
 
 
 @dataclass(frozen=True, slots=True)
+class DiscardedAttempt:
+    """A transient failure the retry loop threw away, summarized for spend accounting.
+
+    `run`/`run_sync` return only the final attempt's `Response`, so a caller
+    tracking spend never sees the cost of the retries that preceded it. Each
+    discarded attempt is summarized here: `cost_usd` and `usage` when the
+    attempt's output carried parseable accounting, else `None`; `raw_bytes` is
+    always the UTF-8 byte length of the discarded output. `attempt` is the
+    zero-based index and `error` the discarded exception's class name.
+
+    Example:
+        >>> DiscardedAttempt(attempt=0, error="BackendCallError", cost_usd=0.02, usage=None, raw_bytes=57)
+    """
+
+    attempt: int
+    error: str
+    cost_usd: float | None
+    usage: dict[str, object] | None
+    raw_bytes: int
+
+
+@dataclass(frozen=True, slots=True)
 class Response:
     """A backend's fully-resolved outcome: the spec, the raw output, and exactly one of result/error.
 
@@ -66,7 +88,8 @@ class Response:
     `output` are always present (the raw bytes live in `output.raw` even on
     failure); exactly one of `result`/`error` is set. Every failure — a nonzero
     exit, an error envelope, a timeout, or a validation error — routes through
-    `error`, never a raise from `run`.
+    `error`, never a raise from `run`. `discarded_attempts` carries the transient
+    failures `run` retried away before this one, empty when there were none.
 
     Example:
         >>> Response(spec=spec, output=Output(raw="hi"), result=Result(raw="hi"))
@@ -76,3 +99,4 @@ class Response:
     output: Output
     result: Result | None = None
     error: Error | None = None
+    discarded_attempts: tuple[DiscardedAttempt, ...] = ()

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import subprocess
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 __all__ = ["RunResult", "acapture_cli", "arun_cli", "capture_cli", "collect_process", "map_concurrent", "run_cli"]
 
@@ -76,6 +78,7 @@ def capture_cli(
     timeout: int = 180,
     env: dict[str, str] | None = None,
     cwd: str | None = None,
+    stdout_path: str | None = None,
 ) -> RunResult:
     """Run a CLI command to completion and capture its full outcome.
 
@@ -88,6 +91,10 @@ def capture_cli(
         timeout: Seconds to wait before the process is killed.
         env: Environment for the process; `None` inherits the current environment.
         cwd: Working directory for the process.
+        stdout_path: When set, the child writes stdout to this file (a regular
+            fd) instead of a pipe; the file is read back into `RunResult.stdout`.
+            A file makes a Node child's stdout writes synchronous, so a large
+            single-blob write is not truncated when the process exits.
 
     Returns:
         The captured stdout, stderr, and exit code.
@@ -95,16 +102,19 @@ def capture_cli(
     Raises:
         subprocess.TimeoutExpired: When the process outlives `timeout`.
     """
-    result = subprocess.run(
-        argv,
-        input=input,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        env=env,
-        cwd=cwd,
-    )
-    return RunResult(result.stdout, result.stderr, result.returncode)
+    with open(stdout_path, "wb") if stdout_path is not None else contextlib.nullcontext() as stdout_file:
+        result = subprocess.run(
+            argv,
+            input=input,
+            stdout=stdout_file if stdout_file is not None else subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+            env=env,
+            cwd=cwd,
+        )
+    stdout = Path(stdout_path).read_text() if stdout_path is not None else result.stdout
+    return RunResult(stdout, result.stderr, result.returncode)
 
 
 async def collect_process(
@@ -115,20 +125,22 @@ async def collect_process(
     """Drain a subprocess's stdout and stderr concurrently and wait for it to exit.
 
     Args:
-        proc: A process created with both stdout and stderr piped.
+        proc: A process created with stderr piped and stdout either piped or
+            redirected to a file. A file-backed stdout (a `None` pipe) is not
+            drained here and comes back empty for the caller to read from the file.
         stderr_tee: Callback invoked with each stderr line as it arrives.
 
     Returns:
         A `(stdout, stderr, returncode)` tuple.
     """
     assert proc.stderr is not None, "create_subprocess_exec was called with stderr=PIPE"
-    assert proc.stdout is not None, "create_subprocess_exec was called with stdout=PIPE"
     stderr_buf = bytearray()
     async with asyncio.TaskGroup() as tg:
+        stdout_task = tg.create_task(proc.stdout.read()) if proc.stdout is not None else None
         tg.create_task(_tee_stderr(proc.stderr, stderr_buf, stderr_tee))
-        stdout_task = tg.create_task(proc.stdout.read())
         rc_task = tg.create_task(proc.wait())
-    return stdout_task.result(), bytes(stderr_buf), rc_task.result()
+    stdout = stdout_task.result() if stdout_task is not None else b""
+    return stdout, bytes(stderr_buf), rc_task.result()
 
 
 async def _tee_stderr(
@@ -140,6 +152,23 @@ async def _tee_stderr(
         buf.extend(raw)
         if stderr_tee is not None:
             stderr_tee(raw)
+
+
+async def _reap(proc: asyncio.subprocess.Process, *, grace: float = 2.0) -> None:
+    """Terminate a still-running child (SIGTERM, then SIGKILL after `grace`) and wait for it to exit.
+
+    A no-op once the child has exited on its own; on a timed-out or cancelled
+    capture it stops the orphan — which keeps running and spending — before the
+    caller unlinks its output file.
+    """
+    if proc.returncode is not None:
+        return
+    proc.terminate()
+    try:
+        await asyncio.wait_for(proc.wait(), grace)
+    except TimeoutError:
+        proc.kill()
+        await proc.wait()
 
 
 async def arun_cli(
@@ -191,6 +220,7 @@ async def acapture_cli(
     env: dict[str, str] | None = None,
     cwd: str | None = None,
     timeout: int | None = None,
+    stdout_path: str | None = None,
 ) -> RunResult:
     """Run a CLI command asynchronously and capture its full outcome.
 
@@ -203,6 +233,11 @@ async def acapture_cli(
         env: Environment for the process; `None` inherits the current environment.
         cwd: Working directory for the process.
         timeout: Seconds to wait before the wait is abandoned; `None` waits forever.
+        stdout_path: When set, the child writes stdout to this file (a regular
+            fd) instead of a pipe; the file is read back into `RunResult.stdout`.
+            A file makes a Node child's stdout writes synchronous, so a large
+            single-blob write is not truncated when the process exits before the
+            async pipe write drains.
 
     Returns:
         The captured stdout, stderr, and exit code.
@@ -210,21 +245,28 @@ async def acapture_cli(
     Raises:
         TimeoutError: When the process outlives `timeout`.
     """
-    proc = await asyncio.create_subprocess_exec(
-        *argv,
-        stdin=asyncio.subprocess.PIPE if input is not None else None,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=env,
-        cwd=cwd,
-    )
-    if input is not None:
-        assert proc.stdin is not None, "create_subprocess_exec was called with stdin=PIPE"
-        proc.stdin.write(input.encode())
-        await proc.stdin.drain()
-        proc.stdin.close()
-    collect = collect_process(proc)
-    stdout, stderr, rc = await (asyncio.wait_for(collect, timeout) if timeout is not None else collect)
+    with open(stdout_path, "wb") if stdout_path is not None else contextlib.nullcontext() as stdout_file:
+        proc = await asyncio.create_subprocess_exec(
+            *argv,
+            stdin=asyncio.subprocess.PIPE if input is not None else None,
+            stdout=stdout_file if stdout_file is not None else asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+            cwd=cwd,
+        )
+        try:
+            if input is not None:
+                assert proc.stdin is not None, "create_subprocess_exec was called with stdin=PIPE"
+                proc.stdin.write(input.encode())
+                await proc.stdin.drain()
+                proc.stdin.close()
+            collect = collect_process(proc)
+            stdout, stderr, rc = await (asyncio.wait_for(collect, timeout) if timeout is not None else collect)
+        finally:
+            await _reap(proc)
+    if stdout_path is not None:
+        # Read after the direct child has exited; a descendant that writes here afterward is not captured.
+        stdout = Path(stdout_path).read_bytes()
     return RunResult(stdout.decode(), stderr.decode(), rc)
 
 

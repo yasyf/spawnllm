@@ -11,9 +11,9 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 
-from spawnllm.backends.base import CliBackend
+from spawnllm.backends.base import CliBackend, Invocation
 from spawnllm.spec import ClaudeConfig
 from spawnllm.structured import structured_value
 
@@ -142,6 +142,27 @@ class ClaudeCliBackend(CliBackend):
             *(["--verbose"] if cfg.verbose else []),
         ]
 
+    def invocation(self, spec: RunSpec) -> Invocation:
+        """Build the `claude -p` invocation, capturing stdout to a real file.
+
+        `claude` is a Node process that writes its single-blob result to stdout
+        asynchronously; when stdout is a pipe and the process exits before that
+        write drains, Node drops the tail (observed truncating at exactly 64 KiB).
+        Pointing stdout at a regular file makes Node's write synchronous, so the
+        full result survives; the file is read back as stdout and removed after
+        the run.
+
+        Args:
+            spec: The configured run to translate into an invocation.
+
+        Returns:
+            An `Invocation` whose stdout is captured to a temp file.
+        """
+        argv = self.build_command(spec)
+        fd, stdout_path = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
+        return Invocation(argv, spec.prompt, stdout_path=stdout_path, cleanup_paths=(stdout_path,))
+
     def schema_for(self, model: type[BaseModel]) -> str:
         """Serialize a Pydantic model into Anthropic's structured-output JSON schema.
 
@@ -174,6 +195,17 @@ class ClaudeCliBackend(CliBackend):
         if (event := result_event(raw)) is not None and event.get("is_error"):
             return event["result"] if isinstance(event.get("result"), str) else "claude reported an error"
         return None
+
+    def accounting(self, raw: str) -> tuple[float | None, dict[str, object] | None]:
+        """Return `total_cost_usd` and `usage` from the `claude` result envelope, or `(None, None)` when absent."""
+        if (event := result_event(raw)) is None:
+            return None, None
+        cost = event.get("total_cost_usd")
+        usage = event.get("usage")
+        return (
+            float(cost) if isinstance(cost, int | float) else None,
+            cast("dict[str, object]", usage) if isinstance(usage, dict) else None,
+        )
 
     def env(self, spec: RunSpec) -> dict[str, str]:
         """Point an isolated run at a fresh, host-free `CLAUDE_CONFIG_DIR`; otherwise add nothing.
