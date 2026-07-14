@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-07-14
+
+### Added
+- `CodexConfig.service_tier` (default `"fast"`), emitted as `-c service_tier=<value>`
+  on every `codex exec` invocation; `None` drops the flag. Isolated runs pass
+  `--ignore-user-config`, which silently dropped a user's `service_tier = "fast"`
+  pin in `~/.codex/config.toml` and turned xhigh/long prompts into 10-30+ minute runs.
+- `CodexConfig.developer_instructions`, emitted as `-c developer_instructions=<value>`
+  and serialized as a TOML string so the value always arrives as a string (codex
+  parses `-c` values as TOML; a bare `true` would otherwise coerce to a boolean).
+- The codex argv always passes `--color never`, keeping ANSI codes out of the streamed log.
+
 ## [0.6.1] - 2026-07-13
 
 ### Added
@@ -167,7 +179,11 @@ First release, published to PyPI as `spawnllm`.
   generation.
 - Click CLI: `spawnllm backends` and `spawnllm call`.
 
-[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/yasyf/spawnllm/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/yasyf/spawnllm/compare/v0.6.0...v0.6.1
+[0.5.5]: https://github.com/yasyf/spawnllm/compare/v0.5.4...v0.5.5
+[0.5.4]: https://github.com/yasyf/spawnllm/compare/v0.5.3...v0.5.4
 [0.4.0]: https://github.com/yasyf/spawnllm/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/yasyf/spawnllm/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/yasyf/spawnllm/compare/v0.2.0...v0.3.0

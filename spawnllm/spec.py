@@ -44,6 +44,16 @@ class ClaudeConfig:
 class CodexConfig:
     """Codex CLI knobs applied only by the Codex backend.
 
+    `service_tier` (default `"fast"`) is emitted as `-c service_tier=<value>` on
+    every invocation, isolated or not: isolated runs pass `--ignore-user-config`,
+    which drops a `service_tier` pin in the user's `~/.codex/config.toml`, and the
+    standard tier turns long prompts into multi-minute runs. Set it to `None` to
+    drop the flag; an isolated run still passes `--ignore-user-config`, so a
+    user-level tier pin applies only with `isolated=False`. `developer_instructions` injects
+    the system-prompt layer via `-c developer_instructions=<value>`, serialized as
+    a TOML string so any text — multi-line, or TOML-ambiguous words like `true` —
+    arrives as a string.
+
     Example:
         >>> CodexConfig(sandbox="read-only", enable_mcp=True)
     """
@@ -51,6 +61,8 @@ class CodexConfig:
     sandbox: str | None = None
     enable_hooks: bool = False
     enable_mcp: bool = False
+    service_tier: str | None = "fast"
+    developer_instructions: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

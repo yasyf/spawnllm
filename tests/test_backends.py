@@ -278,8 +278,12 @@ class TestCodexArgv:
             "--sandbox",
             "read-only",
             "--skip-git-repo-check",
+            "--color",
+            "never",
             "--model",
             "gpt-5.5",
+            "-c",
+            "service_tier=fast",
             "--ignore-user-config",
             "-c",
             "features.hooks=false",
@@ -297,8 +301,12 @@ class TestCodexArgv:
             "--sandbox",
             "read-only",
             "--skip-git-repo-check",
+            "--color",
+            "never",
             "--model",
             "gpt-5.5",
+            "-c",
+            "service_tier=fast",
             "-c",
             "features.hooks=false",
             "-c",
@@ -313,8 +321,12 @@ class TestCodexArgv:
             "--sandbox",
             "read-only",
             "--skip-git-repo-check",
+            "--color",
+            "never",
             "--model",
             "gpt-5.4-mini",
+            "-c",
+            "service_tier=fast",
             "--ignore-user-config",
         ]
 
@@ -331,8 +343,12 @@ class TestCodexArgv:
             "--sandbox",
             "workspace-write",
             "--skip-git-repo-check",
+            "--color",
+            "never",
             "--model",
             "gpt-5.5",
+            "-c",
+            "service_tier=fast",
             "--ignore-user-config",
         ]
 
@@ -351,6 +367,38 @@ class TestCodexArgv:
     def test_bare_model_has_no_effort_flag(self) -> None:
         argv = CodexCliBackend().build_command(RunSpec(prompt="hi", model="gpt-5.5"))
         assert not any(a.startswith("model_reasoning_effort") for a in argv)
+
+    def test_service_tier_none_drops_flag(self) -> None:
+        spec = RunSpec(prompt="hi", model="gpt-5.5", provider_configs={"codex": CodexConfig(service_tier=None)})
+        argv = CodexCliBackend().build_command(spec)
+        assert not any(a.startswith("service_tier") for a in argv)
+
+    def test_service_tier_override(self) -> None:
+        spec = RunSpec(prompt="hi", model="gpt-5.5", provider_configs={"codex": CodexConfig(service_tier="standard")})
+        argv = CodexCliBackend().build_command(spec)
+        assert argv[argv.index("service_tier=standard") - 1] == "-c"
+
+    def test_developer_instructions_single_argv_element(self) -> None:
+        spec = RunSpec(
+            prompt="hi",
+            model="gpt-5.5",
+            provider_configs={"codex": CodexConfig(developer_instructions="Be terse.\nCite sources.")},
+        )
+        argv = CodexCliBackend().build_command(spec)
+        assert argv[argv.index('developer_instructions="Be terse.\\nCite sources."') - 1] == "-c"
+
+    def test_developer_instructions_toml_ambiguous_value_stays_string(self) -> None:
+        spec = RunSpec(
+            prompt="hi",
+            model="gpt-5.5",
+            provider_configs={"codex": CodexConfig(developer_instructions="true")},
+        )
+        argv = CodexCliBackend().build_command(spec)
+        assert 'developer_instructions="true"' in argv
+
+    def test_developer_instructions_default_absent(self) -> None:
+        argv = CodexCliBackend().build_command(RunSpec(prompt="hi", model="gpt-5.5"))
+        assert not any(a.startswith("developer_instructions") for a in argv)
 
     def test_result_value_parses_raw_json(self) -> None:
         assert CodexCliBackend().result_value('{"block": true, "reason": "bad"}') == {"block": True, "reason": "bad"}

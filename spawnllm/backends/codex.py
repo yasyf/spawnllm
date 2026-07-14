@@ -25,8 +25,13 @@ class CodexCliBackend(CliBackend):
     ephemeral session in a read-only sandbox; `invocation` resolves the schema to
     a temp file and captures the final message to an `-o` file. The argv carries
     `--skip-git-repo-check` so a run in an untrusted or non-git `cwd` is not refused —
-    the sandbox already confines it, so the trust gate adds nothing here. An optional
-    `CodexConfig` overrides the sandbox and re-enables Codex hooks or MCP servers.
+    the sandbox already confines it, so the trust gate adds nothing here. The argv pins
+    `service_tier=fast` by default — `--ignore-user-config` discards a user-level tier pin,
+    and the standard tier turns long prompts into multi-minute runs;
+    `CodexConfig(service_tier=None)` drops the flag (an isolated run still ignores the
+    user-level config, so a `config.toml` tier pin needs `isolated=False` too).
+    `--color never` keeps ANSI codes out of the streamed log. An optional `CodexConfig`
+    overrides the sandbox and re-enables Codex hooks or MCP servers.
 
     Attributes:
         models: Mapping from abstract model size to an OpenAI model name.
@@ -73,9 +78,19 @@ class CodexCliBackend(CliBackend):
             "--sandbox",
             cfg.sandbox or "read-only",
             "--skip-git-repo-check",
+            "--color",
+            "never",
             "--model",
             model,
             *(["-c", f"model_reasoning_effort={effort}"] if effort else []),
+            *(["-c", f"service_tier={cfg.service_tier}"] if cfg.service_tier is not None else []),
+            # codex parses -c values as TOML with a raw-string fallback; a JSON string is a
+            # valid TOML basic string, so words like `true` don't coerce to booleans.
+            *(
+                ["-c", f"developer_instructions={json.dumps(cfg.developer_instructions, ensure_ascii=False)}"]
+                if cfg.developer_instructions is not None
+                else []
+            ),
             *(["--ignore-user-config"] if spec.isolated else []),
             *(
                 []
