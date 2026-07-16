@@ -74,9 +74,7 @@ class TestCheckStatus:
         make_expected,
     ) -> None:
         installed(monkeypatch)
-        monkeypatch.setattr(
-            run_path, lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=returncode)
-        )
+        monkeypatch.setattr(run_path, lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=returncode))
         assert backend_cls().check_status() == make_expected(binary)
 
     def test_gemini_ready_via_api_key(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

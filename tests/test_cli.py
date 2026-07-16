@@ -17,9 +17,7 @@ from spawnllm.backends.base import BackendStatus
 from spawnllm.cli import main
 
 
-def _patch_statuses(
-    monkeypatch: pytest.MonkeyPatch, statuses: dict[type[LlmBackend], BackendStatus]
-) -> None:
+def _patch_statuses(monkeypatch: pytest.MonkeyPatch, statuses: dict[type[LlmBackend], BackendStatus]) -> None:
     for cls, status in statuses.items():
         monkeypatch.setattr(cls, "check_status", lambda self, *, timeout=10, _s=status: _s)
 
@@ -44,9 +42,7 @@ def test_backends_lists_available() -> None:
         pytest.param("antigravity", AntigravityCliBackend, id="antigravity"),
     ],
 )
-def test_call_dispatches_to_backend(
-    monkeypatch: pytest.MonkeyPatch, name: str, backend_cls: type[LlmBackend]
-) -> None:
+def test_call_dispatches_to_backend(monkeypatch: pytest.MonkeyPatch, name: str, backend_cls: type[LlmBackend]) -> None:
     captured: dict[str, object] = {}
 
     def fake_call(prompt: str, *, backend, model, agent):
@@ -68,9 +64,7 @@ def test_status_reports_per_backend_and_selection(monkeypatch: pytest.MonkeyPatc
         monkeypatch,
         {
             ClaudeCliBackend: BackendReady("claude"),
-            CodexCliBackend: BackendNotInstalled(
-                binary="codex", install_hint="npm install -g @openai/codex"
-            ),
+            CodexCliBackend: BackendNotInstalled(binary="codex", install_hint="npm install -g @openai/codex"),
             AntigravityCliBackend: BackendNotAuthenticated("agy"),
             GeminiCliBackend: BackendNotAuthenticated("gemini"),
         },

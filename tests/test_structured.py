@@ -153,7 +153,7 @@ class TestExtractJsonBlock:
         assert json.loads(extract_json_block("result: [1, 2, 3].")) == [1, 2, 3]
 
     def test_falls_back_to_full_text_when_fence_lacks_json(self) -> None:
-        text = "Here is some code:\n```\nnot json at all\n```\nAnswer: {\"x\": 1}"
+        text = 'Here is some code:\n```\nnot json at all\n```\nAnswer: {"x": 1}'
         assert json.loads(extract_json_block(text)) == {"x": 1}
 
     def test_deeply_nested_raises_valueerror_not_recursionerror(self) -> None:
