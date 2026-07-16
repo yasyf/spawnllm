@@ -39,7 +39,3 @@ Target Python 3.13+. Run `uv sync --extra dev`, `uv run pytest`, and `uv build`.
 **Writing docs.** When writing or revising docs, a README, a tutorial, a how-to, or reference, use the `writing-docs` skill (Diataxis modes, voice rules, and runnable code-sample rules) and run `slop-cop check <file> --markdown=on` before you finish.
 
 **Docs.** Any public API change must keep `uv run great-docs build` green; run `uv sync --group docs` first.
-
-**Git.** Commits should be atomic and scoped. One logical change per commit.
-
-**Releases.** Tagging `v*` triggers `.github/workflows/release-pypi.yml`, which builds, publishes to PyPI via trusted publishing, and cuts a GitHub release. The version comes from the tag.
