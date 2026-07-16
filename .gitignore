@@ -43,3 +43,4 @@ coverage.xml
 
 # Great Docs build output
 great-docs/
+docs/scripts/.gd-build/

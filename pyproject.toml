@@ -127,5 +127,5 @@ docs = [
     # griffe (2.x) distribution, overriding the legacy griffe<2 pin great-docs
     # itself still declares.
     "griffelib>=2.0",
-    "great-docs>=0.14",
+    "great-docs>=0.15,<0.16",
 ]
