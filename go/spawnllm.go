@@ -113,11 +113,11 @@ func resolveBackend(ctx context.Context, opts CallOpts) (Backend, error) {
 }
 
 func extractSchema[T any](provider Provider) (json.RawMessage, error) {
-	reflector := jsonschema.Reflector{ExpandedStruct: true, DoNotReference: true}
+	// Referenced ($defs + $ref) like Pydantic, so recursive types don't inline forever.
+	reflector := jsonschema.Reflector{ExpandedStruct: true}
 	var value T
 	schema := reflector.Reflect(&value)
-	// $schema/$id are unrecognized by the strict transforms (anthropic folds them
-	// into a junk description); the Pydantic reference emits neither.
+	// $schema/$id trip the anthropic transform into a junk description.
 	schema.Version = ""
 	schema.ID = ""
 	raw, err := json.Marshal(schema)
@@ -196,9 +196,8 @@ func timedOutAttempt(spec RunSpec, provider Provider) *attempt {
 }
 
 func transportFailureAttempt(spec RunSpec, provider Provider, msg string) *attempt {
-	full := fmt.Sprintf("%s request failed: %s", provider, msg)
-	cause := &BackendCallError{Provider: provider, Msg: full}
-	return &attempt{resp: &Response{Spec: spec, Err: &RunError{Msg: full, Cause: cause}}}
+	cause := &BackendCallError{Provider: provider, Msg: msg}
+	return &attempt{resp: &Response{Spec: spec, Err: &RunError{Msg: msg, Cause: cause}}}
 }
 
 func causeName(err error) string {

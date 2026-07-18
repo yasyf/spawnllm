@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestOpenAIEndpointSuccess(t *testing.T) {
@@ -113,5 +114,33 @@ func TestOpenAIEndpointTransientRetry(t *testing.T) {
 	}
 	if len(resp.DiscardedAttempts) != 1 {
 		t.Fatalf("expected 1 discarded 503 attempt, got %d", len(resp.DiscardedAttempts))
+	}
+}
+
+func TestOpenAIEndpointCtxCancellationRaises(t *testing.T) {
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		<-release
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"late"}}]}`)
+	}))
+	defer srv.Close()
+	defer close(release)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	b := OpenAIEndpoint(srv.URL, "qwen3", OpenAIOpts{})
+	resp, err := RunOn(ctx, b, RunSpec{Prompt: "ping"})
+	if err == nil {
+		t.Fatalf("ctx cancellation must return a Go error, got resp %+v", resp)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if resp != nil {
+		t.Fatalf("expected nil response on caller fault, got %+v", resp)
 	}
 }

@@ -21,6 +21,15 @@ type probePerson struct {
 	Neighbors []probeAddress `json:"neighbors"`
 }
 
+type probeTreeNode struct {
+	Label    string          `json:"label"`
+	Children []probeTreeNode `json:"children"`
+}
+
+type probeTree struct {
+	Root probeTreeNode `json:"root"`
+}
+
 func assertObjectsStrict(t *testing.T, node any, path string) {
 	t.Helper()
 	switch n := node.(type) {
@@ -40,6 +49,28 @@ func assertObjectsStrict(t *testing.T, node any, path string) {
 	}
 }
 
+// assertDefsStrict is the lead's explicit ask: every $defs entry, after the
+// strict transform, must carry additionalProperties:false.
+func assertDefsStrict(t *testing.T, schema map[string]any, label string) {
+	t.Helper()
+	defs, ok := schema["$defs"].(map[string]any)
+	if !ok {
+		t.Fatalf("%s: schema has no $defs (nested types were not referenced): %v", label, schema)
+	}
+	if _, isDraft07 := schema["definitions"]; isDraft07 {
+		t.Errorf("%s: schema uses draft-07 \"definitions\" the anthropic transform does not recurse", label)
+	}
+	for name, def := range defs {
+		obj, ok := def.(map[string]any)
+		if !ok {
+			continue
+		}
+		if obj["type"] == "object" && obj["additionalProperties"] != false {
+			t.Errorf("%s: $defs/%s missing additionalProperties:false: %v", label, name, obj)
+		}
+	}
+}
+
 func TestExtractSchemaStrictifiesNested(t *testing.T) {
 	for _, provider := range []Provider{ProviderClaude, ProviderCodex} {
 		raw, err := extractSchema[probePerson](provider)
@@ -51,6 +82,7 @@ func TestExtractSchemaStrictifiesNested(t *testing.T) {
 			t.Fatalf("%s: decode %s: %v", provider, raw, err)
 		}
 		assertObjectsStrict(t, m, string(provider))
+		assertDefsStrict(t, m, string(provider))
 		if _, ok := m["$id"]; ok {
 			t.Errorf("%s: schema carries a leftover $id: %s", provider, raw)
 		}
@@ -60,6 +92,24 @@ func TestExtractSchemaStrictifiesNested(t *testing.T) {
 		if d, ok := m["description"].(string); ok && strings.Contains(d, "$id") {
 			t.Errorf("%s: $id folded into a junk description: %q", provider, d)
 		}
+	}
+}
+
+func TestExtractSchemaHandlesRecursiveType(t *testing.T) {
+	// A recursive type nested in the struct resolves through $defs (the previous
+	// inline config stack-overflowed here); its self-$ref stays valid and strict.
+	raw, err := extractSchema[probeTree](ProviderCodex)
+	if err != nil {
+		t.Fatalf("recursive type: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("decode %s: %v", raw, err)
+	}
+	assertDefsStrict(t, m, "recursive")
+	defs := m["$defs"].(map[string]any)
+	if _, ok := defs["probeTreeNode"]; !ok {
+		t.Fatalf("recursive type not captured in $defs: %v", defs)
 	}
 }
 
@@ -80,16 +130,5 @@ func TestExtractNestedReceivesStrictSchema(t *testing.T) {
 		t.Fatalf("received schema is not JSON: %v", err)
 	}
 	assertObjectsStrict(t, m, "received")
-
-	props, ok := m["properties"].(map[string]any)
-	if !ok {
-		t.Fatalf("received schema has no properties: %s", data)
-	}
-	addr, ok := props["address"].(map[string]any)
-	if !ok {
-		t.Fatalf("nested address object was inlined away: %s", data)
-	}
-	if addr["additionalProperties"] != false {
-		t.Fatalf("nested address object not strictified: %v", addr)
-	}
+	assertDefsStrict(t, m, "received")
 }
