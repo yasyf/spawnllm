@@ -1,0 +1,13 @@
+[package]
+name = "spawnllm-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Sans-io core logic shared by spawnllm's language bindings: backend planning, output resolution, and structured-output helpers."
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["arbitrary_precision"] }
+regex-lite = "0.1"
+sha2 = "0.10"

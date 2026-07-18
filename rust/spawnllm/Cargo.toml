@@ -1,0 +1,10 @@
+[package]
+name = "spawnllm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Run LLM calls through provider CLIs (claude, codex, gemini) or an OpenAI-compatible endpoint."
+
+[dependencies]
+spawnllm-core = { path = "../spawnllm-core", version = "=0.0.0" }
