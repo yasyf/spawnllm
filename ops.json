@@ -1,1 +1,1 @@
-{"v":1,"lamport":2,"session":"e11e582b-8441-4f22-964f-2c90bd88ded6","ops":[{"kind":"verify_note","witness":null,"verified_commit":"d15eda12ec27b248d1e11b5435ae2635cec2c72c"}]}
+{"v":1,"lamport":3,"session":"e11e582b-8441-4f22-964f-2c90bd88ded6","ops":[{"kind":"add_attachment","name":"we-shiuld-have-golang-hidden-salamander.md","oid":"b64c131c80cf88a65bc379142d69314bf36136521b0c4fa5124814e393bd3523","size":16036}]}
