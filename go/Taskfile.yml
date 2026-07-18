@@ -1,0 +1,35 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Build every Go package pure (proves the module stays cgo-free)
+    cmds:
+      - CGO_ENABLED=0 go build ./...
+
+  test:
+    desc: Run the Go suite with the race detector
+    cmds:
+      - go test -race -count=1 ./...
+
+  vet:
+    desc: Vet the module
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Lint with golangci-lint
+    cmds:
+      - golangci-lint run
+
+  fmt:
+    desc: Format with gofumpt + goimports (via golangci-lint)
+    cmds:
+      - golangci-lint fmt
+
+  ci:
+    desc: Everything CI runs
+    cmds:
+      - task: vet
+      - task: lint
+      - task: test
+      - task: build

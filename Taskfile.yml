@@ -1,0 +1,9 @@
+version: '3'
+
+includes:
+  go:
+    taskfile: go
+    dir: go
+  rust:
+    taskfile: rust
+    dir: rust

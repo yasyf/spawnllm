@@ -1,0 +1,34 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Build the workspace
+    cmds:
+      - cargo build --workspace --all-features
+
+  test:
+    desc: Run the workspace suite (strict conformance, all features)
+    env:
+      SPAWNLLM_CONFORMANCE_STRICT: "1"
+    cmds:
+      - cargo test --workspace --all-features
+
+  clippy:
+    desc: Lint with clippy (denies warnings)
+    cmds:
+      # missing_safety_doc: the wasm ABI's unsafe extern "C" fns predate
+      # `# Safety` docs (Phase 7 covers docs); drop this allow once they land.
+      - cargo clippy --workspace --all-targets --all-features -- -D warnings -A clippy::missing_safety_doc
+
+  fmt:
+    desc: Format with rustfmt
+    cmds:
+      - cargo fmt --all
+
+  ci:
+    desc: Everything CI runs
+    cmds:
+      - cargo fmt --all -- --check
+      - task: clippy
+      - task: test
+      - cargo test -p spawnllm --no-default-features

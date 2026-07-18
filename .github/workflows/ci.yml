@@ -42,3 +42,111 @@ jobs:
           uv venv --seed .wheel-smoke
           uv pip install --python .wheel-smoke/bin/python dist/*.whl
           .wheel-smoke/bin/spawnllm --help
+
+  go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go/go.mod
+          cache: true
+
+      - name: Vet
+        working-directory: go
+        run: go vet ./...
+
+      - name: Test (race)
+        working-directory: go
+        run: go test -race -count=1 ./...
+
+      - name: Build (cgo-free)
+        working-directory: go
+        env:
+          CGO_ENABLED: "0"
+        run: go build ./...
+
+  go-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go/go.mod
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          working-directory: go
+
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt,clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Format check
+        working-directory: rust
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        working-directory: rust
+        # missing_safety_doc: the wasm ABI's unsafe extern "C" fns (spawnllm-wasm/src/lib.rs)
+        # predate `# Safety` docs; Phase 7 covers docs, then this allow drops.
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings -A clippy::missing_safety_doc
+
+      - name: Test (strict conformance, all features)
+        working-directory: rust
+        env:
+          SPAWNLLM_CONFORMANCE_STRICT: "1"
+        run: cargo test --workspace --all-features
+
+      - name: Test (spawnllm, no default features)
+        working-directory: rust
+        run: cargo test -p spawnllm --no-default-features
+
+  wasm-fresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go/go.mod
+          cache: true
+
+      - name: Blob freshness (embedded hash vs. current sources)
+        working-directory: go
+        run: go test -run TestBlobFreshness -count=1 ./internal/core/
+
+  vuln:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go/go.mod
+          cache: true
+
+      - name: govulncheck
+        working-directory: go
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
