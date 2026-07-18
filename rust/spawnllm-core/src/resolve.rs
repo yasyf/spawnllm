@@ -12,6 +12,7 @@ enum Provider {
     Claude,
     Codex,
     Gemini,
+    Antigravity,
     OpenaiEndpoint,
 }
 
@@ -21,6 +22,7 @@ impl Provider {
             Self::Claude => "claude",
             Self::Codex => "codex",
             Self::Gemini => "gemini",
+            Self::Antigravity => "antigravity",
             Self::OpenaiEndpoint => "openai_endpoint",
         }
     }
@@ -280,6 +282,14 @@ fn resolve(input: ResolveInput) -> Resolved {
             None,
         ),
         Provider::Gemini => resolve_gemini(&input.raw, input.wants_value),
+        Provider::Antigravity => finish(
+            Provider::Antigravity,
+            input.raw.trim().to_owned(),
+            input.wants_value,
+            None,
+            None,
+            None,
+        ),
         Provider::OpenaiEndpoint => resolve_openai(&input.raw, input.wants_value),
     }
 }

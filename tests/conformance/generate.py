@@ -52,6 +52,7 @@ RESOLVE_BACKENDS: dict[ProviderName, LlmBackend] = {
     "claude": ClaudeCliBackend(),
     "codex": CodexCliBackend(),
     "gemini": GeminiCliBackend(),
+    "antigravity": AntigravityCliBackend(),
     "openai_endpoint": OpenAiEndpointBackend("http://local.test/v1", "qwen3"),
 }
 

@@ -342,6 +342,10 @@ RESOLVE_CASES: tuple[ResolveCase, ...] = (
         "",
         True,
     ),
+    # --- antigravity: plain-text stdout, stripped; no envelope error; JSON extracted from prose ---
+    ResolveCase("antigravity-ok-text", "antigravity", "  the answer  \n", 0, "", False),
+    ResolveCase("antigravity-ok-value", "antigravity", '```json\n{"answer": "7"}\n```', 0, "", True),
+    ResolveCase("antigravity-exit-nonzero", "antigravity", "", 1, "agy print failed", False),
 )
 
 

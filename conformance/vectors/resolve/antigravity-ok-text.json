@@ -1,0 +1,18 @@
+{
+  "expected": {
+    "cost_usd": null,
+    "status": "ok",
+    "text": "the answer",
+    "usage": null,
+    "value": null
+  },
+  "input": {
+    "provider": "antigravity",
+    "raw": "  the answer  \n",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": false
+  },
+  "name": "antigravity-ok-text",
+  "op": "resolve"
+}
