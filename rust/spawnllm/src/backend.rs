@@ -125,10 +125,17 @@ impl Backend {
                 binary: "openai_endpoint".to_owned(),
             };
         }
-        let probes: AuthProbes = core_op(
+        let probes: AuthProbes = match core_op(
             "auth_probes",
             json!({ "provider": self.provider(), "host": { "platform": platform(), "home": home() } }),
-        );
+        ) {
+            Ok(probes) => probes,
+            Err(_) => {
+                return BackendStatus::NotAuthenticated {
+                    binary: String::new(),
+                };
+            }
+        };
         if which(&probes.binary).is_none() {
             return BackendStatus::NotInstalled {
                 binary: probes.binary,

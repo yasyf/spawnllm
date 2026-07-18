@@ -9,6 +9,7 @@ import (
 // capabilities. The zero value is Small.
 type ModelTier string
 
+// The abstract model sizes each backend maps to a concrete model id.
 const (
 	Small  ModelTier = "small"
 	Medium ModelTier = "medium"
@@ -41,12 +42,13 @@ type ClaudeConfig struct {
 	Verbose              bool
 }
 
-// CodexConfig passes knobs through to the codex CLI. ServiceTier nil pins the
-// default "fast"; set it to drop the flag or choose another tier.
+// CodexConfig passes knobs through to the codex CLI.
 type CodexConfig struct {
-	Sandbox               string
-	EnableHooks           bool
-	EnableMCP             bool
+	Sandbox     string
+	EnableHooks bool
+	EnableMCP   bool
+	// ServiceTier nil pins "fast"; a pointer to "" drops the flag, and any
+	// other value selects that tier.
 	ServiceTier           *string
 	DeveloperInstructions string
 }
@@ -69,11 +71,11 @@ type ProviderConfigs struct {
 // RunSpec is a single configured run, translated per backend at execution time.
 // Model is a literal provider model id. UseHostConfig false (the zero value) runs
 // against a fresh, host-free config home; Timeout is per-attempt (0 → 180s) and
-// MaxAttempts bounds the transient-retry loop (0 → 5). Schema, when set, is passed
-// to the provider verbatim.
+// MaxAttempts bounds the transient-retry loop (0 → 5).
 type RunSpec struct {
-	Prompt        string
-	Model         string
+	Prompt string
+	Model  string
+	// Schema, when set, must encode a JSON object and is passed to the provider verbatim.
 	Schema        json.RawMessage
 	Agent         bool
 	UseHostConfig bool
@@ -219,6 +221,8 @@ func coreCodexOf(c *CodexConfig) *coreCodex {
 	if tier == nil {
 		fast := "fast"
 		tier = &fast
+	} else if *tier == "" {
+		tier = nil
 	}
 	return &coreCodex{
 		DeveloperInstructions: optString(c.DeveloperInstructions),

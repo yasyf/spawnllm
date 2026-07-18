@@ -25,7 +25,11 @@ echo "streaming interactive log line to stdout (must be ignored by the host)"
 
 result="$prompt"
 if [ -n "$schema" ] && [ -f "$schema" ]; then
-	result="{\"echo\":\"$prompt\"}"
+	if [ -n "$FAKE_STRUCTURED_RESULT" ]; then
+		result="$FAKE_STRUCTURED_RESULT"
+	else
+		result="{\"echo\":\"$prompt\"}"
+	fi
 	if [ -n "$FAKE_SCHEMA_SINK" ]; then
 		cat "$schema" >"$FAKE_SCHEMA_SINK"
 	fi

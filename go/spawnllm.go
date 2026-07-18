@@ -1,3 +1,10 @@
+// Package spawnllm runs LLM calls through provider CLIs (claude, codex, gemini,
+// agy) or an OpenAI-compatible endpoint, returning one typed Response. Argv
+// planning, output resolution, schema strictification, and retry policy execute
+// in the embedded spawnllm-core WASM engine shared with the Python and Rust
+// implementations; this package is the I/O host: it spawns processes, manages
+// temp files and claude isolation, executes auth probes, and drives the retry
+// loop.
 package spawnllm
 
 import (
@@ -34,9 +41,13 @@ type CallOpts struct {
 }
 
 // Run executes a RunSpec on the first ready backend, retrying transient failures
-// with backoff. The returned error is only a caller fault (context cancellation
-// or backend selection); every provider outcome lands in Response.Err.
+// with backoff. The returned error is only a caller-side failure (an invalid
+// spec, context cancellation, or backend selection); every provider outcome
+// lands in Response.Err.
 func Run(ctx context.Context, spec RunSpec) (*Response, error) {
+	if err := validateRunSpec(spec); err != nil {
+		return nil, err
+	}
 	backend, err := SelectBackend(ctx, SelectOpts{})
 	if err != nil {
 		return nil, err
@@ -47,6 +58,9 @@ func Run(ctx context.Context, spec RunSpec) (*Response, error) {
 // RunOn executes a RunSpec on a given backend, retrying transient failures with
 // backoff. ctx is the deadline across all retries; RunSpec.Timeout is per-attempt.
 func RunOn(ctx context.Context, backend Backend, spec RunSpec) (*Response, error) {
+	if err := validateRunSpec(spec); err != nil {
+		return nil, err
+	}
 	return runOn(ctx, backend, spec, false)
 }
 
@@ -99,10 +113,26 @@ func Extract[T any](ctx context.Context, prompt string, opts CallOpts) (T, error
 		return zero, resp.Err
 	}
 	var out T
-	if err := json.Unmarshal(resp.Result.Parsed, &out); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(resp.Result.Parsed))
+	dec.UseNumber()
+	if err := dec.Decode(&out); err != nil {
 		return zero, fmt.Errorf("spawnllm: unmarshal structured output: %w", err)
 	}
 	return out, nil
+}
+
+func validateRunSpec(spec RunSpec) error {
+	if len(spec.Schema) == 0 {
+		return nil
+	}
+	var schema map[string]json.RawMessage
+	if err := json.Unmarshal(spec.Schema, &schema); err != nil {
+		return fmt.Errorf("spawnllm: schema must be a JSON object: %w", err)
+	}
+	if schema == nil {
+		return errors.New("spawnllm: schema must be a JSON object")
+	}
+	return nil
 }
 
 func resolveBackend(ctx context.Context, opts CallOpts) (Backend, error) {
@@ -143,7 +173,10 @@ func runOn(ctx context.Context, backend Backend, spec RunSpec, wantsValue bool) 
 	for attemptIdx := 0; ; attemptIdx++ {
 		att, err := backend.execute(ctx, spec, wantsValue)
 		if err != nil {
-			return nil, err
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			att = transportFailureAttempt(spec, backend.Provider(), err.Error())
 		}
 		resp := att.resp
 		if resp.Err == nil {

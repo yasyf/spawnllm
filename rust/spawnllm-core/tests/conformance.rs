@@ -20,8 +20,19 @@ fn sorted_children(dir: &Path, keep: impl Fn(&Path) -> bool) -> Vec<PathBuf> {
 }
 
 fn number_eq(left: &Number, right: &Number) -> bool {
-    left.to_string() == right.to_string()
-        || matches!((left.as_f64(), right.as_f64()), (Some(a), Some(b)) if a == b && a.is_finite())
+    let left = left.to_string();
+    let right = right.to_string();
+    if left == right {
+        return true;
+    }
+    let float_shaped = |value: &str| value.contains(['.', 'e', 'E']);
+    if !float_shaped(&left) && !float_shaped(&right) {
+        return false;
+    }
+    matches!(
+        (left.parse::<f64>(), right.parse::<f64>()),
+        (Ok(a), Ok(b)) if a == b && a.is_finite()
+    )
 }
 
 fn value_eq(left: &Value, right: &Value) -> bool {
@@ -49,12 +60,17 @@ fn ops_filter() -> Option<BTreeSet<String>> {
     })
 }
 
+fn requires_replayed_vectors(filter: Option<&BTreeSet<String>>) -> bool {
+    filter.is_none_or(|ops| !ops.is_empty())
+}
+
 #[test]
 fn conformance_vectors() {
     let strict = env::var("SPAWNLLM_CONFORMANCE_STRICT").is_ok_and(|value| value == "1");
     let filter = ops_filter();
 
     let mut passed = 0usize;
+    let mut replayed = 0usize;
     let mut skipped: Vec<String> = Vec::new();
     let mut failures: Vec<String> = Vec::new();
 
@@ -66,6 +82,7 @@ fn conformance_vectors() {
         for path in sorted_children(&op_dir, |path| {
             path.extension().is_some_and(|ext| ext == "json")
         }) {
+            replayed += 1;
             let vector: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
             let label = format!("{op}/{}", vector["name"].as_str().unwrap());
             let request = json!({ "op": vector["op"], "input": vector["input"] });
@@ -94,15 +111,44 @@ fn conformance_vectors() {
         .filter_map(|label| label.split('/').next())
         .collect();
     println!(
-        "conformance: {passed} passed, {} skipped {skipped_ops:?}, {} failed",
+        "conformance: {passed} passed, {} skipped {skipped_ops:?}, {} failed ({replayed} replayed)",
         skipped.len(),
         failures.len()
     );
 
+    assert!(
+        replayed > 0 || !requires_replayed_vectors(filter.as_ref()),
+        "no conformance vectors replayed"
+    );
     assert!(
         failures.is_empty(),
         "conformance failures ({}):\n{}",
         failures.len(),
         failures.join("\n")
     );
+}
+
+#[test]
+fn nonempty_filter_requires_at_least_one_replayed_vector() {
+    assert!(requires_replayed_vectors(None));
+    assert!(requires_replayed_vectors(Some(&BTreeSet::from([
+        "missing-op".to_owned()
+    ]))));
+    assert!(!requires_replayed_vectors(Some(&BTreeSet::new())));
+}
+
+#[test]
+fn pure_integer_numbers_do_not_compare_through_f64() {
+    let left = serde_json::from_str::<Number>("9007199254740992").unwrap();
+    let right = serde_json::from_str::<Number>("9007199254740993").unwrap();
+
+    assert!(!number_eq(&left, &right));
+}
+
+#[test]
+fn float_shaped_numbers_can_compare_through_f64() {
+    let integer = serde_json::from_str::<Number>("1").unwrap();
+    let float = serde_json::from_str::<Number>("1.0").unwrap();
+
+    assert!(number_eq(&integer, &float));
 }

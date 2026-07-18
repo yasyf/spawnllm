@@ -81,17 +81,17 @@ pub(crate) async fn exec_attempt(
     } else {
         cmd.stdout(Stdio::piped());
     }
+    cmd.kill_on_drop(true);
 
-    let mut child = cmd.spawn()?;
-
-    {
-        let mut stdin = child.stdin.take().expect("stdin piped");
+    let mut child = ChildGuard::new(cmd.spawn()?);
+    let mut stdin = child.child_mut().stdin.take().expect("stdin piped");
+    let piped_stdout = child.child_mut().stdout.take();
+    let mut stderr_handle = child.child_mut().stderr.take().expect("stderr piped");
+    let write_in = async move {
         stdin.write_all(plan.stdin.as_bytes()).await?;
         stdin.shutdown().await.ok();
-    }
-
-    let piped_stdout = child.stdout.take();
-    let mut stderr_handle = child.stderr.take().expect("stderr piped");
+        Ok::<(), std::io::Error>(())
+    };
     let read_out = async move {
         let mut buf = Vec::new();
         if let Some(mut handle) = piped_stdout {
@@ -104,24 +104,23 @@ pub(crate) async fn exec_attempt(
         stderr_handle.read_to_end(&mut buf).await?;
         Ok::<Vec<u8>, std::io::Error>(buf)
     };
-    let wait = child.wait();
-    let combined = async { tokio::join!(read_out, read_err, wait) };
+    let wait = child.child_mut().wait();
+    let combined = async move {
+        let (_, stdout, stderr, status) = tokio::try_join!(write_in, read_out, read_err, wait)?;
+        Ok::<_, std::io::Error>((stdout, stderr, status))
+    };
 
     let outcome = tokio::time::timeout(spec.timeout, combined).await;
+    child.reap().await;
     match outcome {
-        Err(_) => {
-            reap(&mut child).await;
-            Ok(Attempt {
-                output: String::new(),
-                kind: AttemptKind::Timeout {
-                    duration: spec.timeout,
-                },
-            })
-        }
-        Ok((stdout_res, stderr_res, status_res)) => {
-            let stdout_bytes = stdout_res?;
-            let stderr_bytes = stderr_res?;
-            let status = status_res?;
+        Err(_) => Ok(Attempt {
+            output: String::new(),
+            kind: AttemptKind::Timeout {
+                duration: spec.timeout,
+            },
+        }),
+        Ok(result) => {
+            let (stdout_bytes, stderr_bytes, status) = result?;
             let returncode = status.code().map_or(-1, i64::from);
             let stderr = String::from_utf8_lossy(&stderr_bytes).into_owned();
             let raw = read_raw(
@@ -133,6 +132,35 @@ pub(crate) async fn exec_attempt(
             drop(temp_files);
             let kind = resolve_kind(provider, &raw, returncode, &stderr, wants_value);
             Ok(Attempt { output: raw, kind })
+        }
+    }
+}
+
+struct ChildGuard {
+    child: Option<Child>,
+}
+
+impl ChildGuard {
+    fn new(child: Child) -> Self {
+        Self { child: Some(child) }
+    }
+
+    fn child_mut(&mut self) -> &mut Child {
+        self.child.as_mut().expect("child is present")
+    }
+
+    async fn reap(&mut self) {
+        if let Some(mut child) = self.child.take() {
+            reap(&mut child).await;
+        }
+    }
+}
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.child.take() {
+            // Cancellation cannot await cleanup, so transfer the child to a live runtime task.
+            tokio::spawn(async move { reap(&mut child).await });
         }
     }
 }
@@ -163,10 +191,10 @@ async fn reap(child: &mut Child) {
         unsafe {
             libc::kill(pid as libc::pid_t, libc::SIGTERM);
         }
-        if tokio::time::timeout(Duration::from_secs(2), child.wait())
-            .await
-            .is_ok()
-        {
+        if matches!(
+            tokio::time::timeout(Duration::from_secs(2), child.wait()).await,
+            Ok(Ok(_))
+        ) {
             return;
         }
     }

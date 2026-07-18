@@ -75,6 +75,44 @@ async fn isolation_seeds_stripped_account_and_credentials_from_files() {
     );
 }
 
+#[allow(clippy::await_holding_lock)]
+#[tokio::test]
+async fn empty_claude_config_dir_uses_the_default_home() {
+    common::fixtures();
+    let _guard = common::ENV_LOCK
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+
+    let source = tempfile::tempdir().unwrap();
+    std::fs::create_dir(source.path().join(".claude")).unwrap();
+    std::fs::write(
+        source.path().join(".claude/.credentials.json"),
+        r#"{"token": "home-token"}"#,
+    )
+    .unwrap();
+    let cred_out = tempfile::NamedTempFile::new().unwrap();
+    let cred_path = cred_out.path().to_str().unwrap().to_owned();
+    let original_home = std::env::var_os("HOME");
+
+    unsafe {
+        std::env::set_var("HOME", source.path());
+        std::env::set_var("CLAUDE_CONFIG_DIR", "");
+    }
+    let spec = RunSpec::new("hi", "haiku").env(env(&[("SPAWNLLM_FAKE_CRED_OUT", &cred_path)]));
+    let response = spawnllm::run_on(&Backend::Claude, spec).await;
+    clear_config_dir();
+    match original_home {
+        Some(home) => unsafe { std::env::set_var("HOME", home) },
+        None => unsafe { std::env::remove_var("HOME") },
+    }
+
+    response.outcome.expect("isolated claude run succeeds");
+    assert_eq!(
+        std::fs::read_to_string(&cred_path).unwrap(),
+        r#"{"token": "home-token"}"#
+    );
+}
+
 #[cfg(target_os = "macos")]
 #[allow(clippy::await_holding_lock)]
 #[tokio::test]

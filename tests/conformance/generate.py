@@ -400,11 +400,12 @@ def _keychain_service(home: str) -> str:
 def _isolation_sources(case: cases.IsolationSourcesCase) -> dict[str, object]:
     # Mirrors ClaudeBase._isolated_dir path derivation; keychain service hashes str(config_home).
     env = case.claude_config_dir_env
-    config_home = env if env is not None else f"{case.home}/.claude"
+    config_home = Path(env) if env is not None else Path(case.home) / ".claude"
+    account_path = config_home / ".claude.json" if env is not None else Path(case.home) / ".claude.json"
     return {
-        "account_path": f"{env}/.claude.json" if env is not None else f"{case.home}/.claude.json",
-        "credentials_path": f"{config_home}/.credentials.json",
-        "keychain_service": _keychain_service(config_home) if case.platform == "darwin" else None,
+        "account_path": str(account_path),
+        "credentials_path": str(config_home / ".credentials.json"),
+        "keychain_service": _keychain_service(str(config_home)) if case.platform == "darwin" else None,
     }
 
 

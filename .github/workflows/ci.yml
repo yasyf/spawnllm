@@ -105,9 +105,7 @@ jobs:
 
       - name: Clippy
         working-directory: rust
-        # missing_safety_doc: the wasm ABI's unsafe extern "C" fns (spawnllm-wasm/src/lib.rs)
-        # predate `# Safety` docs; Phase 7 covers docs, then this allow drops.
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings -A clippy::missing_safety_doc
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Test (strict conformance, all features)
         working-directory: rust

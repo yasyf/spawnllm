@@ -42,10 +42,7 @@ impl Attempt {
         match &self.kind {
             AttemptKind::Ok { .. } => None,
             AttemptKind::Error { msg, .. } => Some(msg.clone()),
-            AttemptKind::Timeout { duration } => Some(format!(
-                "{provider} timed out after {}s",
-                duration.as_secs()
-            )),
+            AttemptKind::Timeout { duration } => Some(timeout_message(provider, *duration)),
         }
     }
 
@@ -53,7 +50,7 @@ impl Attempt {
         let (error, cost_usd, usage) = match &self.kind {
             AttemptKind::Error {
                 cost_usd, usage, ..
-            } => ("BackendCall".to_owned(), *cost_usd, usage.clone()),
+            } => ("BackendCallError".to_owned(), *cost_usd, usage.clone()),
             AttemptKind::Timeout { .. } => ("Timeout".to_owned(), None, None),
             AttemptKind::Ok { .. } => ("Ok".to_owned(), None, None),
         };
@@ -123,15 +120,21 @@ fn portable(spec: &RunSpec, endpoint: Option<&Value>) -> Value {
     })
 }
 
-pub(crate) async fn dispatch_run(backend: &Backend, spec: RunSpec) -> Response {
+pub(crate) async fn dispatch_run(backend: &Backend, spec: RunSpec, wants_value: bool) -> Response {
+    if let Err(error) = spec.validate() {
+        return error_response(spec, error, Vec::new());
+    }
     let provider = backend.provider();
-    let wants_value = spec.schema.is_some();
     let plan_input = json!({
         "provider": provider,
         "spec": portable(&spec, backend.endpoint_value().as_ref()),
         "host": { "platform": host::platform() },
     });
-    match core_op::<InvocationPlan>("plan", plan_input) {
+    let plan = match core_op::<InvocationPlan>("plan", plan_input) {
+        Ok(plan) => plan,
+        Err(error) => return error_response(spec, error.into(), Vec::new()),
+    };
+    match plan {
         InvocationPlan::Exec(plan) => exec_loop(spec, plan, provider, wants_value).await,
         #[cfg(feature = "openai")]
         InvocationPlan::Http(plan) => http_loop(spec, plan, provider, wants_value).await,
@@ -149,7 +152,7 @@ async fn exec_loop(
     let isolated_dir = if plan.needs_claude_isolation {
         match crate::isolate::seed_isolation().await {
             Ok(dir) => Some(dir),
-            Err(error) => return io_response(spec, error, Vec::new()),
+            Err(error) => return error_response(spec, error, Vec::new()),
         }
     } else {
         None
@@ -168,7 +171,7 @@ async fn exec_loop(
         .await;
         let att = match outcome {
             Ok(att) => att,
-            Err(error) => return io_response(spec, error, discarded),
+            Err(error) => return error_response(spec, error.into(), discarded),
         };
         if let Some((output, outcome)) = settle(provider, attempt, max, att, &mut discarded).await {
             return Response {
@@ -252,7 +255,7 @@ fn finalize(att: Attempt, provider: &str) -> (String, Result<RunResult, RunError
             (att.output, Err(RunError { msg, source }))
         }
         AttemptKind::Timeout { duration } => {
-            let msg = format!("{provider} timed out after {}s", duration.as_secs());
+            let msg = timeout_message(provider, duration);
             (
                 att.output,
                 Err(RunError {
@@ -264,15 +267,16 @@ fn finalize(att: Attempt, provider: &str) -> (String, Result<RunResult, RunError
     }
 }
 
-fn io_response(spec: RunSpec, error: std::io::Error, discarded: Vec<DiscardedAttempt>) -> Response {
+fn timeout_message(provider: &str, duration: Duration) -> String {
+    format!("{provider} timed out after {}s", duration.as_secs_f64())
+}
+
+fn error_response(spec: RunSpec, error: Error, discarded: Vec<DiscardedAttempt>) -> Response {
     let msg = error.to_string();
     Response {
         spec,
         output: String::new(),
-        outcome: Err(RunError {
-            msg,
-            source: Error::Io(error),
-        }),
+        outcome: Err(RunError { msg, source: error }),
         discarded_attempts: discarded,
     }
 }

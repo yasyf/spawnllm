@@ -5,13 +5,18 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
-/// Serializes tests that mutate the process environment (`CLAUDE_CONFIG_DIR`).
+/// Serializes tests that mutate host configuration environment variables.
 pub static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 static FIXTURES: OnceLock<PathBuf> = OnceLock::new();
 
 const CLAUDE_FAKE: &str = r#"#!/bin/sh
 if [ "$1" = "auth" ]; then exit 0; fi
+if [ -n "$SPAWNLLM_FAKE_PID_OUT" ]; then printf '%s' "$$" > "$SPAWNLLM_FAKE_PID_OUT"; fi
+if [ -n "$SPAWNLLM_FAKE_TERM_OUT" ]; then trap 'printf term > "$SPAWNLLM_FAKE_TERM_OUT"; exit 0' TERM; fi
+if [ -n "$SPAWNLLM_FAKE_EXIT_BEFORE_STDIN" ]; then exit 0; fi
+if [ -n "$SPAWNLLM_FAKE_SPIN" ]; then while :; do :; done; fi
+if [ -n "$SPAWNLLM_FAKE_IGNORE_STDIN" ]; then sleep "$SPAWNLLM_FAKE_IGNORE_STDIN"; exit 0; fi
 has_schema=0
 schema=""
 prev=""

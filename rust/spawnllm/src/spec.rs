@@ -136,6 +136,9 @@ impl RunSpec {
         }
     }
 
+    /// Constrain the response with a JSON object schema.
+    ///
+    /// Any non-object JSON value produces [`Error::Validation`] in the run outcome.
     pub fn schema(mut self, schema: Value) -> Self {
         self.schema = Some(schema);
         self
@@ -184,6 +187,21 @@ impl RunSpec {
     pub fn gemini(mut self, config: GeminiConfig) -> Self {
         self.gemini = Some(config);
         self
+    }
+
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        if self
+            .schema
+            .as_ref()
+            .is_some_and(|schema| !schema.is_object())
+        {
+            return Err(Error::Validation(
+                <serde_json::Error as serde::de::Error>::custom(
+                    "RunSpec schema must be a JSON object",
+                ),
+            ));
+        }
+        Ok(())
     }
 }
 

@@ -43,6 +43,9 @@ use spec::DEFAULT_SELECT_TIMEOUT;
 /// land in [`Response::outcome`] as an `Err`, never as a panic. The prompt's model
 /// is taken from the spec verbatim (no tier mapping).
 pub async fn run(spec: RunSpec) -> Response {
+    if let Err(error) = spec.validate() {
+        return spec::unavailable_response(spec, error);
+    }
     match select_backend(None, DEFAULT_SELECT_TIMEOUT).await {
         Ok(backend) => run_on(&backend, spec).await,
         Err(error) => spec::unavailable_response(spec, error),
@@ -51,7 +54,7 @@ pub async fn run(spec: RunSpec) -> Response {
 
 /// Execute a [`RunSpec`] on a specific [`Backend`].
 pub async fn run_on(backend: &Backend, spec: RunSpec) -> Response {
-    run::dispatch_run(backend, spec).await
+    run::dispatch_run(backend, spec, false).await
 }
 
 /// Run one LLM call and return its text response.
@@ -80,9 +83,9 @@ pub async fn extract<T: DeserializeOwned + JsonSchema>(
     opts: CallOpts,
 ) -> Result<T, Error> {
     let backend = resolve_backend(&opts).await?;
-    let schema = strict_schema_for::<T>(&backend);
+    let schema = strict_schema_for::<T>(&backend)?;
     let spec = RunSpec::call_spec(prompt, backend.model_for(opts.model), &opts).schema(schema);
-    match run_on(&backend, spec).await.outcome {
+    match run::dispatch_run(&backend, spec, true).await.outcome {
         Ok(result) => {
             let value = result.parsed.expect("a schema run yields a parsed value");
             serde_json::from_value(value).map_err(Error::Validation)
@@ -101,18 +104,23 @@ async fn resolve_backend(opts: &CallOpts) -> Result<Backend, Error> {
 /// Build `T`'s JSON schema (schemars 2020-12, `$defs`) and apply core's strict-schema
 /// transform for the backend's dialect. Both the Anthropic and OpenAI transforms recurse
 /// `$defs`, so every nested definition is strictified.
-pub(crate) fn strict_schema_for<T: JsonSchema>(backend: &Backend) -> serde_json::Value {
+#[derive(serde::Deserialize)]
+struct StrictSchemaOutput {
+    schema: serde_json::Value,
+}
+
+pub(crate) fn strict_schema_for<T: JsonSchema>(
+    backend: &Backend,
+) -> Result<serde_json::Value, Error> {
     let raw_schema =
         serde_json::to_value(schemars::schema_for!(T)).expect("json schema serializes");
     match backend.strict_dialect() {
-        Some(dialect) => core_io::core_op::<serde_json::Value>(
+        Some(dialect) => Ok(core_io::core_op::<StrictSchemaOutput>(
             "strict_schema",
             serde_json::json!({ "dialect": dialect, "schema": raw_schema }),
-        )
-        .get("schema")
-        .cloned()
-        .expect("strict_schema returns a schema"),
-        None => raw_schema,
+        )?
+        .schema),
+        None => Ok(raw_schema),
     }
 }
 
@@ -139,7 +147,7 @@ mod tests {
     #[test]
     fn nested_extract_schema_is_strict_in_every_definition() {
         for backend in [Backend::Claude, Backend::Codex] {
-            let schema = strict_schema_for::<Outer>(&backend);
+            let schema = strict_schema_for::<Outer>(&backend).unwrap();
             assert_eq!(
                 schema.get("additionalProperties"),
                 Some(&Value::Bool(false)),

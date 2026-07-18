@@ -10,12 +10,25 @@ pub extern "C" fn sl_alloc(len: u32) -> u32 {
     unsafe { alloc(layout(len as usize)) as u32 }
 }
 
+/// # Safety
+///
+/// `ptr` must be a live buffer from [`sl_alloc`] (or unpacked from an
+/// [`sl_call`] response) and `len` the exact length it was allocated with;
+/// any other pair, or a second free, is undefined behavior.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sl_free(ptr: u32, len: u32) {
     unsafe { dealloc(ptr as *mut u8, layout(len as usize)) };
 }
 
-// Returns the response buffer as `(ptr << 32) | len` in one u64; host frees it via `sl_free`.
+/// Dispatches one request and returns the response buffer packed as
+/// `(ptr << 32) | len`.
+///
+/// # Safety
+///
+/// `ptr` must point at `len` initialized bytes of valid UTF-8 in the module's
+/// linear memory (the host always sends JSON; anything else traps), and the
+/// returned buffer must be released with [`sl_free`] using the unpacked
+/// pointer and length.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sl_call(ptr: u32, len: u32) -> u64 {
     let request = unsafe { slice::from_raw_parts(ptr as *const u8, len as usize) };

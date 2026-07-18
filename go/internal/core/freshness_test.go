@@ -24,9 +24,9 @@ func TestBlobFreshness(t *testing.T) {
 	}
 	want := strings.TrimSpace(string(out))
 
-	version, err := CoreVersion()
+	version, err := BlobVersion()
 	if err != nil {
-		t.Fatalf("CoreVersion: %v", err)
+		t.Fatalf("BlobVersion: %v", err)
 	}
 	if version.SourceHash != want {
 		t.Fatalf("stale blob: embedded source_hash=%s, current sources=%s (run scripts/build_wasm.sh)",

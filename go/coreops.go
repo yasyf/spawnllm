@@ -47,14 +47,16 @@ type modelTiers struct {
 	Small  string `json:"small"`
 }
 
-func (m modelTiers) tier(t ModelTier) string {
+func (m modelTiers) tier(t ModelTier) (string, error) {
 	switch t.orDefault() {
 	case Large:
-		return m.Large
+		return m.Large, nil
 	case Medium:
-		return m.Medium
+		return m.Medium, nil
+	case Small:
+		return m.Small, nil
 	default:
-		return m.Small
+		return "", fmt.Errorf("spawnllm: unknown model tier %q", t)
 	}
 }
 

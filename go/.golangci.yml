@@ -28,13 +28,10 @@ linters:
         - G304
         - G115
     revive:
-      # Doc-comment coverage lands in Phase 7; re-enable once it does.
       enable-default-rules: true
       rules:
         - name: exported
-          disabled: true
         - name: package-comments
-          disabled: true
   exclusions:
     rules:
       - path: _test\.go

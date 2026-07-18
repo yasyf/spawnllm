@@ -46,6 +46,13 @@ fn transform_anthropic(schema: Value) -> Value {
         Value::Object(src) => src,
         other => return other,
     };
+    if src
+        .get("$ref")
+        .and_then(Value::as_str)
+        .is_some_and(|reference| !reference.starts_with("#/"))
+    {
+        return Value::Object(src);
+    }
     let mut out = Map::new();
 
     if let Some(Value::Object(defs)) = src.remove("$defs") {
@@ -264,8 +271,8 @@ fn ensure_strict(schema: Value, root: &Value) -> Value {
         .filter(|reference| !reference.is_empty())
         .map(str::to_string);
     if let Some(reference) = inline_ref.filter(|_| obj.len() > 1) {
-        let Value::Object(mut merged) = resolve_ref(root, &reference) else {
-            panic!("$ref {reference} did not resolve to an object");
+        let Some(Value::Object(mut merged)) = resolve_ref(root, &reference) else {
+            return Value::Object(obj);
         };
         for (key, value) in obj {
             merged.insert(key, value);
@@ -296,13 +303,12 @@ fn ordered_required(prop_keys: &[String], existing: Option<&Value>) -> Vec<Value
         .collect()
 }
 
-fn resolve_ref(root: &Value, reference: &str) -> Value {
+fn resolve_ref(root: &Value, reference: &str) -> Option<Value> {
     reference
-        .strip_prefix("#/")
-        .expect("$ref must start with '#/'")
+        .strip_prefix("#/")?
         .split('/')
-        .fold(root, |current, key| &current[key])
-        .clone()
+        .try_fold(root, |current, key| current.get(key))
+        .cloned()
 }
 
 fn py_str(value: &Value) -> String {
@@ -359,4 +365,25 @@ fn py_repr_str(text: &str) -> String {
     }
     out.push(quote);
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn external_refs_with_siblings_are_unchanged_in_both_dialects() {
+        let schema = json!({
+            "$ref": "https://example.com/x",
+            "description": "external schema",
+        });
+
+        for dialect in ["anthropic", "openai"] {
+            let output = dispatch(json!({ "dialect": dialect, "schema": schema.clone() }))
+                .unwrap_or_else(|_| panic!("{dialect} transform succeeds"));
+            assert_eq!(output["schema"], schema, "dialect: {dialect}");
+        }
+    }
 }

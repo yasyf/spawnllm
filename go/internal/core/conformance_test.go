@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -37,9 +38,36 @@ func numberEqual(a, b json.Number) bool {
 	if a.String() == b.String() {
 		return true
 	}
+	if !strings.ContainsAny(a.String(), ".eE") && !strings.ContainsAny(b.String(), ".eE") {
+		return false
+	}
 	af, aerr := a.Float64()
 	bf, berr := b.Float64()
 	return aerr == nil && berr == nil && af == bf && !math.IsInf(af, 0) && !math.IsNaN(af)
+}
+
+func TestNumberEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		a    json.Number
+		b    json.Number
+		want bool
+	}{
+		{name: "same integer", a: "9007199254740993", b: "9007199254740993", want: true},
+		{name: "distinct large integers", a: "9007199254740992", b: "9007199254740993", want: false},
+		{name: "distinct integer lexemes", a: "-0", b: "0", want: false},
+		{name: "decimal and integer", a: "1.0", b: "1", want: true},
+		{name: "exponent and integer", a: "1e3", b: "1000", want: true},
+		{name: "distinct float values", a: "1.5", b: "2", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := numberEqual(tt.a, tt.b); got != tt.want {
+				t.Fatalf("numberEqual(%s, %s) = %v, want %v", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
 }
 
 func valueEqual(a, b any) bool {

@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use schemars::JsonSchema;
 use serde::Deserialize;
+use serde_json::json;
 
 use spawnllm::{Backend, BackendStatus, CallOpts, Error, ModelTier, RunSpec, Specialty};
 
@@ -31,6 +32,27 @@ fn env(pairs: &[(&str, &str)]) -> HashMap<String, String> {
         .iter()
         .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
         .collect()
+}
+
+#[cfg(unix)]
+async fn recorded_pid(path: &std::path::Path) -> i32 {
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Ok(raw) = std::fs::read_to_string(path)
+                && let Ok(pid) = raw.parse()
+            {
+                return pid;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("fake CLI records its pid")
+}
+
+#[cfg(unix)]
+fn process_exists(pid: i32) -> bool {
+    unsafe { libc::kill(pid, 0) == 0 }
 }
 
 #[tokio::test]
@@ -87,10 +109,16 @@ async fn run_on_codex_reads_the_result_file_not_stdout() {
 #[tokio::test]
 async fn run_on_times_out_and_kills_the_child() {
     common::fixtures();
+    let term = tempfile::NamedTempFile::new().unwrap();
+    let term_path = term.path().to_str().unwrap().to_owned();
     let spec = RunSpec::new("hi", "haiku")
         .isolated(false)
-        .timeout(Duration::from_millis(300))
-        .env(env(&[("SPAWNLLM_FAKE_SLEEP", "10")]));
+        .timeout(Duration::from_millis(500))
+        .max_attempts(1)
+        .env(env(&[
+            ("SPAWNLLM_FAKE_SPIN", "1"),
+            ("SPAWNLLM_FAKE_TERM_OUT", &term_path),
+        ]));
     let started = Instant::now();
     let response = spawnllm::run_on(&Backend::Claude, spec).await;
     let error = response.outcome.expect_err("a slept-out run times out");
@@ -99,10 +127,88 @@ async fn run_on_times_out_and_kills_the_child() {
         "got {:?}",
         error.source
     );
+    assert_eq!(error.msg, "claude timed out after 0.5s");
+    assert_eq!(std::fs::read_to_string(&term_path).unwrap(), "term");
     assert!(
         started.elapsed() < Duration::from_secs(5),
         "reap should be prompt"
     );
+}
+
+#[tokio::test]
+async fn run_on_times_out_while_stdin_write_is_blocked() {
+    common::fixtures();
+    let spec = RunSpec::new("x".repeat(1024 * 1024), "haiku")
+        .isolated(false)
+        .timeout(Duration::from_millis(200))
+        .max_attempts(1)
+        .env(env(&[("SPAWNLLM_FAKE_IGNORE_STDIN", "10")]));
+    let started = Instant::now();
+
+    let response = spawnllm::run_on(&Backend::Claude, spec).await;
+    let error = response
+        .outcome
+        .expect_err("a blocked stdin write reaches the attempt timeout");
+
+    assert!(matches!(error.source, Error::Timeout(_)));
+    assert_eq!(error.msg, "claude timed out after 0.2s");
+    assert!(started.elapsed() < Duration::from_secs(3));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn early_stdin_write_error_reaps_the_child() {
+    common::fixtures();
+    let pid_file = tempfile::NamedTempFile::new().unwrap();
+    let pid_path = pid_file.path().to_str().unwrap().to_owned();
+    let spec = RunSpec::new("x".repeat(1024 * 1024), "haiku")
+        .isolated(false)
+        .max_attempts(1)
+        .env(env(&[
+            ("SPAWNLLM_FAKE_PID_OUT", &pid_path),
+            ("SPAWNLLM_FAKE_EXIT_BEFORE_STDIN", "1"),
+        ]));
+
+    let response = spawnllm::run_on(&Backend::Claude, spec).await;
+    let pid = recorded_pid(pid_file.path()).await;
+
+    assert!(matches!(
+        response.outcome.expect_err("stdin write fails").source,
+        Error::Io(_)
+    ));
+    assert!(!process_exists(pid), "child {pid} was not reaped");
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn cancelling_run_reaps_the_child_with_sigterm() {
+    common::fixtures();
+    let pid_file = tempfile::NamedTempFile::new().unwrap();
+    let term_file = tempfile::NamedTempFile::new().unwrap();
+    let pid_path = pid_file.path().to_str().unwrap().to_owned();
+    let term_path = term_file.path().to_str().unwrap().to_owned();
+    let spec = RunSpec::new("hi", "haiku").isolated(false).env(env(&[
+        ("SPAWNLLM_FAKE_PID_OUT", &pid_path),
+        ("SPAWNLLM_FAKE_TERM_OUT", &term_path),
+        ("SPAWNLLM_FAKE_SPIN", "1"),
+    ]));
+    let task = tokio::spawn(async move { spawnllm::run_on(&Backend::Claude, spec).await });
+    let pid = recorded_pid(pid_file.path()).await;
+
+    task.abort();
+    assert!(task.await.unwrap_err().is_cancelled());
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while process_exists(pid)
+            || std::fs::read_to_string(term_file.path())
+                .unwrap()
+                .is_empty()
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("cancelled child receives SIGTERM and is reaped");
+    assert_eq!(std::fs::read_to_string(term_file.path()).unwrap(), "term");
 }
 
 #[tokio::test]
@@ -118,7 +224,7 @@ async fn transient_failure_is_retried_then_succeeds() {
     assert_eq!(result.raw, "hello");
     assert_eq!(response.discarded_attempts.len(), 1);
     assert_eq!(response.discarded_attempts[0].attempt, 0);
-    assert_eq!(response.discarded_attempts[0].error, "BackendCall");
+    assert_eq!(response.discarded_attempts[0].error, "BackendCallError");
 }
 
 #[tokio::test]
@@ -151,6 +257,39 @@ async fn extract_deserializes_structured_output_via_claude() {
         .await
         .expect("extract succeeds");
     assert_eq!(value, Sample { x: 42 });
+}
+
+#[tokio::test]
+async fn raw_schema_run_returns_text_without_a_parsed_value() {
+    common::fixtures();
+    let spec = RunSpec::new("give me x", "haiku")
+        .isolated(false)
+        .schema(json!({
+            "type": "object",
+            "properties": {"x": {"type": "integer"}},
+            "required": ["x"],
+        }));
+
+    let result = spawnllm::run_on(&Backend::Claude, spec)
+        .await
+        .outcome
+        .expect("raw-schema run succeeds");
+
+    assert_eq!(result.raw, "ok");
+    assert!(result.parsed.is_none());
+}
+
+#[tokio::test]
+async fn run_rejects_every_non_object_schema_as_validation() {
+    for schema in [json!("string"), json!(true), json!(["array"])] {
+        let response = spawnllm::run(RunSpec::new("hi", "haiku").schema(schema)).await;
+        let error = response
+            .outcome
+            .expect_err("a non-object schema is invalid");
+
+        assert!(matches!(error.source, Error::Validation(_)));
+        assert!(error.msg.contains("RunSpec schema must be a JSON object"));
+    }
 }
 
 #[tokio::test]

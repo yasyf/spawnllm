@@ -19,13 +19,17 @@ import (
 //go:embed spawnllm_core.wasm
 var wasmBlob []byte
 
+type wasmFunction interface {
+	Call(context.Context, ...uint64) ([]uint64, error)
+}
+
 type engine struct {
 	mu     sync.Mutex
 	module api.Module
 	stderr *bytes.Buffer
-	alloc  api.Function
-	free   api.Function
-	call   api.Function
+	alloc  wasmFunction
+	free   wasmFunction
+	call   wasmFunction
 }
 
 // Version mirrors the core `version` op payload.
@@ -83,8 +87,8 @@ func Call(request any) (json.RawMessage, error) {
 	return engine.dispatch(request)
 }
 
-// CoreVersion reports the embedded blob's crate version and stamped source hash.
-func CoreVersion() (Version, error) {
+// BlobVersion reports the embedded blob's crate version and stamped source hash.
+func BlobVersion() (Version, error) {
 	raw, err := Call(struct {
 		Op string `json:"op"`
 	}{Op: "version"})
@@ -98,7 +102,7 @@ func CoreVersion() (Version, error) {
 	return version, nil
 }
 
-func (e *engine) dispatch(request any) (json.RawMessage, error) {
+func (e *engine) dispatch(request any) (response json.RawMessage, err error) {
 	requestBytes, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -114,6 +118,12 @@ func (e *engine) dispatch(request any) (json.RawMessage, error) {
 		return nil, e.trap("sl_alloc", err)
 	}
 	inPtr := uint32(in[0])
+	defer func() {
+		if _, freeErr := e.free.Call(ctx, uint64(inPtr), inLen); freeErr != nil && err == nil {
+			response = nil
+			err = e.trap("sl_free", freeErr)
+		}
+	}()
 	if !e.module.Memory().Write(inPtr, requestBytes) {
 		return nil, fmt.Errorf("spawnllm core: request write out of bounds")
 	}
@@ -122,9 +132,6 @@ func (e *engine) dispatch(request any) (json.RawMessage, error) {
 	if err != nil {
 		return nil, e.trap("sl_call", err)
 	}
-	if _, err := e.free.Call(ctx, uint64(inPtr), inLen); err != nil {
-		return nil, e.trap("sl_free", err)
-	}
 
 	outPtr := uint32(packed[0] >> 32)
 	outLen := uint32(packed[0])
@@ -132,7 +139,7 @@ func (e *engine) dispatch(request any) (json.RawMessage, error) {
 	if !ok {
 		return nil, fmt.Errorf("spawnllm core: response read out of bounds")
 	}
-	response := make([]byte, len(view))
+	response = make([]byte, len(view))
 	copy(response, view)
 	if _, err := e.free.Call(ctx, uint64(outPtr), uint64(outLen)); err != nil {
 		return nil, e.trap("sl_free", err)

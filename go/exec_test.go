@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -70,6 +71,42 @@ func TestCodexResultFromFile(t *testing.T) {
 	}
 	if resp.Output == "streaming interactive log line to stdout (must be ignored by the host)\n" {
 		t.Fatal("host read the stdout log instead of the -o file")
+	}
+}
+
+func TestMissingBinaryLandsInResponse(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	resp, err := RunOn(context.Background(), ClaudeBackend(), RunSpec{
+		Prompt:        "ping",
+		Model:         "haiku",
+		UseHostConfig: true,
+		MaxAttempts:   1,
+	})
+	if err != nil {
+		t.Fatalf("setup failure must not raise a Go error: %v", err)
+	}
+	if resp == nil || resp.Err == nil {
+		t.Fatalf("setup failure must land in Response.Err, got %+v", resp)
+	}
+	var callErr *BackendCallError
+	if !errors.As(resp.Err, &callErr) {
+		t.Fatalf("cause = %T, want *BackendCallError", resp.Err.Cause)
+	}
+	if callErr.Provider != ProviderClaude {
+		t.Fatalf("provider = %q, want %q", callErr.Provider, ProviderClaude)
+	}
+}
+
+func TestSubstituteFilesOnlyReplacesWholeArgument(t *testing.T) {
+	got := substituteFiles(
+		[]string{"${file:schema}", "literal ${file:schema} token", "${file:other}"},
+		map[string]string{"schema": "/tmp/schema.json"},
+	)
+	want := []string{"/tmp/schema.json", "literal ${file:schema} token", "${file:other}"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("argument %d = %q, want %q", i, got[i], want[i])
+		}
 	}
 }
 
@@ -180,6 +217,10 @@ type echoResult struct {
 	Echo string `json:"echo"`
 }
 
+type preciseNumberResult struct {
+	Value any `json:"value"`
+}
+
 func TestExtractStructured(t *testing.T) {
 	withFakeBin(t)
 	got, err := Extract[echoResult](context.Background(), "hello", CallOpts{Backend: CodexBackend()})
@@ -188,6 +229,40 @@ func TestExtractStructured(t *testing.T) {
 	}
 	if got.Echo != "hello" {
 		t.Fatalf("Extract = %+v, want Echo=hello", got)
+	}
+}
+
+func TestExtractPreservesLargeIntegerInAny(t *testing.T) {
+	withFakeBin(t)
+	t.Setenv("FAKE_STRUCTURED_RESULT", `{"value":9007199254740993}`)
+	got, err := Extract[preciseNumberResult](context.Background(), "number", CallOpts{Backend: CodexBackend()})
+	if err != nil {
+		t.Fatalf("Extract: %v", err)
+	}
+	number, ok := got.Value.(json.Number)
+	if !ok {
+		t.Fatalf("Value = %T(%v), want json.Number", got.Value, got.Value)
+	}
+	if number.String() != "9007199254740993" {
+		t.Fatalf("Value = %s, want 9007199254740993", number)
+	}
+}
+
+func TestRunRejectsNonObjectSchema(t *testing.T) {
+	runners := map[string]func(context.Context, RunSpec) (*Response, error){
+		"Run":   Run,
+		"RunOn": func(ctx context.Context, spec RunSpec) (*Response, error) { return RunOn(ctx, CodexBackend(), spec) },
+	}
+	for name, run := range runners {
+		t.Run(name, func(t *testing.T) {
+			resp, err := run(context.Background(), RunSpec{Schema: json.RawMessage(`"string schema"`)})
+			if err == nil || !strings.Contains(err.Error(), "schema must be a JSON object") {
+				t.Fatalf("error = %v, want JSON object caller fault", err)
+			}
+			if resp != nil {
+				t.Fatalf("response = %+v, want nil on caller fault", resp)
+			}
+		})
 	}
 }
 

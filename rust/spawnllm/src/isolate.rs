@@ -1,11 +1,16 @@
 use std::io::Write;
 use std::path::Path;
+#[cfg(any(target_os = "macos", test))]
+use std::process::Output;
+#[cfg(any(target_os = "macos", test))]
+use std::time::Duration;
 
 use serde::Deserialize;
 use serde_json::json;
 use tempfile::TempDir;
 
 use crate::core_io::core_op;
+use crate::error::Error;
 use crate::host::{home, platform};
 
 #[derive(Debug, Deserialize)]
@@ -27,15 +32,15 @@ struct SeedFile {
     mode: String,
 }
 
-pub(crate) async fn seed_isolation() -> std::io::Result<TempDir> {
+pub(crate) async fn seed_isolation() -> Result<TempDir, Error> {
     let sources: Sources = core_op(
         "claude_isolation_sources",
         json!({ "host": {
             "platform": platform(),
             "home": home(),
-            "claude_config_dir_env": std::env::var("CLAUDE_CONFIG_DIR").ok(),
+            "claude_config_dir_env": std::env::var("CLAUDE_CONFIG_DIR").ok().filter(|value| !value.is_empty()),
         } }),
-    );
+    )?;
 
     let account_json = std::fs::read_to_string(&sources.account_path).ok();
     let credentials_json = match std::fs::read_to_string(&sources.credentials_path) {
@@ -49,7 +54,7 @@ pub(crate) async fn seed_isolation() -> std::io::Result<TempDir> {
     let seed: Seed = core_op(
         "claude_isolation_seed",
         json!({ "account_json": account_json, "credentials_json": credentials_json }),
-    );
+    )?;
 
     let dir = tempfile::Builder::new()
         .prefix("spawnllm-claude-config-")
@@ -67,11 +72,9 @@ pub(crate) async fn seed_isolation() -> std::io::Result<TempDir> {
 async fn keychain_credentials(service: &str) -> Option<String> {
     #[cfg(target_os = "macos")]
     {
-        let output = tokio::process::Command::new("security")
-            .args(["find-generic-password", "-s", service, "-w"])
-            .output()
-            .await
-            .ok()?;
+        let mut command = tokio::process::Command::new("security");
+        command.args(["find-generic-password", "-s", service, "-w"]);
+        let output = timed_command_output(&mut command, Duration::from_secs(10)).await?;
         output
             .status
             .success()
@@ -82,6 +85,18 @@ async fn keychain_credentials(service: &str) -> Option<String> {
         let _ = service;
         None
     }
+}
+
+#[cfg(any(target_os = "macos", test))]
+async fn timed_command_output(
+    command: &mut tokio::process::Command,
+    timeout: Duration,
+) -> Option<Output> {
+    command.kill_on_drop(true);
+    tokio::time::timeout(timeout, command.output())
+        .await
+        .ok()?
+        .ok()
 }
 
 #[cfg(unix)]
@@ -95,4 +110,37 @@ fn set_mode(path: &Path, mode: &str) -> std::io::Result<()> {
 #[cfg(not(unix))]
 fn set_mode(_path: &Path, _mode: &str) -> std::io::Result<()> {
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Instant;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn timed_command_output_returns_none_on_spawn_failure() {
+        let mut command = tokio::process::Command::new("spawnllm-command-that-does-not-exist");
+
+        assert!(
+            timed_command_output(&mut command, Duration::from_secs(1))
+                .await
+                .is_none()
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn timed_command_output_returns_none_at_the_deadline() {
+        let mut command = tokio::process::Command::new("sh");
+        command.args(["-c", "sleep 5"]);
+        let started = Instant::now();
+
+        assert!(
+            timed_command_output(&mut command, Duration::from_millis(50))
+                .await
+                .is_none()
+        );
+        assert!(started.elapsed() < Duration::from_secs(1));
+    }
 }

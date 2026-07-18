@@ -22,6 +22,8 @@ pub enum Error {
     Timeout(Duration),
     #[error("validation failed: {0}")]
     Validation(#[from] serde_json::Error),
+    #[error("core op {op} failed: {msg}")]
+    Core { op: String, msg: String },
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }

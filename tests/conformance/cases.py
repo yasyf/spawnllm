@@ -458,6 +458,7 @@ ISOLATION_SOURCES_CASES: tuple[IsolationSourcesCase, ...] = (
     IsolationSourcesCase("default-home-darwin", "darwin", HOME_DARWIN, None),
     IsolationSourcesCase("default-home-linux", "linux", HOME_LINUX, None),
     IsolationSourcesCase("config-dir-env-darwin", "darwin", HOME_DARWIN, "/Users/testuser/.acct"),
+    IsolationSourcesCase("config-dir-env-trailing-slash-darwin", "darwin", HOME_DARWIN, "/Users/testuser/.acct/"),
     IsolationSourcesCase("config-dir-env-linux", "linux", HOME_LINUX, "/home/testuser/.acct"),
 )
 

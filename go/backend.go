@@ -14,6 +14,7 @@ import (
 // Provider identifies an LLM backend's provider.
 type Provider string
 
+// The providers a Backend can identify as.
 const (
 	ProviderClaude         Provider = "claude"
 	ProviderCodex          Provider = "codex"
@@ -25,6 +26,7 @@ const (
 // Specialty scopes backend auto-selection to the backend that serves it.
 type Specialty string
 
+// The specialties the routing table maps to a preferred backend.
 const (
 	SpecialtyDebugging Specialty = "debugging"
 	SpecialtyReview    Specialty = "review"
@@ -34,6 +36,7 @@ const (
 // BackendState is the readiness of a backend reported by CheckStatus.
 type BackendState int
 
+// The readiness states CheckStatus reports.
 const (
 	BackendReady BackendState = iota
 	BackendNotInstalled
@@ -179,6 +182,9 @@ func SelectBackend(ctx context.Context, opts SelectOpts) (Backend, error) {
 			return b, nil
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return nil, &BackendUnavailableError{Specialty: opts.Specialty, Statuses: statuses}
 }
 
@@ -219,7 +225,7 @@ func modelTier(b Backend, tier ModelTier) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("spawnllm: no model tiers for provider %q", b.Provider())
 	}
-	return tiers.tier(tier), nil
+	return tiers.tier(tier)
 }
 
 func checkStatusViaProbes(ctx context.Context, provider Provider) BackendStatus {

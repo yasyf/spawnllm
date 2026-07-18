@@ -16,9 +16,7 @@ tasks:
   clippy:
     desc: Lint with clippy (denies warnings)
     cmds:
-      # missing_safety_doc: the wasm ABI's unsafe extern "C" fns predate
-      # `# Safety` docs (Phase 7 covers docs); drop this allow once they land.
-      - cargo clippy --workspace --all-targets --all-features -- -D warnings -A clippy::missing_safety_doc
+      - cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   fmt:
     desc: Format with rustfmt

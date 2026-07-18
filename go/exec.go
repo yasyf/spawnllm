@@ -141,7 +141,10 @@ func substituteFiles(argv []string, paths map[string]string) []string {
 	out := make([]string, len(argv))
 	for i, arg := range argv {
 		for id, path := range paths {
-			arg = strings.ReplaceAll(arg, "${file:"+id+"}", path)
+			if arg == "${file:"+id+"}" {
+				arg = path
+				break
+			}
 		}
 		out[i] = arg
 	}

@@ -80,7 +80,10 @@ impl Formatter for PythonFormatter {
 fn isolation_sources(input: IsolationSourcesInput) -> IsolationSources {
     let host = input.host;
     let (account_path, config_home) = match host.claude_config_dir_env {
-        Some(config_home) => (format!("{config_home}/.claude.json"), config_home),
+        Some(config_home) => {
+            let config_home = config_home.trim_end_matches('/').to_owned();
+            (format!("{config_home}/.claude.json"), config_home)
+        }
         None => (
             format!("{}/.claude.json", host.home),
             format!("{}/.claude", host.home),

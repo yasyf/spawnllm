@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -45,6 +46,16 @@ func TestSelectBackendUnavailable(t *testing.T) {
 	}
 }
 
+func TestSelectBackendReturnsCanceledContext(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := SelectBackend(ctx, SelectOpts{})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("SelectBackend error = %v, want context.Canceled", err)
+	}
+}
+
 func TestCoreSpecDefaults(t *testing.T) {
 	cs := RunSpec{Prompt: "p", Model: "m"}.core()
 	if !cs.Isolated {
@@ -79,6 +90,27 @@ func TestCodexServiceTierDefault(t *testing.T) {
 	cs = RunSpec{Providers: ProviderConfigs{Codex: &CodexConfig{ServiceTier: &explicit}}}.core()
 	if *cs.Codex.ServiceTier != "flex" {
 		t.Fatalf("explicit service tier = %v, want flex", *cs.Codex.ServiceTier)
+	}
+	empty := ""
+	cs = RunSpec{Providers: ProviderConfigs{Codex: &CodexConfig{ServiceTier: &empty}}}.core()
+	if cs.Codex.ServiceTier != nil {
+		t.Fatalf("empty service tier = %v, want nil", *cs.Codex.ServiceTier)
+	}
+	_, plan, _, err := corePlan(ProviderCodex, cs)
+	if err != nil {
+		t.Fatalf("corePlan: %v", err)
+	}
+	for _, arg := range plan.Argv {
+		if strings.Contains(arg, "service_tier") {
+			t.Fatalf("empty service tier emitted flag in argv: %v", plan.Argv)
+		}
+	}
+}
+
+func TestCallRejectsUnknownModelTier(t *testing.T) {
+	_, err := Call(context.Background(), "ping", CallOpts{Backend: ClaudeBackend(), Model: ModelTier("unknown")})
+	if err == nil || !strings.Contains(err.Error(), `unknown model tier "unknown"`) {
+		t.Fatalf("Call error = %v, want unknown model tier", err)
 	}
 }
 
