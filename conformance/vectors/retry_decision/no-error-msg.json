@@ -1,0 +1,13 @@
+{
+  "expected": {
+    "retry": false,
+    "sleep_s": 0.0
+  },
+  "input": {
+    "attempt": 0,
+    "error_msg": null,
+    "max_attempts": 5
+  },
+  "name": "no-error-msg",
+  "op": "retry_decision"
+}

@@ -1,0 +1,42 @@
+{
+  "expected": {
+    "argv": [
+      "agy",
+      "--model",
+      "gemini-3.5",
+      "--dangerously-skip-permissions",
+      "--print-timeout",
+      "120s",
+      "-p",
+      "hi"
+    ],
+    "env": {},
+    "files": [],
+    "kind": "exec",
+    "needs_claude_isolation": false,
+    "read_result_from": "stdout",
+    "stdin": "",
+    "stdout_to_file": false
+  },
+  "input": {
+    "host": {
+      "platform": "darwin"
+    },
+    "provider": "antigravity",
+    "spec": {
+      "agent": true,
+      "claude": null,
+      "codex": null,
+      "gemini": null,
+      "isolated": true,
+      "max_attempts": 5,
+      "model": "gemini-3.5",
+      "openai_endpoint": null,
+      "prompt": "hi",
+      "schema": null,
+      "timeout": 180
+    }
+  },
+  "name": "antigravity-agent",
+  "op": "plan"
+}

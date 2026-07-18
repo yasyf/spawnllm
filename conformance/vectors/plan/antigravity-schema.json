@@ -1,0 +1,51 @@
+{
+  "expected": {
+    "argv": [
+      "agy",
+      "--model",
+      "gemini-3.5",
+      "--print-timeout",
+      "120s",
+      "-p",
+      "hi\n\nRespond with ONLY a single JSON object that conforms to this JSON Schema. No prose, no explanation, no markdown code fences.\nJSON Schema:\n{\"type\": \"object\", \"properties\": {\"answer\": {\"type\": \"string\"}}, \"required\": [\"answer\"]}"
+    ],
+    "env": {},
+    "files": [],
+    "kind": "exec",
+    "needs_claude_isolation": false,
+    "read_result_from": "stdout",
+    "stdin": "",
+    "stdout_to_file": false
+  },
+  "input": {
+    "host": {
+      "platform": "darwin"
+    },
+    "provider": "antigravity",
+    "spec": {
+      "agent": false,
+      "claude": null,
+      "codex": null,
+      "gemini": null,
+      "isolated": true,
+      "max_attempts": 5,
+      "model": "gemini-3.5",
+      "openai_endpoint": null,
+      "prompt": "hi",
+      "schema": {
+        "properties": {
+          "answer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "type": "object"
+      },
+      "timeout": 180
+    }
+  },
+  "name": "antigravity-schema",
+  "op": "plan"
+}

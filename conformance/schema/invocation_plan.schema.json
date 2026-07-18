@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A host-executable plan: a subprocess exec or an HTTP request.",
+  "oneOf": [
+    {
+      "properties": {
+        "argv": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "files": {
+          "items": {
+            "properties": {
+              "content": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "enum": [
+                  "schema",
+                  "result",
+                  "stdout"
+                ]
+              },
+              "suffix": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "suffix",
+              "content"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "const": "exec"
+        },
+        "needs_claude_isolation": {
+          "type": "boolean"
+        },
+        "read_result_from": {
+          "enum": [
+            "stdout",
+            "file:result"
+          ]
+        },
+        "stdin": {
+          "type": "string"
+        },
+        "stdout_to_file": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "argv",
+        "stdin",
+        "files",
+        "stdout_to_file",
+        "read_result_from",
+        "env",
+        "needs_claude_isolation"
+      ],
+      "type": "object"
+    },
+    {
+      "properties": {
+        "body": {
+          "type": "object"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "kind": {
+          "const": "http"
+        },
+        "method": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "method",
+        "url",
+        "headers",
+        "body"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "InvocationPlan"
+}

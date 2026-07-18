@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A resolved provider outcome: exactly one of ok / error.",
+  "oneOf": [
+    {
+      "properties": {
+        "cost_usd": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "status": {
+          "const": "ok"
+        },
+        "text": {
+          "type": "string"
+        },
+        "usage": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "value": {}
+      },
+      "required": [
+        "status",
+        "text",
+        "value",
+        "cost_usd",
+        "usage"
+      ],
+      "type": "object"
+    },
+    {
+      "properties": {
+        "cost_usd": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "exit",
+            "envelope",
+            "parse"
+          ]
+        },
+        "msg": {
+          "type": "string"
+        },
+        "status": {
+          "const": "error"
+        },
+        "transient": {
+          "type": "boolean"
+        },
+        "usage": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "kind",
+        "msg",
+        "transient",
+        "cost_usd",
+        "usage"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "Resolved"
+}

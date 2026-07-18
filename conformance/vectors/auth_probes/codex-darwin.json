@@ -1,0 +1,25 @@
+{
+  "expected": {
+    "binary": "codex",
+    "install_hint": "npm install -g @openai/codex",
+    "probes": [
+      {
+        "argv": [
+          "codex",
+          "login",
+          "status"
+        ],
+        "kind": "exec_exit0"
+      }
+    ]
+  },
+  "input": {
+    "host": {
+      "home": "/Users/testuser",
+      "platform": "darwin"
+    },
+    "provider": "codex"
+  },
+  "name": "codex-darwin",
+  "op": "auth_probes"
+}

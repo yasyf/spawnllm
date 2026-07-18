@@ -1,0 +1,48 @@
+{
+  "expected": {
+    "argv": [
+      "gemini",
+      "--model",
+      "gemini-2.5-flash",
+      "-o",
+      "json",
+      "--approval-mode",
+      "auto",
+      "-e",
+      "none",
+      "-p",
+      "hi"
+    ],
+    "env": {},
+    "files": [],
+    "kind": "exec",
+    "needs_claude_isolation": false,
+    "read_result_from": "stdout",
+    "stdin": "",
+    "stdout_to_file": false
+  },
+  "input": {
+    "host": {
+      "platform": "darwin"
+    },
+    "provider": "gemini",
+    "spec": {
+      "agent": false,
+      "claude": null,
+      "codex": null,
+      "gemini": {
+        "approval_mode": "auto",
+        "extensions": null
+      },
+      "isolated": true,
+      "max_attempts": 5,
+      "model": "gemini-2.5-flash",
+      "openai_endpoint": null,
+      "prompt": "hi",
+      "schema": null,
+      "timeout": 180
+    }
+  },
+  "name": "gemini-approval-mode",
+  "op": "plan"
+}

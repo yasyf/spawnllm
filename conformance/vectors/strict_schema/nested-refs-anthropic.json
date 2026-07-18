@@ -1,0 +1,149 @@
+{
+  "expected": {
+    "schema": {
+      "$defs": {
+        "Color": {
+          "enum": [
+            "red",
+            "blue"
+          ],
+          "title": "Color",
+          "type": "string"
+        },
+        "Inner": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "title": "A",
+              "type": "integer"
+            },
+            "b": {
+              "description": "{default: default}",
+              "title": "B",
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "title": "Inner",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "inner": {
+          "$ref": "#/$defs/Inner"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "opt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "{default: None}",
+          "title": "Opt"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "inner",
+        "tags",
+        "color"
+      ],
+      "title": "NestedRefs",
+      "type": "object"
+    }
+  },
+  "input": {
+    "dialect": "anthropic",
+    "schema": {
+      "$defs": {
+        "Color": {
+          "enum": [
+            "red",
+            "blue"
+          ],
+          "title": "Color",
+          "type": "string"
+        },
+        "Inner": {
+          "properties": {
+            "a": {
+              "title": "A",
+              "type": "integer"
+            },
+            "b": {
+              "default": "default",
+              "title": "B",
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "title": "Inner",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "inner": {
+          "$ref": "#/$defs/Inner"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "opt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Opt"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "inner",
+        "tags",
+        "color"
+      ],
+      "title": "NestedRefs",
+      "type": "object"
+    }
+  },
+  "name": "nested-refs-anthropic",
+  "op": "strict_schema"
+}

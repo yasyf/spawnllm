@@ -1,0 +1,16 @@
+{
+  "expected": {
+    "account_path": "/Users/testuser/.claude.json",
+    "credentials_path": "/Users/testuser/.claude/.credentials.json",
+    "keychain_service": "Claude Code-credentials-1cc69f60"
+  },
+  "input": {
+    "host": {
+      "claude_config_dir_env": null,
+      "home": "/Users/testuser",
+      "platform": "darwin"
+    }
+  },
+  "name": "default-home-darwin",
+  "op": "claude_isolation_sources"
+}

@@ -1,0 +1,12 @@
+{
+  "expected": {
+    "value": {
+      "first": 1
+    }
+  },
+  "input": {
+    "text": "{\"first\": 1} and then {\"second\": 2}"
+  },
+  "name": "first-value-wins",
+  "op": "extract_json"
+}

@@ -1,0 +1,54 @@
+{
+  "expected": {
+    "argv": [
+      "claude",
+      "-p",
+      "--no-session-persistence",
+      "--model",
+      "opus",
+      "--setting-sources",
+      "",
+      "--strict-mcp-config",
+      "--permission-mode",
+      "auto",
+      "--max-budget-usd",
+      "1"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${isolated_config_dir}"
+    },
+    "files": [
+      {
+        "content": null,
+        "id": "stdout",
+        "suffix": ".json"
+      }
+    ],
+    "kind": "exec",
+    "needs_claude_isolation": true,
+    "read_result_from": "stdout",
+    "stdin": "hi",
+    "stdout_to_file": true
+  },
+  "input": {
+    "host": {
+      "platform": "darwin"
+    },
+    "provider": "claude",
+    "spec": {
+      "agent": true,
+      "claude": null,
+      "codex": null,
+      "gemini": null,
+      "isolated": true,
+      "max_attempts": 5,
+      "model": "opus",
+      "openai_endpoint": null,
+      "prompt": "hi",
+      "schema": null,
+      "timeout": 180
+    }
+  },
+  "name": "claude-agent",
+  "op": "plan"
+}

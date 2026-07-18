@@ -1,0 +1,18 @@
+{
+  "expected": {
+    "cost_usd": null,
+    "status": "ok",
+    "text": "plain answer text",
+    "usage": null,
+    "value": null
+  },
+  "input": {
+    "provider": "codex",
+    "raw": "plain answer text",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": false
+  },
+  "name": "codex-ok-text",
+  "op": "resolve"
+}

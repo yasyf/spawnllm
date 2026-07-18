@@ -1,0 +1,19 @@
+{
+  "expected": {
+    "cost_usd": null,
+    "kind": "envelope",
+    "msg": "gemini call failed: {\"response\": \"\", \"stats\": {\"models\": {\"g\": {\"api\": {\"totalErrors\": 1}}}}}",
+    "status": "error",
+    "transient": false,
+    "usage": null
+  },
+  "input": {
+    "provider": "gemini",
+    "raw": "{\"response\": \"\", \"stats\": {\"models\": {\"g\": {\"api\": {\"totalErrors\": 1}}}}}",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": false
+  },
+  "name": "gemini-total-errors",
+  "op": "resolve"
+}

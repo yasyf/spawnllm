@@ -1,0 +1,60 @@
+{
+  "expected": {
+    "argv": [
+      "claude",
+      "-p",
+      "--no-session-persistence",
+      "--model",
+      "haiku",
+      "--strict-mcp-config"
+    ],
+    "env": {},
+    "files": [
+      {
+        "content": null,
+        "id": "stdout",
+        "suffix": ".json"
+      }
+    ],
+    "kind": "exec",
+    "needs_claude_isolation": false,
+    "read_result_from": "stdout",
+    "stdin": "hi",
+    "stdout_to_file": true
+  },
+  "input": {
+    "host": {
+      "platform": "darwin"
+    },
+    "provider": "claude",
+    "spec": {
+      "agent": false,
+      "claude": {
+        "append_system_prompt": null,
+        "disable_slash_commands": false,
+        "disallowed_tools": [],
+        "max_budget_usd": null,
+        "max_turns": null,
+        "mcp_config": null,
+        "output_format": null,
+        "permission_mode": null,
+        "settings": null,
+        "strict_mcp": true,
+        "system_prompt": null,
+        "tools": null,
+        "verbose": false
+      },
+      "codex": null,
+      "gemini": null,
+      "isolated": false,
+      "max_attempts": 5,
+      "model": "haiku",
+      "openai_endpoint": null,
+      "prompt": "hi",
+      "schema": null,
+      "timeout": 180
+    }
+  },
+  "name": "claude-strict-mcp",
+  "op": "plan"
+}

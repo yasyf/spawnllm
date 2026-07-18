@@ -1,0 +1,24 @@
+{
+  "expected": {
+    "binary": "agy",
+    "install_hint": "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+    "probes": [
+      {
+        "kind": "env_any",
+        "vars": [
+          "GEMINI_API_KEY",
+          "ANTIGRAVITY_API_KEY"
+        ]
+      }
+    ]
+  },
+  "input": {
+    "host": {
+      "home": "/home/testuser",
+      "platform": "linux"
+    },
+    "provider": "antigravity"
+  },
+  "name": "antigravity-linux",
+  "op": "auth_probes"
+}

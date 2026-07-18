@@ -1,0 +1,16 @@
+{
+  "expected": {
+    "account_path": "/home/testuser/.claude.json",
+    "credentials_path": "/home/testuser/.claude/.credentials.json",
+    "keychain_service": null
+  },
+  "input": {
+    "host": {
+      "claude_config_dir_env": null,
+      "home": "/home/testuser",
+      "platform": "linux"
+    }
+  },
+  "name": "default-home-linux",
+  "op": "claude_isolation_sources"
+}

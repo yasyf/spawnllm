@@ -1,0 +1,28 @@
+{
+  "expected": {
+    "binary": "gemini",
+    "install_hint": "npm install -g @google/gemini-cli",
+    "probes": [
+      {
+        "kind": "file_exists",
+        "path": "/home/testuser/.gemini/oauth_creds.json"
+      },
+      {
+        "kind": "env_any",
+        "vars": [
+          "GEMINI_API_KEY",
+          "GOOGLE_API_KEY"
+        ]
+      }
+    ]
+  },
+  "input": {
+    "host": {
+      "home": "/home/testuser",
+      "platform": "linux"
+    },
+    "provider": "gemini"
+  },
+  "name": "gemini-linux",
+  "op": "auth_probes"
+}

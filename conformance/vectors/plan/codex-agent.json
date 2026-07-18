@@ -1,0 +1,55 @@
+{
+  "expected": {
+    "argv": [
+      "codex",
+      "exec",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--color",
+      "never",
+      "--model",
+      "gpt-5.4-mini",
+      "-c",
+      "service_tier=fast",
+      "--ignore-user-config",
+      "-o",
+      "${file:result}"
+    ],
+    "env": {},
+    "files": [
+      {
+        "content": null,
+        "id": "result",
+        "suffix": ".json"
+      }
+    ],
+    "kind": "exec",
+    "needs_claude_isolation": false,
+    "read_result_from": "file:result",
+    "stdin": "hi",
+    "stdout_to_file": false
+  },
+  "input": {
+    "host": {
+      "platform": "darwin"
+    },
+    "provider": "codex",
+    "spec": {
+      "agent": true,
+      "claude": null,
+      "codex": null,
+      "gemini": null,
+      "isolated": true,
+      "max_attempts": 5,
+      "model": "gpt-5.4-mini",
+      "openai_endpoint": null,
+      "prompt": "hi",
+      "schema": null,
+      "timeout": 180
+    }
+  },
+  "name": "codex-agent",
+  "op": "plan"
+}

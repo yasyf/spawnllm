@@ -1,0 +1,60 @@
+{
+  "expected": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "title": "A",
+          "type": "integer"
+        },
+        "b": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "{default: None}",
+          "title": "B"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "OptionalField",
+      "type": "object"
+    }
+  },
+  "input": {
+    "dialect": "anthropic",
+    "schema": {
+      "properties": {
+        "a": {
+          "title": "A",
+          "type": "integer"
+        },
+        "b": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "B"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "OptionalField",
+      "type": "object"
+    }
+  },
+  "name": "optional-field-anthropic",
+  "op": "strict_schema"
+}

@@ -1,0 +1,150 @@
+{
+  "expected": {
+    "schema": {
+      "$defs": {
+        "Color": {
+          "enum": [
+            "red",
+            "blue"
+          ],
+          "title": "Color",
+          "type": "string"
+        },
+        "Inner": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "title": "A",
+              "type": "integer"
+            },
+            "b": {
+              "default": "default",
+              "title": "B",
+              "type": "string"
+            }
+          },
+          "required": [
+            "a",
+            "b"
+          ],
+          "title": "Inner",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "inner": {
+          "$ref": "#/$defs/Inner"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "opt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Opt"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "inner",
+        "tags",
+        "color",
+        "opt"
+      ],
+      "title": "NestedRefs",
+      "type": "object"
+    }
+  },
+  "input": {
+    "dialect": "openai",
+    "schema": {
+      "$defs": {
+        "Color": {
+          "enum": [
+            "red",
+            "blue"
+          ],
+          "title": "Color",
+          "type": "string"
+        },
+        "Inner": {
+          "properties": {
+            "a": {
+              "title": "A",
+              "type": "integer"
+            },
+            "b": {
+              "default": "default",
+              "title": "B",
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "title": "Inner",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "inner": {
+          "$ref": "#/$defs/Inner"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "opt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Opt"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "inner",
+        "tags",
+        "color"
+      ],
+      "title": "NestedRefs",
+      "type": "object"
+    }
+  },
+  "name": "nested-refs-openai",
+  "op": "strict_schema"
+}

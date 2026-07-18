@@ -1,0 +1,22 @@
+{
+  "expected": {
+    "files": [
+      {
+        "content": "{\"oauthAccount\": {\"accountUuid\": \"a\"}}",
+        "mode": "0644",
+        "name": ".claude.json"
+      },
+      {
+        "content": "{\"claudeAiOauth\": {\"accessToken\": \"tok\"}}",
+        "mode": "0600",
+        "name": ".credentials.json"
+      }
+    ]
+  },
+  "input": {
+    "account_json": "{\"oauthAccount\": {\"accountUuid\": \"a\"}, \"mcpServers\": {\"semble\": {\"command\": \"x\"}}}",
+    "credentials_json": "{\"claudeAiOauth\": {\"accessToken\": \"tok\"}}"
+  },
+  "name": "both-files-mcp-popped",
+  "op": "claude_isolation_seed"
+}

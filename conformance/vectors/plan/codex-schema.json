@@ -1,0 +1,76 @@
+{
+  "expected": {
+    "argv": [
+      "codex",
+      "exec",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--color",
+      "never",
+      "--model",
+      "gpt-5.5",
+      "-c",
+      "service_tier=fast",
+      "--ignore-user-config",
+      "-c",
+      "features.hooks=false",
+      "-c",
+      "features.mcp_servers=false",
+      "--output-schema",
+      "${file:schema}",
+      "-o",
+      "${file:result}"
+    ],
+    "env": {},
+    "files": [
+      {
+        "content": "{\"type\": \"object\", \"properties\": {\"answer\": {\"type\": \"string\"}}, \"required\": [\"answer\"]}",
+        "id": "schema",
+        "suffix": ".json"
+      },
+      {
+        "content": null,
+        "id": "result",
+        "suffix": ".json"
+      }
+    ],
+    "kind": "exec",
+    "needs_claude_isolation": false,
+    "read_result_from": "file:result",
+    "stdin": "hi",
+    "stdout_to_file": false
+  },
+  "input": {
+    "host": {
+      "platform": "darwin"
+    },
+    "provider": "codex",
+    "spec": {
+      "agent": false,
+      "claude": null,
+      "codex": null,
+      "gemini": null,
+      "isolated": true,
+      "max_attempts": 5,
+      "model": "gpt-5.5",
+      "openai_endpoint": null,
+      "prompt": "hi",
+      "schema": {
+        "properties": {
+          "answer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "type": "object"
+      },
+      "timeout": 180
+    }
+  },
+  "name": "codex-schema",
+  "op": "plan"
+}

@@ -1,0 +1,19 @@
+{
+  "expected": {
+    "cost_usd": null,
+    "kind": "envelope",
+    "msg": "Overloaded",
+    "status": "error",
+    "transient": true,
+    "usage": null
+  },
+  "input": {
+    "provider": "claude",
+    "raw": "{\"type\": \"result\", \"is_error\": true, \"result\": \"Overloaded\"}",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": false
+  },
+  "name": "claude-is-error",
+  "op": "resolve"
+}

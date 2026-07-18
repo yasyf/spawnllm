@@ -1,0 +1,52 @@
+{
+  "expected": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "minLength": 2,
+          "title": "Label",
+          "type": "string"
+        },
+        "n": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "N",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "n",
+        "label"
+      ],
+      "title": "Constrained",
+      "type": "object"
+    }
+  },
+  "input": {
+    "dialect": "openai",
+    "schema": {
+      "properties": {
+        "label": {
+          "minLength": 2,
+          "title": "Label",
+          "type": "string"
+        },
+        "n": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "N",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "n",
+        "label"
+      ],
+      "title": "Constrained",
+      "type": "object"
+    }
+  },
+  "name": "constrained-openai",
+  "op": "strict_schema"
+}

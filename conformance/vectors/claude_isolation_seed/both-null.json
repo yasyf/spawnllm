@@ -1,0 +1,11 @@
+{
+  "expected": {
+    "files": []
+  },
+  "input": {
+    "account_json": null,
+    "credentials_json": null
+  },
+  "name": "both-null",
+  "op": "claude_isolation_seed"
+}

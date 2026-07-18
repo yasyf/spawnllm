@@ -1,0 +1,47 @@
+{
+  "expected": {
+    "argv": [
+      "claude",
+      "-p",
+      "--no-session-persistence",
+      "--model",
+      "haiku",
+      "--system-prompt",
+      ""
+    ],
+    "env": {},
+    "files": [
+      {
+        "content": null,
+        "id": "stdout",
+        "suffix": ".json"
+      }
+    ],
+    "kind": "exec",
+    "needs_claude_isolation": false,
+    "read_result_from": "stdout",
+    "stdin": "hi",
+    "stdout_to_file": true
+  },
+  "input": {
+    "host": {
+      "platform": "darwin"
+    },
+    "provider": "claude",
+    "spec": {
+      "agent": false,
+      "claude": null,
+      "codex": null,
+      "gemini": null,
+      "isolated": false,
+      "max_attempts": 5,
+      "model": "haiku",
+      "openai_endpoint": null,
+      "prompt": "hi",
+      "schema": null,
+      "timeout": 180
+    }
+  },
+  "name": "claude-isolated-false",
+  "op": "plan"
+}

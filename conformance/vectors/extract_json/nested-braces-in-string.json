@@ -1,0 +1,13 @@
+{
+  "expected": {
+    "value": {
+      "n": 6,
+      "path": "a{b}c"
+    }
+  },
+  "input": {
+    "text": "{\"path\": \"a{b}c\", \"n\": 6}"
+  },
+  "name": "nested-braces-in-string",
+  "op": "extract_json"
+}

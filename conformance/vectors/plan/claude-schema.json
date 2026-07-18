@@ -1,0 +1,66 @@
+{
+  "expected": {
+    "argv": [
+      "claude",
+      "-p",
+      "--no-session-persistence",
+      "--model",
+      "haiku",
+      "--setting-sources",
+      "",
+      "--strict-mcp-config",
+      "--system-prompt",
+      "",
+      "--json-schema",
+      "{\"type\": \"object\", \"properties\": {\"answer\": {\"type\": \"string\"}}, \"required\": [\"answer\"]}",
+      "--output-format",
+      "json"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${isolated_config_dir}"
+    },
+    "files": [
+      {
+        "content": null,
+        "id": "stdout",
+        "suffix": ".json"
+      }
+    ],
+    "kind": "exec",
+    "needs_claude_isolation": true,
+    "read_result_from": "stdout",
+    "stdin": "hi",
+    "stdout_to_file": true
+  },
+  "input": {
+    "host": {
+      "platform": "darwin"
+    },
+    "provider": "claude",
+    "spec": {
+      "agent": false,
+      "claude": null,
+      "codex": null,
+      "gemini": null,
+      "isolated": true,
+      "max_attempts": 5,
+      "model": "haiku",
+      "openai_endpoint": null,
+      "prompt": "hi",
+      "schema": {
+        "properties": {
+          "answer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "type": "object"
+      },
+      "timeout": 180
+    }
+  },
+  "name": "claude-schema",
+  "op": "plan"
+}

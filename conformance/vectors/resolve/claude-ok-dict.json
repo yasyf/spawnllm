@@ -1,0 +1,18 @@
+{
+  "expected": {
+    "cost_usd": null,
+    "status": "ok",
+    "text": "hello world",
+    "usage": null,
+    "value": null
+  },
+  "input": {
+    "provider": "claude",
+    "raw": "{\"type\": \"result\", \"is_error\": false, \"result\": \"hello world\"}",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": false
+  },
+  "name": "claude-ok-dict",
+  "op": "resolve"
+}

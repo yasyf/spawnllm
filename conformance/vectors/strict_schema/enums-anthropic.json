@@ -1,0 +1,54 @@
+{
+  "expected": {
+    "schema": {
+      "$defs": {
+        "Color": {
+          "enum": [
+            "red",
+            "blue"
+          ],
+          "title": "Color",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        }
+      },
+      "required": [
+        "color"
+      ],
+      "title": "Enums",
+      "type": "object"
+    }
+  },
+  "input": {
+    "dialect": "anthropic",
+    "schema": {
+      "$defs": {
+        "Color": {
+          "enum": [
+            "red",
+            "blue"
+          ],
+          "title": "Color",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        }
+      },
+      "required": [
+        "color"
+      ],
+      "title": "Enums",
+      "type": "object"
+    }
+  },
+  "name": "enums-anthropic",
+  "op": "strict_schema"
+}

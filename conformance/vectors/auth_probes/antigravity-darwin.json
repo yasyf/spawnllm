@@ -1,0 +1,29 @@
+{
+  "expected": {
+    "binary": "agy",
+    "install_hint": "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+    "probes": [
+      {
+        "account": "antigravity",
+        "kind": "keychain_exists",
+        "service": "gemini"
+      },
+      {
+        "kind": "env_any",
+        "vars": [
+          "GEMINI_API_KEY",
+          "ANTIGRAVITY_API_KEY"
+        ]
+      }
+    ]
+  },
+  "input": {
+    "host": {
+      "home": "/Users/testuser",
+      "platform": "darwin"
+    },
+    "provider": "antigravity"
+  },
+  "name": "antigravity-darwin",
+  "op": "auth_probes"
+}

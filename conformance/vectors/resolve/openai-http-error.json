@@ -1,0 +1,19 @@
+{
+  "expected": {
+    "cost_usd": null,
+    "kind": "exit",
+    "msg": "openai_endpoint exited 503: service overloaded",
+    "status": "error",
+    "transient": true,
+    "usage": null
+  },
+  "input": {
+    "provider": "openai_endpoint",
+    "raw": "service overloaded",
+    "returncode": 503,
+    "stderr": "service overloaded",
+    "wants_value": false
+  },
+  "name": "openai-http-error",
+  "op": "resolve"
+}

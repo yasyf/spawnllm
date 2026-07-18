@@ -1,0 +1,21 @@
+{
+  "expected": {
+    "cost_usd": null,
+    "status": "ok",
+    "text": "{\"block\": true, \"reason\": \"policy\"}",
+    "usage": null,
+    "value": {
+      "block": true,
+      "reason": "policy"
+    }
+  },
+  "input": {
+    "provider": "codex",
+    "raw": "{\"block\": true, \"reason\": \"policy\"}",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": true
+  },
+  "name": "codex-ok-value",
+  "op": "resolve"
+}

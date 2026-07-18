@@ -1,0 +1,20 @@
+{
+  "expected": {
+    "cost_usd": null,
+    "status": "ok",
+    "text": "```json\n{\"answer\": \"7\"}\n```",
+    "usage": null,
+    "value": {
+      "answer": "7"
+    }
+  },
+  "input": {
+    "provider": "gemini",
+    "raw": "{\"response\": \"```json\\n{\\\"answer\\\": \\\"7\\\"}\\n```\", \"stats\": {\"models\": {\"g\": {\"api\": {\"totalErrors\": 0}}}}}",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": true
+  },
+  "name": "gemini-ok-value",
+  "op": "resolve"
+}

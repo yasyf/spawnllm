@@ -1,0 +1,57 @@
+{
+  "expected": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "default": 1,
+          "title": "A",
+          "type": "integer"
+        },
+        "b": {
+          "default": "hi",
+          "title": "B",
+          "type": "string"
+        },
+        "c": {
+          "default": false,
+          "title": "C",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "c"
+      ],
+      "title": "Defaults",
+      "type": "object"
+    }
+  },
+  "input": {
+    "dialect": "openai",
+    "schema": {
+      "properties": {
+        "a": {
+          "default": 1,
+          "title": "A",
+          "type": "integer"
+        },
+        "b": {
+          "default": "hi",
+          "title": "B",
+          "type": "string"
+        },
+        "c": {
+          "default": false,
+          "title": "C",
+          "type": "boolean"
+        }
+      },
+      "title": "Defaults",
+      "type": "object"
+    }
+  },
+  "name": "defaults-openai",
+  "op": "strict_schema"
+}

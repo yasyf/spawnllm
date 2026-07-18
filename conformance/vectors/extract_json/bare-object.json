@@ -1,0 +1,12 @@
+{
+  "expected": {
+    "value": {
+      "x": 3
+    }
+  },
+  "input": {
+    "text": "{\"x\": 3}"
+  },
+  "name": "bare-object",
+  "op": "extract_json"
+}

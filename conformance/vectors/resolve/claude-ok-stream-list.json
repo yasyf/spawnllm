@@ -1,0 +1,20 @@
+{
+  "expected": {
+    "cost_usd": null,
+    "status": "ok",
+    "text": "answer",
+    "usage": null,
+    "value": {
+      "answer": "42"
+    }
+  },
+  "input": {
+    "provider": "claude",
+    "raw": "[{\"type\": \"system\"}, {\"type\": \"result\", \"is_error\": false, \"result\": \"answer\", \"structured_output\": {\"answer\": \"42\"}}]",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": true
+  },
+  "name": "claude-ok-stream-list",
+  "op": "resolve"
+}

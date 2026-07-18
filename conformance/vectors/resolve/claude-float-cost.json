@@ -1,0 +1,21 @@
+{
+  "expected": {
+    "cost_usd": 0.0123,
+    "status": "ok",
+    "text": "hi",
+    "usage": {
+      "input_tokens": 12,
+      "output_tokens": 7
+    },
+    "value": null
+  },
+  "input": {
+    "provider": "claude",
+    "raw": "{\"type\": \"result\", \"is_error\": false, \"result\": \"hi\", \"total_cost_usd\": 0.0123, \"usage\": {\"input_tokens\": 12, \"output_tokens\": 7}}",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": false
+  },
+  "name": "claude-float-cost",
+  "op": "resolve"
+}

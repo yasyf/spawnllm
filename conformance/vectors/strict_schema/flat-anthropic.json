@@ -1,0 +1,36 @@
+{
+  "expected": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x"
+      ],
+      "title": "Flat",
+      "type": "object"
+    }
+  },
+  "input": {
+    "dialect": "anthropic",
+    "schema": {
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x"
+      ],
+      "title": "Flat",
+      "type": "object"
+    }
+  },
+  "name": "flat-anthropic",
+  "op": "strict_schema"
+}

@@ -1,0 +1,36 @@
+{
+  "expected": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x"
+      ],
+      "title": "Flat",
+      "type": "object"
+    }
+  },
+  "input": {
+    "dialect": "openai",
+    "schema": {
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x"
+      ],
+      "title": "Flat",
+      "type": "object"
+    }
+  },
+  "name": "flat-openai",
+  "op": "strict_schema"
+}

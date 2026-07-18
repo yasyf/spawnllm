@@ -1,0 +1,50 @@
+{
+  "expected": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "val": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Val"
+        }
+      },
+      "required": [
+        "val"
+      ],
+      "title": "Union",
+      "type": "object"
+    }
+  },
+  "input": {
+    "dialect": "anthropic",
+    "schema": {
+      "properties": {
+        "val": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Val"
+        }
+      },
+      "required": [
+        "val"
+      ],
+      "title": "Union",
+      "type": "object"
+    }
+  },
+  "name": "union-anthropic",
+  "op": "strict_schema"
+}

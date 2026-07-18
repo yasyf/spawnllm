@@ -1,0 +1,50 @@
+{
+  "expected": {
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "val": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Val"
+        }
+      },
+      "required": [
+        "val"
+      ],
+      "title": "Union",
+      "type": "object"
+    }
+  },
+  "input": {
+    "dialect": "openai",
+    "schema": {
+      "properties": {
+        "val": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Val"
+        }
+      },
+      "required": [
+        "val"
+      ],
+      "title": "Union",
+      "type": "object"
+    }
+  },
+  "name": "union-openai",
+  "op": "strict_schema"
+}

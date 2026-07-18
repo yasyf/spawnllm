@@ -1,0 +1,102 @@
+{
+  "expected": {
+    "argv": [
+      "claude",
+      "-p",
+      "--no-session-persistence",
+      "--model",
+      "opus",
+      "--setting-sources",
+      "",
+      "--strict-mcp-config",
+      "--permission-mode",
+      "bypassPermissions",
+      "--mcp-config",
+      "{\"mcpServers\":{}}",
+      "--disallowedTools",
+      "Bash",
+      "--append-system-prompt",
+      "extra",
+      "--settings",
+      "{\"model\":\"opus\"}",
+      "--max-budget-usd",
+      "5.0",
+      "--system-prompt",
+      "terse",
+      "--max-turns",
+      "2",
+      "--tools",
+      "Read",
+      "--disable-slash-commands",
+      "--json-schema",
+      "{\"type\": \"object\", \"properties\": {\"answer\": {\"type\": \"string\"}}, \"required\": [\"answer\"]}",
+      "--output-format",
+      "json",
+      "--verbose"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${isolated_config_dir}"
+    },
+    "files": [
+      {
+        "content": null,
+        "id": "stdout",
+        "suffix": ".json"
+      }
+    ],
+    "kind": "exec",
+    "needs_claude_isolation": true,
+    "read_result_from": "stdout",
+    "stdin": "hi",
+    "stdout_to_file": true
+  },
+  "input": {
+    "host": {
+      "platform": "darwin"
+    },
+    "provider": "claude",
+    "spec": {
+      "agent": true,
+      "claude": {
+        "append_system_prompt": "extra",
+        "disable_slash_commands": true,
+        "disallowed_tools": [
+          "Bash"
+        ],
+        "max_budget_usd": 5.0,
+        "max_turns": 2,
+        "mcp_config": "{\"mcpServers\":{}}",
+        "output_format": null,
+        "permission_mode": "bypassPermissions",
+        "settings": "{\"model\":\"opus\"}",
+        "strict_mcp": true,
+        "system_prompt": "terse",
+        "tools": [
+          "Read"
+        ],
+        "verbose": true
+      },
+      "codex": null,
+      "gemini": null,
+      "isolated": true,
+      "max_attempts": 5,
+      "model": "opus",
+      "openai_endpoint": null,
+      "prompt": "hi",
+      "schema": {
+        "properties": {
+          "answer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "type": "object"
+      },
+      "timeout": 180
+    }
+  },
+  "name": "claude-full-explicit-agent",
+  "op": "plan"
+}

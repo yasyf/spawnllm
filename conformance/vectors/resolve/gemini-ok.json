@@ -1,0 +1,18 @@
+{
+  "expected": {
+    "cost_usd": null,
+    "status": "ok",
+    "text": "hi there",
+    "usage": null,
+    "value": null
+  },
+  "input": {
+    "provider": "gemini",
+    "raw": "{\"response\": \"hi there\", \"stats\": {\"models\": {\"g\": {\"api\": {\"totalErrors\": 0}}}}}",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": false
+  },
+  "name": "gemini-ok",
+  "op": "resolve"
+}

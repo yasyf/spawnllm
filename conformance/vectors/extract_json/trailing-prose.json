@@ -1,0 +1,12 @@
+{
+  "expected": {
+    "value": {
+      "x": 5
+    }
+  },
+  "input": {
+    "text": "{\"x\": 5}\n\nHope that helps!"
+  },
+  "name": "trailing-prose",
+  "op": "extract_json"
+}
