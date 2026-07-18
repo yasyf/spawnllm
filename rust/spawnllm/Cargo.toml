@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Run LLM calls through provider CLIs (claude, codex, gemini) or an OpenAI-compatible endpoint."
+readme = "README.md"
 
 [features]
 default = ["openai"]

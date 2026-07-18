@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Sans-io core logic shared by spawnllm's language bindings: backend planning, output resolution, and structured-output helpers."
+readme = "README.md"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

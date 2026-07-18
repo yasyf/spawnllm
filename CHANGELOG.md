@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Go (`github.com/yasyf/spawnllm/go`) and Rust (`spawnllm` on crates.io) bindings
+  covering the full portable surface — `run`/`call`/`extract`, backend selection,
+  and status — against the claude/codex/gemini/agy CLIs and OpenAI-compatible
+  endpoints. All drift-prone logic lives once in the new `spawnllm-core` Rust
+  crate: linked natively by the Rust crate, embedded as a wazero-run WASM blob by
+  the Go module (no cgo), and pinned to the Python implementation by 117 shared
+  conformance vectors generated from it (`tests/conformance/`). Versions release
+  in lockstep across all three languages.
+
 ### Changed
 - **Breaking:** `ClaudeConfig.tools` is now `tuple[str, ...] | None` instead of a
   raw flag string: `None` keeps the CLI's default toolset, `()` disables every

@@ -71,6 +71,17 @@ uv add "spawnllm[mlx]"
 
 `AdapterFuser.ensure_fused` fuses your compressed adapter into the base model once and caches the result in the Hugging Face hub layout; `MlxEngine` loads it on a dedicated worker thread, precomputes a prompt cache for your shared prefix messages, and batches generation. Wrap the engine in an `MlxBackend` and the same `run_sync` call works.
 
+### Call the same backends from Go or Rust
+
+The bindings ship the identical engine: argv planning, output parsing, schema strictification, and retry policy compile from one Rust core, pinned to the Python behavior by a shared golden-vector suite and released in lockstep.
+
+```bash
+go get github.com/yasyf/spawnllm/go   # pure Go, no cgo — the core embeds as WASM
+cargo add spawnllm                    # async-first, with a blocking mirror
+```
+
+Both expose `Call`/`call` and typed `Extract`/`extract` against your existing CLI logins — see the [Go README](https://github.com/yasyf/spawnllm/tree/main/go) and the [Rust README](https://github.com/yasyf/spawnllm/tree/main/rust/spawnllm). MLX stays Python-only.
+
 ## More in the docs
 
 - **Spec-driven runs** — a literal model id, per-provider flag passthrough, and envelope-aware retry via `RunSpec` — [Running reference](https://yasyf.github.io/spawnllm/reference/#running)
