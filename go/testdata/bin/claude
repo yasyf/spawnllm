@@ -1,0 +1,47 @@
+#!/bin/sh
+# Fake claude CLI for spawnllm integration tests. Reads the prompt from stdin,
+# reports whether its stdout fd is a regular file, echoes its isolated config
+# home, and supports a one-shot transient failure and a sleep for timeout tests.
+prompt="$(cat)"
+
+if [ -n "$FAKE_SLEEP" ]; then
+	sleep "$FAKE_SLEEP"
+fi
+
+if [ -f /dev/stdout ]; then
+	stdout_regular=true
+else
+	stdout_regular=false
+fi
+
+config_dir="${CLAUDE_CONFIG_DIR:-}"
+seeded=false
+account_has_mcp=false
+creds_present=false
+if [ -n "$config_dir" ]; then
+	if [ -f "$config_dir/.claude.json" ]; then
+		seeded=true
+		if grep -q mcpServers "$config_dir/.claude.json"; then
+			account_has_mcp=true
+		fi
+	fi
+	if [ -f "$config_dir/.credentials.json" ]; then
+		creds_present=true
+	fi
+fi
+
+if [ -n "$FAKE_TRANSIENT_COUNTER" ]; then
+	n=0
+	if [ -f "$FAKE_TRANSIENT_COUNTER" ]; then
+		n="$(cat "$FAKE_TRANSIENT_COUNTER")"
+	fi
+	n=$((n + 1))
+	echo "$n" >"$FAKE_TRANSIENT_COUNTER"
+	if [ "$n" -eq 1 ]; then
+		printf '{"type":"result","is_error":true,"result":"529 overloaded"}\n'
+		exit 0
+	fi
+fi
+
+printf '{"type":"result","is_error":false,"result":"%s","stdout_regular":%s,"config_dir":"%s","seeded":%s,"account_has_mcp":%s,"creds_present":%s}\n' \
+	"$prompt" "$stdout_regular" "$config_dir" "$seeded" "$account_has_mcp" "$creds_present"

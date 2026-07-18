@@ -6,5 +6,29 @@ license.workspace = true
 repository.workspace = true
 description = "Run LLM calls through provider CLIs (claude, codex, gemini) or an OpenAI-compatible endpoint."
 
+[features]
+default = ["openai"]
+openai = ["dep:reqwest"]
+
 [dependencies]
 spawnllm-core = { path = "../spawnllm-core", version = "=0.0.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["arbitrary_precision"] }
+schemars = "1"
+thiserror = "2"
+tempfile = "3"
+tokio = { version = "1", features = ["process", "time", "rt", "io-util", "fs", "macros"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"], optional = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["process", "time", "rt", "rt-multi-thread", "io-util", "fs", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+tempfile = "3"
+
+[package.metadata.docs.rs]
+all-features = true

@@ -1,0 +1,23 @@
+#!/bin/sh
+# Fake macOS `security` for spawnllm integration tests. Answers
+# find-generic-password: -w prints FAKE_KEYCHAIN_CREDENTIAL (empty exits 1, a
+# keychain miss), and the account-existence probe exits per FAKE_KEYCHAIN_EXISTS.
+want_w=false
+for arg in "$@"; do
+	if [ "$arg" = "-w" ]; then
+		want_w=true
+	fi
+done
+
+if [ "$want_w" = true ]; then
+	if [ -n "$FAKE_KEYCHAIN_CREDENTIAL" ]; then
+		printf '%s' "$FAKE_KEYCHAIN_CREDENTIAL"
+		exit 0
+	fi
+	exit 1
+fi
+
+if [ "${FAKE_KEYCHAIN_EXISTS:-0}" = "1" ]; then
+	exit 0
+fi
+exit 1

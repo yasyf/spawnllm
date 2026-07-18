@@ -1,0 +1,36 @@
+#!/bin/sh
+# Fake codex CLI for spawnllm integration tests. Streams a log to stdout (which
+# the host must ignore) and writes the final message to the -o <file> argument.
+prompt="$(cat)"
+
+out=""
+schema=""
+while [ $# -gt 0 ]; do
+	case "$1" in
+	-o)
+		out="$2"
+		shift 2
+		;;
+	--output-schema)
+		schema="$2"
+		shift 2
+		;;
+	*)
+		shift
+		;;
+	esac
+done
+
+echo "streaming interactive log line to stdout (must be ignored by the host)"
+
+result="$prompt"
+if [ -n "$schema" ] && [ -f "$schema" ]; then
+	result="{\"echo\":\"$prompt\"}"
+	if [ -n "$FAKE_SCHEMA_SINK" ]; then
+		cat "$schema" >"$FAKE_SCHEMA_SINK"
+	fi
+fi
+
+if [ -n "$out" ]; then
+	printf '%s' "$result" >"$out"
+fi
