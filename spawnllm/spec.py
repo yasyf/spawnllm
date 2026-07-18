@@ -19,10 +19,13 @@ class ClaudeConfig:
     (`permission_mode`, `mcp_config`, `strict_mcp`, `append_system_prompt`,
     `system_prompt`, `settings`, `disallowed_tools`) and orthogonal extras
     (`max_turns`, `max_budget_usd`, `tools`, `disable_slash_commands`,
-    `output_format`, `verbose`).
+    `output_format`, `verbose`). `tools` selects the built-in toolset: `None`
+    keeps the CLI default, `()` disables every built-in tool, and names
+    restrict the session to those tools.
 
     Example:
         >>> ClaudeConfig(permission_mode="bypassPermissions", strict_mcp=True)
+        >>> ClaudeConfig(tools=())  # bare session: no built-in tools
     """
 
     permission_mode: str | None = None
@@ -34,7 +37,7 @@ class ClaudeConfig:
     disallowed_tools: tuple[str, ...] = ()
     max_turns: int | None = None
     max_budget_usd: float | None = None
-    tools: str | None = None
+    tools: tuple[str, ...] | None = None
     disable_slash_commands: bool = False
     output_format: str | None = None
     verbose: bool = False

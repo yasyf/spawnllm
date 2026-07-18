@@ -130,7 +130,7 @@ class ClaudeCliBackend(CliBackend):
             ),
             *(["--system-prompt", cfg.system_prompt] if cfg.system_prompt is not None else []),
             *(["--max-turns", str(cfg.max_turns)] if cfg.max_turns is not None else []),
-            *(["--tools", cfg.tools] if cfg.tools is not None else []),
+            *(["--tools", *cfg.tools] if cfg.tools else ["--tools", ""] if cfg.tools is not None else []),
             *(["--disable-slash-commands"] if cfg.disable_slash_commands else []),
             *(
                 ["--json-schema", schema, "--output-format", "json"]

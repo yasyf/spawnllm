@@ -133,7 +133,7 @@ class TestClaudeArgv:
                 "claude": ClaudeConfig(
                     system_prompt="SP",
                     max_turns=1,
-                    tools="",
+                    tools=(),
                     disable_slash_commands=True,
                     output_format="json",
                 )
@@ -158,6 +158,15 @@ class TestClaudeArgv:
             "--output-format",
             "json",
         ]
+
+    def test_tools_allowlist_spreads_names(self) -> None:
+        spec = RunSpec(
+            prompt="hi",
+            model="haiku",
+            provider_configs={"claude": ClaudeConfig(tools=("Bash", "Read"))},
+        )
+        argv = ClaudeCliBackend().build_command(spec)
+        assert argv[argv.index("--tools") :][:3] == ["--tools", "Bash", "Read"]
 
     def test_folded_sentiment_verbose_appends_flag(self) -> None:
         spec = RunSpec(

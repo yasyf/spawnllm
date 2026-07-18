@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** `ClaudeConfig.tools` is now `tuple[str, ...] | None` instead of a
+  raw flag string: `None` keeps the CLI's default toolset, `()` disables every
+  built-in tool (emitted as `--tools ""`), and names spread variadically
+  (`("Bash", "Read")` → `--tools Bash Read`). The old empty-string sentinel
+  (`tools=""`) becomes `tools=()`.
+
 ## [0.6.2] - 2026-07-14
 
 ### Added
