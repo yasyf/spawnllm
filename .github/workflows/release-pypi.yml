@@ -15,6 +15,8 @@ jobs:
     with:
       dist-name: spawnllm
       python-version: "3.14"
+      # The wheel/sdist must carry a freshly built wasm core blob (ubuntu runners ship rustup+stable).
+      pre-build: rustup target add wasm32-wasip1 && bash scripts/build_wasm.sh
 
   # PyPI Trusted Publishing must run in THIS repo's workflow — it authenticates via the OIDC
   # job_workflow_ref claim, which inside a reusable workflow points at homebrew-tap, not here

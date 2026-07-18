@@ -1,0 +1,21 @@
+{
+  "properties": {
+    "a": {
+      "default": 1,
+      "title": "A",
+      "type": "integer"
+    },
+    "b": {
+      "default": "hi",
+      "title": "B",
+      "type": "string"
+    },
+    "c": {
+      "default": false,
+      "title": "C",
+      "type": "boolean"
+    }
+  },
+  "title": "Defaults",
+  "type": "object"
+}

@@ -46,6 +46,6 @@ The API is async-first — `call`, `extract`, `run`, and `run_on` are `async fn`
 
 ## Parity
 
-Behavior is pinned to the Python implementation by a shared golden-vector suite: argv construction, output parsing, schema strictification, and retry policy live once in `spawnllm-core`, linked natively here and embedded as WASM by the [Go module](https://pkg.go.dev/github.com/yasyf/spawnllm/go). Versions release in lockstep with the Python package; identical versions implement identical semantics. Local MLX inference stays Python-only.
+Behavior lives once in `spawnllm-core` and is pinned by a shared golden-vector suite: argv construction, output parsing, schema strictification, and retry policy are linked natively here and embedded as WASM by the [Go module](https://pkg.go.dev/github.com/yasyf/spawnllm/go) and the Python package. Versions release in lockstep across all three languages; identical versions implement identical semantics. Local MLX inference stays Python-only.
 
 Full API: [docs.rs/spawnllm](https://docs.rs/spawnllm). Licensed under [MIT](https://github.com/yasyf/spawnllm/blob/main/LICENSE).

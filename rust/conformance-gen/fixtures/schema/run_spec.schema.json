@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Portable run configuration (snake_case; response_model is host-side sugar and absent).",
+  "properties": {
+    "agent": {
+      "type": "boolean"
+    },
+    "claude": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "codex": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "gemini": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "isolated": {
+      "type": "boolean"
+    },
+    "max_attempts": {
+      "type": "integer"
+    },
+    "model": {
+      "type": "string"
+    },
+    "openai_endpoint": {
+      "properties": {
+        "api_key": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "prompt": {
+      "type": "string"
+    },
+    "schema": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "timeout": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "prompt",
+    "model",
+    "agent",
+    "isolated",
+    "timeout",
+    "max_attempts"
+  ],
+  "title": "RunSpec",
+  "type": "object"
+}

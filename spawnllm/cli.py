@@ -7,6 +7,7 @@ from typing import cast
 import click
 from loguru import logger
 
+from spawnllm import _core
 from spawnllm.backends import (
     BackendNotAuthenticated,
     BackendNotInstalled,
@@ -64,3 +65,4 @@ def status() -> None:
         click.echo(f"selected: {select_backend().binary}")
     except BackendUnavailable:
         click.echo("selected: none available")
+    click.echo(f"core: {(v := _core.version())['core_version']}@{v['source_hash'][:12]}")

@@ -34,14 +34,22 @@ NOT_INSTALLED = [
     pytest.param(AntigravityCliBackend, "agy", AGY_HINT, id="agy"),
 ]
 
+# The auth-probe executor runs every subprocess-backed probe through the host
+# module, so one patch point serves each exec_exit0 (claude/codex) probe.
 SUBPROCESS_AUTH = [
-    pytest.param(ClaudeCliBackend, "claude", "spawnllm.backends.claude.subprocess.run", id="claude"),
-    pytest.param(CodexCliBackend, "codex", "spawnllm.backends.codex.subprocess.run", id="codex"),
+    pytest.param(ClaudeCliBackend, "claude", id="claude"),
+    pytest.param(CodexCliBackend, "codex", id="codex"),
 ]
 
 
 def installed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("spawnllm.backends.base.shutil.which", lambda name: f"/usr/bin/{name}")
+
+
+def gemini_creds_absent(monkeypatch: pytest.MonkeyPatch, home: Path) -> None:
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
 
 
 class TestCheckStatus:
@@ -56,7 +64,7 @@ class TestCheckStatus:
         monkeypatch.setattr("spawnllm.backends.base.shutil.which", lambda name: None)
         assert backend_cls().check_status() == BackendNotInstalled(binary=binary, install_hint=install_hint)
 
-    @pytest.mark.parametrize(("backend_cls", "binary", "run_path"), SUBPROCESS_AUTH)
+    @pytest.mark.parametrize(("backend_cls", "binary"), SUBPROCESS_AUTH)
     @pytest.mark.parametrize(
         ("returncode", "make_expected"),
         [
@@ -69,18 +77,19 @@ class TestCheckStatus:
         monkeypatch: pytest.MonkeyPatch,
         backend_cls: type[LlmBackend],
         binary: str,
-        run_path: str,
         returncode: int,
         make_expected,
     ) -> None:
         installed(monkeypatch)
-        monkeypatch.setattr(run_path, lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=returncode))
+        monkeypatch.setattr(
+            "spawnllm.backends.base.subprocess.run",
+            lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=returncode),
+        )
         assert backend_cls().check_status() == make_expected(binary)
 
     def test_gemini_ready_via_api_key(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         installed(monkeypatch)
-        monkeypatch.setattr("spawnllm.backends.gemini.Path.home", lambda: tmp_path)
-        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+        gemini_creds_absent(monkeypatch, tmp_path)
         monkeypatch.setenv("GEMINI_API_KEY", "k")
         assert GeminiCliBackend().check_status() == BackendReady(binary="gemini")
 
@@ -88,25 +97,19 @@ class TestCheckStatus:
         installed(monkeypatch)
         (tmp_path / ".gemini").mkdir()
         (tmp_path / ".gemini" / "oauth_creds.json").write_text("{}")
-        monkeypatch.setattr("spawnllm.backends.gemini.Path.home", lambda: tmp_path)
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+        gemini_creds_absent(monkeypatch, tmp_path)
         assert GeminiCliBackend().check_status() == BackendReady(binary="gemini")
 
     def test_gemini_not_authenticated(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         installed(monkeypatch)
-        monkeypatch.setattr("spawnllm.backends.gemini.Path.home", lambda: tmp_path)
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+        gemini_creds_absent(monkeypatch, tmp_path)
         assert GeminiCliBackend().check_status() == BackendNotAuthenticated(binary="gemini")
 
     def test_agy_ready_via_keychain(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # base.shutil and gemini.shutil are the same module, so one which patch
-        # serves both the agy install probe and the keychain "security" lookup.
-        monkeypatch.setattr("spawnllm.backends.base.shutil.which", lambda name: f"/usr/bin/{name}")
-        monkeypatch.setattr("spawnllm.backends.gemini.sys.platform", "darwin")
+        installed(monkeypatch)
+        monkeypatch.setattr("spawnllm.backends.base.sys.platform", "darwin")
         monkeypatch.setattr(
-            "spawnllm.backends.gemini.subprocess.run",
+            "spawnllm.backends.base.subprocess.run",
             lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=0),
         )
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
@@ -117,16 +120,21 @@ class TestCheckStatus:
         monkeypatch.setattr(
             "spawnllm.backends.base.shutil.which", lambda name: "/usr/bin/agy" if name == "agy" else None
         )
-        monkeypatch.setattr("spawnllm.backends.gemini.sys.platform", "darwin")
+        monkeypatch.setattr("spawnllm.backends.base.sys.platform", "darwin")
+        # A Keychain miss leaves the env-key probe to authenticate.
+        monkeypatch.setattr(
+            "spawnllm.backends.base.subprocess.run",
+            lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=1),
+        )
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
         monkeypatch.setenv("ANTIGRAVITY_API_KEY", "k")
         assert AntigravityCliBackend().check_status() == BackendReady(binary="agy")
 
     def test_agy_not_authenticated(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr("spawnllm.backends.base.shutil.which", lambda name: f"/usr/bin/{name}")
-        monkeypatch.setattr("spawnllm.backends.gemini.sys.platform", "darwin")
+        installed(monkeypatch)
+        monkeypatch.setattr("spawnllm.backends.base.sys.platform", "darwin")
         monkeypatch.setattr(
-            "spawnllm.backends.gemini.subprocess.run",
+            "spawnllm.backends.base.subprocess.run",
             lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=1),
         )
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)

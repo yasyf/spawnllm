@@ -73,7 +73,7 @@ uv add "spawnllm[mlx]"
 
 ### Call the same backends from Go or Rust
 
-The bindings ship the identical engine: argv planning, output parsing, schema strictification, and retry policy compile from one Rust core, pinned to the Python behavior by a shared golden-vector suite and released in lockstep.
+All three languages run the identical engine: argv planning, output parsing, schema strictification, and retry policy live once in a Rust core — linked natively by the Rust crate, embedded as WASM by the Go module and the Python package — pinned by a shared golden-vector suite and released in lockstep.
 
 ```bash
 go get github.com/yasyf/spawnllm/go   # pure Go, no cgo — the core embeds as WASM

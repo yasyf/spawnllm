@@ -10,7 +10,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  blob:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Build core wasm blob
+        run: bash scripts/build_wasm.sh
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: core-blob
+          path: go/internal/core/spawnllm_core.wasm
+          if-no-files-found: error
+
   test:
+    needs: blob
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -18,6 +42,18 @@ jobs:
         python-version: ["3.13", "3.14"]
     steps:
       - uses: actions/checkout@v7
+
+      - name: Download core blob (Go)
+        uses: actions/download-artifact@v8
+        with:
+          name: core-blob
+          path: go/internal/core
+
+      - name: Download core blob (Python)
+        uses: actions/download-artifact@v8
+        with:
+          name: core-blob
+          path: spawnllm/_core
 
       - name: Install uv
         uses: astral-sh/setup-uv@v8.2.0
@@ -44,10 +80,17 @@ jobs:
           .wheel-smoke/bin/spawnllm --help
 
   go:
+    needs: blob
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+
+      - name: Download core blob
+        uses: actions/download-artifact@v8
+        with:
+          name: core-blob
+          path: go/internal/core
 
       - uses: actions/setup-go@v6
         with:
@@ -69,10 +112,17 @@ jobs:
         run: go build ./...
 
   go-lint:
+    needs: blob
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+
+      - name: Download core blob
+        uses: actions/download-artifact@v8
+        with:
+          name: core-blob
+          path: go/internal/core
 
       - uses: actions/setup-go@v6
         with:
@@ -117,26 +167,18 @@ jobs:
         working-directory: rust
         run: cargo test -p spawnllm --no-default-features
 
-  wasm-fresh:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go/go.mod
-          cache: true
-
-      - name: Blob freshness (embedded hash vs. current sources)
-        working-directory: go
-        run: go test -run TestBlobFreshness -count=1 ./internal/core/
-
   vuln:
+    needs: blob
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+
+      - name: Download core blob
+        uses: actions/download-artifact@v8
+        with:
+          name: core-blob
+          path: go/internal/core
 
       - uses: actions/setup-go@v6
         with:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import pytest
 from click.testing import CliRunner
 
@@ -71,13 +73,15 @@ def test_status_reports_per_backend_and_selection(monkeypatch: pytest.MonkeyPatc
     )
     result = CliRunner().invoke(main, ["status"])
     assert result.exit_code == 0
-    assert result.output.splitlines() == [
+    *lines, core_line = result.output.splitlines()
+    assert lines == [
         "claude: ready",
         "codex: not installed — install with: npm install -g @openai/codex",
         "agy: not authenticated",
         "gemini: not authenticated",
         "selected: claude",
     ]
+    assert re.fullmatch(r"core: \d+\.\d+\.\d+@[0-9a-f]{12}", core_line)
 
 
 def test_status_reports_none_available(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -92,10 +96,12 @@ def test_status_reports_none_available(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     result = CliRunner().invoke(main, ["status"])
     assert result.exit_code == 0
-    assert result.output.splitlines() == [
+    *lines, core_line = result.output.splitlines()
+    assert lines == [
         "claude: not authenticated",
         "codex: not authenticated",
         "agy: not authenticated",
         "gemini: not authenticated",
         "selected: none available",
     ]
+    assert re.fullmatch(r"core: \d+\.\d+\.\d+@[0-9a-f]{12}", core_line)

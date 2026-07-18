@@ -7,3 +7,9 @@ includes:
   rust:
     taskfile: rust
     dir: rust
+
+tasks:
+  blob:
+    desc: Build the wasm core blob
+    cmds:
+      - bash scripts/build_wasm.sh

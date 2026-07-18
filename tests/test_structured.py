@@ -1,38 +1,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
 
-from spawnllm import (
-    ClaudeCliBackend,
-    CodexCliBackend,
-    Error,
-    GeminiCliBackend,
-    LlmBackend,
-    Output,
-    Response,
-    Result,
-    RunSpec,
-)
-from spawnllm.structured import (
-    extract_json_block,
-    is_transient,
-    resolve_schema_path,
-    structured_value,
-)
-
-SPEC = RunSpec(prompt="hi", model="haiku")
-
-
-def err_response(msg: str) -> Response:
-    return Response(spec=SPEC, output=Output(msg), error=Error(msg, RuntimeError(msg)))
-
-
-def ok_response(text: str) -> Response:
-    return Response(spec=SPEC, output=Output(text), result=Result(raw=text))
+from spawnllm import ClaudeCliBackend, CodexCliBackend, GeminiCliBackend, LlmBackend
+from spawnllm.structured import extract_json_block, structured_value
 
 
 class Verdict(BaseModel):
@@ -74,19 +48,6 @@ class TestSchemaFor:
         assert schema["$defs"]["Leg"]["properties"]["price"]["type"] == "number"
 
 
-class TestResolveSchemaPath:
-    def test_none_when_no_schema(self) -> None:
-        assert resolve_schema_path(ClaudeCliBackend(), None) is None
-
-    def test_claude_returns_schema_verbatim(self) -> None:
-        assert resolve_schema_path(ClaudeCliBackend(), '{"x":1}') == '{"x":1}'
-
-    def test_codex_writes_tempfile(self) -> None:
-        path = resolve_schema_path(CodexCliBackend(), '{"x":1}')
-        assert path is not None
-        assert Path(path).read_text() == '{"x":1}'
-
-
 class TestStructuredValue:
     def test_event_list_structured_output(self) -> None:
         events = json.dumps([{"type": "result", "structured_output": {"should_block": True, "reason": "x"}}])
@@ -110,30 +71,6 @@ class TestStructuredValue:
         events = json.dumps([{"type": "result", "structured_output": {"should_block": True, "reason": "x"}}])
         result = Verdict.model_validate(structured_value(events))
         assert result.should_block is True
-
-
-class TestIsTransient:
-    @pytest.mark.parametrize(
-        "resp, expected",
-        [
-            (err_response("codex exited 1: API Error: 529 Overloaded"), True),
-            (err_response("claude reported an error: Overloaded"), True),
-            (err_response("gemini call failed: rate limit"), True),
-            (ok_response("ok"), False),
-            (err_response("codex exited 127: codex: not found"), False),
-            (err_response("boom"), False),
-        ],
-        ids=[
-            "exit-529-error",
-            "overloaded-error",
-            "rate-limit-error",
-            "no-error",
-            "nonzero-no-transient-text",
-            "plain-error",
-        ],
-    )
-    def test_classifies_by_error_text(self, resp: Response, expected: bool) -> None:
-        assert is_transient(resp) is expected
 
 
 class TestExtractJsonBlock:

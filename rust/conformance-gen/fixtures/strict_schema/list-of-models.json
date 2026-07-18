@@ -1,0 +1,36 @@
+{
+  "$defs": {
+    "Inner": {
+      "properties": {
+        "a": {
+          "title": "A",
+          "type": "integer"
+        },
+        "b": {
+          "default": "default",
+          "title": "B",
+          "type": "string"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "Inner",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "rows": {
+      "items": {
+        "$ref": "#/$defs/Inner"
+      },
+      "title": "Rows",
+      "type": "array"
+    }
+  },
+  "required": [
+    "rows"
+  ],
+  "title": "ListOfModels",
+  "type": "object"
+}

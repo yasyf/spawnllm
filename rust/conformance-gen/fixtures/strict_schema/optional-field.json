@@ -1,0 +1,25 @@
+{
+  "properties": {
+    "a": {
+      "title": "A",
+      "type": "integer"
+    },
+    "b": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "B"
+    }
+  },
+  "required": [
+    "a"
+  ],
+  "title": "OptionalField",
+  "type": "object"
+}

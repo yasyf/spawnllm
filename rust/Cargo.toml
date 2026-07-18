@@ -1,5 +1,5 @@
 [workspace]
-members = ["spawnllm-core", "spawnllm-wasm", "spawnllm"]
+members = ["spawnllm-core", "spawnllm-wasm", "spawnllm", "conformance-gen"]
 resolver = "3"
 
 [workspace.package]

@@ -1,0 +1,27 @@
+{
+  "properties": {
+    "items": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "matrix": {
+      "items": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Matrix",
+      "type": "array"
+    }
+  },
+  "required": [
+    "items",
+    "matrix"
+  ],
+  "title": "Arrays",
+  "type": "object"
+}

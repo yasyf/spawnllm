@@ -1,0 +1,22 @@
+{
+  "$defs": {
+    "Color": {
+      "enum": [
+        "red",
+        "blue"
+      ],
+      "title": "Color",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "color": {
+      "$ref": "#/$defs/Color"
+    }
+  },
+  "required": [
+    "color"
+  ],
+  "title": "Enums",
+  "type": "object"
+}

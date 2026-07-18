@@ -1,18 +1,30 @@
-"""Abstract execution contract for an LLM backend and its subprocess family."""
+"""Abstract execution contract for an LLM backend and its subprocess family.
+
+Every drift-prone decision — argv planning, output resolution, schema
+strictification, and auth-probe layout — executes in the embedded `spawnllm-core`
+wasm engine via `spawnllm._core`. This module is the I/O host: it spawns
+processes, mints and cleans temp files, seeds claude isolation, and runs the
+auth probes the core lays out.
+"""
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import shutil
 import subprocess
+import sys
+import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
+from spawnllm import _core
 from spawnllm.proc import acapture_cli, capture_cli
 from spawnllm.response import Error, Output, Response, Result
+from spawnllm.spec import ClaudeConfig, CodexConfig, GeminiConfig
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -93,19 +105,58 @@ class Invocation:
     cleanup_paths: tuple[str, ...] = ()
 
 
+def run_probe(probe: dict[str, Any], *, timeout: int) -> bool:
+    """Execute one auth probe the core laid out, mirroring the reference host's probe kinds."""
+    match probe:
+        case {"kind": "exec_exit0", "argv": [*argv]}:
+            try:
+                return (
+                    subprocess.run(
+                        [*map(str, argv)], capture_output=True, text=True, timeout=timeout, check=False
+                    ).returncode
+                    == 0
+                )
+            except FileNotFoundError:
+                return False
+        case {"kind": "keychain_exists", "service": service, "account": account}:
+            try:
+                return (
+                    subprocess.run(
+                        ["security", "find-generic-password", "-s", str(service), "-a", str(account)],
+                        capture_output=True,
+                        timeout=timeout,
+                        check=False,
+                    ).returncode
+                    == 0
+                )
+            except FileNotFoundError:
+                return False
+        case {"kind": "env_any", "vars": [*names]}:
+            return any(os.environ.get(str(name)) for name in names)
+        case {"kind": "file_exists", "path": path}:
+            return os.path.exists(str(path))
+        case _:
+            return False
+
+
 class LlmBackend(ABC):
     """Abstract execution contract for an LLM backend.
 
     Concrete backends map abstract model sizes to provider-specific model names
-    and encapsulate how to execute a `RunSpec` and parse the raw response.
+    and encapsulate how to execute a `RunSpec` and parse the raw response. The
+    portable decisions — argv, output resolution, schema strictification — run in
+    the shared wasm core; a backend supplies only its `provider` and the I/O.
 
     Attributes:
         models: Mapping from abstract model size to the provider's model name.
         provider: Provider identifier keying a `RunSpec`'s `provider_configs`.
+        schema_dialect: Strict-schema dialect the core applies to a `response_model`
+            (`"anthropic"`, `"openai"`, or `None` to emit the plain JSON schema).
     """
 
     models: ClassVar[dict[TModel, str]]
     provider: ClassVar[ProviderName]
+    schema_dialect: ClassVar[str | None] = None
 
     @abstractmethod
     async def aexecute(self, spec: RunSpec) -> Response:
@@ -170,8 +221,9 @@ class LlmBackend(ABC):
     def schema_for(self, model: type[BaseModel]) -> str:
         """Serialize a Pydantic model into the JSON-schema string this backend expects.
 
-        The default emits the model's plain JSON schema; provider backends
-        override to apply their SDK's strict-schema transform.
+        The core's `strict_schema` op applies the backend's `schema_dialect`
+        transform over the model's plain JSON schema; a `None` dialect emits the
+        schema unchanged.
 
         Args:
             model: The Pydantic model describing the structured output.
@@ -179,37 +231,52 @@ class LlmBackend(ABC):
         Returns:
             A JSON-schema string suitable for this backend's structured-output argument.
         """
-        return json.dumps(model.model_json_schema())
+        schema = model.model_json_schema()
+        if self.schema_dialect is None:
+            return json.dumps(schema)
+        return json.dumps(_core.dispatch("strict_schema", {"dialect": self.schema_dialect, "schema": schema})["schema"])
 
-    def schema_arg(self, spec: RunSpec) -> str | None:
-        """Return the JSON-schema string for `spec`, from a `response_model` or a raw `schema`.
-
-        A `response_model` is run through `schema_for` (the provider's
-        strict-schema transform); a raw `schema` passes verbatim — a dict is
-        `json.dumps`'d, a string is returned unchanged. Returns `None` when
-        neither is set.
-
-        Args:
-            spec: The configured run, carrying the optional `response_model` or `schema`.
-
-        Returns:
-            The JSON-schema string for this backend's structured-output argument, or `None`.
-        """
+    def wire_schema(self, spec: RunSpec) -> dict[str, Any] | None:
+        """Return the portable schema object for `spec`, from a `response_model` or a raw `schema`."""
         if spec.response_model is not None:
-            return self.schema_for(spec.response_model)
+            return json.loads(self.schema_for(spec.response_model))
         if spec.schema is not None:
-            return json.dumps(spec.schema) if isinstance(spec.schema, dict) else spec.schema
+            return spec.schema if isinstance(spec.schema, dict) else json.loads(spec.schema)
         return None
 
-    def to_response(self, raw: str, *, returncode: int, stderr: str, spec: RunSpec) -> Response:
-        """Resolve a raw capture into a structured `Response`: detect failure, extract text, validate.
+    def openai_section(self) -> dict[str, Any] | None:
+        """Return the `openai_endpoint` wire section; `None` for every backend but the endpoint backend."""
+        return None
 
-        `output` always carries the full raw stream. A nonzero exit, an error
-        envelope, or a `pydantic.ValidationError` from a non-conforming model all
-        route through `error` (with the underlying exception preserved in
-        `error.ex`) and leave `result` as `None`; a success yields `result` (text
-        from `result_text`, plus the validated model from `result_value` when
-        `spec.response_model` is set) and `error` as `None`.
+    def wire_spec(self, spec: RunSpec) -> dict[str, Any]:
+        """Serialize a `RunSpec` into the portable wire spec the core `plan`/`resolve` ops consume."""
+        return {
+            "prompt": spec.prompt,
+            "model": spec.model,
+            "schema": self.wire_schema(spec),
+            "agent": spec.agent,
+            "isolated": spec.isolated,
+            "timeout": spec.timeout,
+            "max_attempts": spec.max_attempts,
+            "claude": dataclasses.asdict(c) if (c := spec.config_for(ClaudeConfig)) is not None else None,
+            "codex": dataclasses.asdict(x) if (x := spec.config_for(CodexConfig)) is not None else None,
+            "gemini": dataclasses.asdict(g) if (g := spec.config_for(GeminiConfig)) is not None else None,
+            "openai_endpoint": self.openai_section(),
+        }
+
+    def core_plan(self, spec: RunSpec) -> dict[str, Any]:
+        """Ask the core to plan this run's invocation (an exec argv or an HTTP request)."""
+        return _core.dispatch(
+            "plan", {"host": {"platform": sys.platform}, "provider": self.provider, "spec": self.wire_spec(spec)}
+        )
+
+    def to_response(self, raw: str, *, returncode: int, stderr: str, spec: RunSpec) -> Response:
+        """Resolve a raw capture into a structured `Response` via the core `resolve` op.
+
+        `output` always carries the full raw stream. The core detects failure (a
+        nonzero exit or an error envelope) and extracts the final text and, when
+        `spec.response_model` is set, the structured value; a `pydantic.ValidationError`
+        from a non-conforming model routes through `error`.
 
         Args:
             raw: The raw output read wherever the provider wrote it.
@@ -223,37 +290,32 @@ class LlmBackend(ABC):
         import pydantic
 
         output = Output(raw)
-        if returncode != 0:
-            msg = f"{self.provider} exited {returncode}: {stderr.strip()[-2000:]}"
-            return Response(spec=spec, output=output, error=Error(msg, BackendCallError(msg)))
-        if (err := self.envelope_error(raw)) is not None:
-            return Response(spec=spec, output=output, error=Error(err, BackendCallError(err)))
+        resolved = _core.dispatch(
+            "resolve",
+            {
+                "provider": self.provider,
+                "raw": raw,
+                "returncode": returncode,
+                "stderr": stderr,
+                "wants_value": spec.response_model is not None,
+            },
+        )
+        if resolved["status"] != "ok":
+            return Response(spec=spec, output=output, error=Error(resolved["msg"], BackendCallError(resolved["msg"])))
         if spec.response_model is None:
-            return Response(spec=spec, output=output, result=Result(raw=self.result_text(raw)))
+            return Response(spec=spec, output=output, result=Result(raw=resolved["text"]))
         try:
-            parsed = spec.response_model.model_validate(self.result_value(raw))
+            parsed = spec.response_model.model_validate(resolved["value"])
         except pydantic.ValidationError as e:
             return Response(spec=spec, output=output, error=Error(str(e), e))
-        return Response(spec=spec, output=output, result=Result(raw=self.result_text(raw), parsed=parsed))
-
-    def result_text(self, raw: str) -> str:
-        """Return the final text output from a raw capture; the default is `raw` unchanged."""
-        return raw
-
-    def result_value(self, raw: str) -> object:
-        """Return the JSON value to validate from a raw capture; the default parses `raw` as JSON."""
-        return json.loads(raw)
-
-    def envelope_error(self, raw: str) -> str | None:
-        """Return the provider's error message from an error envelope, or `None` on success."""
-        return None
+        return Response(spec=spec, output=output, result=Result(raw=resolved["text"], parsed=parsed))
 
     def accounting(self, raw: str) -> tuple[float | None, dict[str, object] | None]:
         """Return the `(cost_usd, usage)` an attempt's output reports, or `(None, None)` when it carries neither.
 
         The retry loop calls this on each transient failure it discards, so a
         caller reconciling spend can still see the cost. The default parses
-        nothing; a backend whose envelope records spend overrides it.
+        nothing; the CLI family reads the core's `resolve` accounting.
 
         Args:
             raw: The raw output read wherever the provider wrote it.
@@ -267,9 +329,9 @@ class LlmBackend(ABC):
 class CliBackend(LlmBackend):
     """Execution contract for the subprocess-backed LLM family.
 
-    Concrete CLI backends build an argv from a `RunSpec`; `aexecute`/`execute`
-    run it, merge environment overrides, and resolve the result from stdout or a
-    designated result file.
+    The core plans each invocation's argv, files, env, and result source; this
+    class materializes that plan into temp files and a subprocess, runs it, and
+    resolves the result. Concrete CLI backends supply only ClassVars.
 
     Attributes:
         binary: Name of the backend's CLI executable on PATH.
@@ -279,31 +341,92 @@ class CliBackend(LlmBackend):
     binary: ClassVar[str]
     install_hint: ClassVar[str]
 
-    @abstractmethod
+    def claude_isolation(self) -> str:
+        """Return the isolated config home a claude run substitutes into `${isolated_config_dir}`."""
+        raise NotImplementedError
+
     def build_command(self, spec: RunSpec) -> list[str]:
-        """Build the CLI argv for a single invocation.
-
-        Args:
-            spec: The configured run to translate into argv.
-
-        Returns:
-            The argv list to execute.
-        """
+        """Return the core-planned argv (with `${file:id}` placeholders) for a single invocation."""
+        return self.core_plan(spec)["argv"]
 
     def invocation(self, spec: RunSpec) -> Invocation:
-        """Build the argv, stdin, and result source for a single invocation.
+        """Materialize the core's exec plan into a runnable `Invocation`.
 
-        The default delivers the prompt over stdin and reads the result from
-        stdout; subclasses override to deliver the prompt inline or to read the
-        result from a file.
+        Mints a temp file per `files[]` entry (writing its content when non-null),
+        substitutes `${file:id}` placeholders in the argv and — for a claude run —
+        `${isolated_config_dir}`, and wires the plan's stdout/result source and the
+        minted paths into the returned `Invocation` for cleanup.
 
         Args:
             spec: The configured run to translate into an invocation.
 
         Returns:
-            An `Invocation` carrying the argv, stdin text, and result source.
+            An `Invocation` carrying the materialized argv, stdin, and result source.
         """
-        return Invocation(self.build_command(spec), spec.prompt)
+        plan = self.core_plan(spec)
+        paths: dict[str, str] = {}
+        try:
+            for entry in plan["files"]:
+                fd, path = tempfile.mkstemp(suffix=entry["suffix"])
+                paths[entry["id"]] = path
+                try:
+                    if entry["content"] is not None:
+                        os.write(fd, entry["content"].encode())
+                finally:
+                    os.close(fd)
+            tokens = {f"${{file:{file_id}}}": path for file_id, path in paths.items()}
+            argv = [tokens.get(arg, arg) for arg in self.build_command(spec)]
+            if plan["needs_claude_isolation"]:
+                directory = self.claude_isolation()
+                argv = [arg.replace("${isolated_config_dir}", directory) for arg in argv]
+        except BaseException:
+            for path in paths.values():
+                Path(path).unlink(missing_ok=True)
+            raise
+        return Invocation(
+            argv,
+            plan["stdin"],
+            result_path=paths.get("result") if plan["read_result_from"] == "file:result" else None,
+            stdout_path=paths.get("stdout") if plan["stdout_to_file"] else None,
+            cleanup_paths=tuple(paths.values()),
+        )
+
+    def env(self, spec: RunSpec) -> dict[str, str]:
+        """Return the core-planned env, substituting the isolated config home into a claude run's values.
+
+        Args:
+            spec: The configured run; the plan gates isolation on `spec.isolated`.
+
+        Returns:
+            The plan's env map with `${isolated_config_dir}` resolved, or `{}`.
+        """
+        plan = self.core_plan(spec)
+        if not plan["needs_claude_isolation"]:
+            return plan["env"]
+        directory = self.claude_isolation()
+        return {key: value.replace("${isolated_config_dir}", directory) for key, value in plan["env"].items()}
+
+    def accounting(self, raw: str) -> tuple[float | None, dict[str, object] | None]:
+        """Return the `(cost_usd, usage)` the core's `resolve` op reads from `raw`."""
+        resolved = _core.dispatch(
+            "resolve", {"provider": self.provider, "raw": raw, "returncode": 0, "stderr": "", "wants_value": False}
+        )
+        return resolved["cost_usd"], resolved["usage"]
+
+    def is_authenticated(self, *, timeout: int) -> bool:
+        """Report whether any of the core's auth probes for this provider succeeds.
+
+        Args:
+            timeout: Seconds to wait for each subprocess-backed probe.
+
+        Returns:
+            `True` when a probe reports an authenticated session.
+        """
+        probes = _core.dispatch(
+            "auth_probes",
+            {"provider": self.provider, "host": {"platform": sys.platform, "home": str(Path.home())}},
+        )
+        return any(run_probe(probe, timeout=timeout) for probe in probes["probes"])
 
     def timed_out(self, spec: RunSpec) -> Response:
         msg = f"{self.provider} timed out after {spec.timeout}s"

@@ -10,6 +10,8 @@
 go get github.com/yasyf/spawnllm/go
 ```
 
+Use a tagged version. The embedded WASM engine ships only on release tags (`go/vX.Y.Z`), so `@main` and commit pseudo-versions fail to compile.
+
 ```go
 package main
 
@@ -70,6 +72,6 @@ Local MLX inference stays Python-only — use the [Python package](https://githu
 
 ## Parity
 
-Behavior is pinned to the Python implementation by a shared golden-vector suite: argv construction, output parsing, schema strictification, and retry policy execute in the same `spawnllm-core` Rust engine both bindings share, embedded here as a WASM blob and replayed against every vector in CI (`CGO_ENABLED=0` throughout). Versions release in lockstep with the Python package; identical versions implement identical semantics.
+Behavior lives once in the `spawnllm-core` Rust engine all three languages share — embedded here as a WASM blob (`CGO_ENABLED=0` throughout), linked natively by the Rust crate, and embedded via wasmtime by the Python package — with every vector of a shared golden suite replayed in CI. Versions release in lockstep; identical versions implement identical semantics.
 
 Full API: [pkg.go.dev](https://pkg.go.dev/github.com/yasyf/spawnllm/go). Licensed under [MIT](https://github.com/yasyf/spawnllm/blob/main/LICENSE).

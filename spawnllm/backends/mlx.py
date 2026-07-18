@@ -6,12 +6,12 @@ import asyncio
 from typing import TYPE_CHECKING, ClassVar
 
 from spawnllm.backends.base import BackendReady, LlmBackend
+from spawnllm.response import Error, Output, Response, Result
 from spawnllm.structured import structured_value
 
 if TYPE_CHECKING:
     from spawnllm.backends.base import BackendStatus
     from spawnllm.mlx import MlxEngine
-    from spawnllm.response import Response
     from spawnllm.spec import RunSpec
     from spawnllm.types import ProviderName, TModel
 
@@ -22,7 +22,8 @@ class MlxBackend(LlmBackend):
     Unlike the CLI backends this is never auto-selected; the consumer constructs
     it explicitly with a loaded `MlxEngine`. `RunSpec.model` is ignored — the
     engine is already bound to a fused model — and every provider config and CLI
-    flag is irrelevant, so `models` is the empty identity mapping.
+    flag is irrelevant, so `models` is the empty identity mapping. The core knows
+    no `mlx` provider, so resolution stays in-process here.
 
     Example:
         >>> backend = MlxBackend(engine=engine, max_tokens=512)
@@ -47,6 +48,19 @@ class MlxBackend(LlmBackend):
 
     def execute(self, spec: RunSpec) -> Response:
         return asyncio.run(self.aexecute(spec))
+
+    def to_response(self, raw: str, *, returncode: int, stderr: str, spec: RunSpec) -> Response:
+        """Resolve locally-generated text into a `Response`, validating a `response_model` when set."""
+        import pydantic
+
+        output = Output(raw)
+        if spec.response_model is None:
+            return Response(spec=spec, output=output, result=Result(raw=raw))
+        try:
+            parsed = spec.response_model.model_validate(self.result_value(raw))
+        except pydantic.ValidationError as e:
+            return Response(spec=spec, output=output, error=Error(str(e), e))
+        return Response(spec=spec, output=output, result=Result(raw=raw, parsed=parsed))
 
     def result_value(self, raw: str) -> object:
         """Return the `structured_output` from a stream-json result event, else `raw` parsed as JSON."""

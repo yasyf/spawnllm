@@ -1,0 +1,20 @@
+{
+  "properties": {
+    "val": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "title": "Val"
+    }
+  },
+  "required": [
+    "val"
+  ],
+  "title": "Union",
+  "type": "object"
+}

@@ -4,6 +4,43 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-07-19
+
+### Changed
+- **The Python package now runs on `spawnllm-core`**, the same Rust engine the Go
+  and Rust bindings use: argv planning, output parsing, strict-schema transforms,
+  JSON extraction, retry policy, auth probes, and Claude isolation seeding all
+  dispatch through the core's wasm32-wasip1 build, loaded via `wasmtime`. The
+  hand-written Python duplicates are gone; Python owns only I/O — subprocess
+  spawning, temp files, the keychain, HTTP, and the MLX engine. Public API is
+  unchanged.
+- The conformance oracle inverted: `rust/conformance-gen` now generates the
+  golden vectors from the core (byte-identical to the retired Python generator
+  on the whole committed corpus), and Python replays them through its wasm glue
+  exactly like Go does. A behavior change now lands core-first: edit the Rust
+  core, regenerate vectors, and every host inherits it.
+- The wasm blob is no longer committed; every surface builds it from source
+  (`bash scripts/build_wasm.sh`, CI artifact job, release workflows). Wheels and
+  sdists ship the freshly built blob and stay `py3-none-any`.
+- Edge-case output now matches the core's serialization: large-exponent floats
+  format as `1e20` (not `1e+20`), the Claude isolation seed writes sorted-key
+  raw-UTF-8 JSON, a `RunSpec.schema` given as a pre-serialized *string* is
+  parsed and re-serialized rather than passed through byte-for-byte, and JSON
+  extraction recognizes only objects and arrays — a bare scalar reply no longer
+  parses as a structured value (it never could through Go or Rust).
+- Tests that patched per-backend auth internals patch
+  `spawnllm.backends.base.subprocess.run` instead.
+
+### Removed
+- `openai` and `anthropic` are no longer runtime dependencies — the core's
+  `strict_schema` op replaces their private transform functions. They remain in
+  the `dev` extra, where a cross-check test pins the core against the live SDK
+  output.
+- The Python conformance generator (`tests/conformance/`) and the per-backend
+  argv/parse internals it snapshotted (`build_command` bodies, `result_text`,
+  `result_value`, `envelope_error`, `schema_arg`, `structured.first_json_value`,
+  `is_transient`, `backoff`).
+
 ## [0.8.0] - 2026-07-19
 
 ### Added

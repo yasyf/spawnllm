@@ -1,0 +1,13 @@
+{
+  "properties": {
+    "x": {
+      "title": "X",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "x"
+  ],
+  "title": "Flat",
+  "type": "object"
+}

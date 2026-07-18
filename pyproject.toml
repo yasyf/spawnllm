@@ -22,11 +22,7 @@ dependencies = [
     "httpx>=0.27",
     "loguru>=0.7",
     "pydantic>=2",
-    # Per-backend strict-schema transforms: openai.lib._pydantic.to_strict_json_schema
-    # and anthropic.lib._parse._transform.transform_schema. Both import paths are
-    # SDK-private, so the floors pin verified-working versions.
-    "openai>=2.43",
-    "anthropic>=0.111",
+    "wasmtime>=46",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +35,12 @@ dev = [
     "zstandard>=0.25.0",
     "numpy>=1.26",
     "orjson>=3.10",
+    # The conformance SDK-crosscheck tests compare the core's strict-schema output
+    # against openai.lib._pydantic.to_strict_json_schema and
+    # anthropic.lib._parse._transform.transform_schema. Both import paths are
+    # SDK-private, so the floors pin verified-working versions.
+    "openai>=2.43",
+    "anthropic>=0.111",
 ]
 # Cross-platform LoRA adapter codec (zstd + numpy); imported without mlx.
 adapter = [
