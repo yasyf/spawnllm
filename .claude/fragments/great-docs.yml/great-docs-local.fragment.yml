@@ -10,11 +10,16 @@ repo: https://github.com/yasyf/spawnllm
 site_url: "https://yasyf.github.io/spawnllm/"
 pypi: true
 
-# Conservative defaults: a solid navbar and a single accent, no gradient
-# presets or hero starfield. The gradient/starfield extras read as busy and the
-# starfield canvas intercepts homepage clicks; keep them off unless asked.
-navbar_color: "#1e293b"
-accent_color: "#7c3aed"
+# Mascot-derived palette, per-mode accent for WCAG AA. No gradient/starfield
+# extras (busy; the starfield canvas eats homepage clicks) unless asked.
+navbar_color: "#181c2b"
+accent_color:
+  light: "#c2185b"
+  dark: "#f48fb1"
+
+# Open Graph / social preview for link unfurls.
+social_cards:
+  image: docs/assets/social-preview.jpg
 
 hero:
   name: spawnllm
