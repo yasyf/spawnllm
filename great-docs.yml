@@ -111,6 +111,8 @@ reference:
       - mlx.AdapterFuser
       - mlx.MLXPatches
 
+# Composed by concatenation after each repo's local fragment: top-level keys
+# here must not collide with any repo fragment (last key silently wins).
 parser: google
 github_style: widget
 jupyter: python3
@@ -118,6 +120,7 @@ dark_mode_toggle: true
 back_to_top: true
 keyboard_nav: true
 fast_sidebar: true
+freeze: auto
 
 pre_render:
   - docs/scripts/.gd-build/native_reference_titles.py
