@@ -21,6 +21,7 @@ accent_color:
 # Open Graph / social preview for link unfurls.
 social_cards:
   image: docs/assets/social-preview.jpg
+  twitter_site: "@yasyf"
 
 hero:
   name: spawnllm
