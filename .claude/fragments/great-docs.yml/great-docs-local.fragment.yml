@@ -52,7 +52,6 @@ reference:
       - call.call_sync
       - extract.extract
       - extract.extract_sync
-      - structured.resolve_schema_path
       - structured.extract_json_block
       - structured.structured_value
   - title: Running
