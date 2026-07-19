@@ -1,1 +1,1 @@
-{"v":1,"lamport":7,"session":"3a166e82-24dd-4f1b-bd44-290e8b702c09","ops":[{"kind":"set_criterion_status","id":"ae90571b469f3e432cd078b92661fb3c","status":"met","note":"Single commit 3538597959e2 landed, all CI green; v0.10.0 tagged; Release (PyPI) 29677017627, Release (crates.io) 29677017519, Release (Go module) 29677017536 all completed successfully."}]}
+{"v":1,"lamport":8,"session":"3a166e82-24dd-4f1b-bd44-290e8b702c09","ops":[{"kind":"set_status","status":"done"},{"kind":"link_commit","sha":"3538597959e2c3596c2872183fba042bd895d41e"}]}
