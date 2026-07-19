@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel
 
-from spawnllm import ClaudeCliBackend, CliBackend, CodexCliBackend, extract_sync
+from spawnllm import ClaudeCliBackend, CliBackend, CodexCliBackend, RunSpec, extract_sync
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -69,6 +69,23 @@ print(json.dumps([
     )
 
 
+def write_fake_claude_env(path: Path, sink: Path) -> None:
+    write_executable(
+        path,
+        f"""\
+import json, os
+open({str(sink)!r}, "w").write(
+    "ANTHROPIC_API_KEY=" + os.environ.get("ANTHROPIC_API_KEY", "<unset>") + "\\n"
+    "ANTHROPIC_AUTH_TOKEN=" + os.environ.get("ANTHROPIC_AUTH_TOKEN", "<unset>") + "\\n"
+)
+print(json.dumps([
+    {{"type": "system"}},
+    {{"type": "result", "is_error": False, "result": "ok", "structured_output": json.loads({PAYLOAD_JSON!r})}},
+]))
+""",
+    )
+
+
 def write_fake_codex(path: Path, sink: Path) -> None:
     write_executable(
         path,
@@ -98,6 +115,55 @@ CASES = (
     pytest.param(ClaudeCliBackend, "anthropic", id="claude-receives-anthropic-strict-schema"),
     pytest.param(CodexCliBackend, "openai", id="codex-receives-openai-strict-schema"),
 )
+
+AUTH_ENV_CASES = (
+    pytest.param(
+        False,
+        None,
+        "ANTHROPIC_API_KEY=<unset>\nANTHROPIC_AUTH_TOKEN=<unset>\n",
+        id="default-strips-parent-api-auth-env",
+    ),
+    pytest.param(
+        True,
+        None,
+        "ANTHROPIC_API_KEY=parent-api-key\nANTHROPIC_AUTH_TOKEN=parent-auth-token\n",
+        id="api-auth-keeps-parent-api-auth-env",
+    ),
+    pytest.param(
+        False,
+        {"ANTHROPIC_API_KEY": "spec-api-key"},
+        "ANTHROPIC_API_KEY=spec-api-key\nANTHROPIC_AUTH_TOKEN=<unset>\n",
+        id="explicit-spec-env-restores-stripped-api-auth-key",
+    ),
+)
+
+
+@pytest.mark.parametrize("api_auth,spec_env,expected", AUTH_ENV_CASES)
+def test_claude_child_process_api_auth_env(
+    api_auth: bool,
+    spec_env: dict[str, str] | None,
+    expected: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    sink = tmp_path / "received-env.txt"
+    write_fake_claude_env(bindir / "claude", sink)
+    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
+    (isolated_home := tmp_path / "config").mkdir()
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(isolated_home))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "parent-api-key")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "parent-auth-token")
+
+    response = ClaudeCliBackend().execute(
+        RunSpec(prompt="hi", model="haiku", isolated=False, env=spec_env, api_auth=api_auth)
+    )
+
+    assert response.error is None
+    assert response.result is not None
+    assert response.result.raw == "ok"
+    assert sink.read_text() == expected
 
 
 @pytest.mark.parametrize("backend_cls,dialect", CASES)

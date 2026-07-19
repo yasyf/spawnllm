@@ -1,20 +1,20 @@
 {
   "expected": {
     "argv": [
-      "agy",
+      "gemini",
       "--model",
-      "gemini-3.5",
-      "--dangerously-skip-permissions",
-      "--print-timeout",
-      "120s",
+      "gemini-2.5-flash",
+      "-o",
+      "json",
+      "--approval-mode",
+      "default",
+      "-e",
+      "none",
       "-p",
       "hi"
     ],
     "env": {},
-    "env_unset": [
-      "GEMINI_API_KEY",
-      "ANTIGRAVITY_API_KEY"
-    ],
+    "env_unset": [],
     "files": [],
     "kind": "exec",
     "needs_claude_isolation": false,
@@ -26,22 +26,22 @@
     "host": {
       "platform": "darwin"
     },
-    "provider": "antigravity",
+    "provider": "gemini",
     "spec": {
-      "agent": true,
-      "api_auth": false,
+      "agent": false,
+      "api_auth": true,
       "claude": null,
       "codex": null,
       "gemini": null,
       "isolated": true,
       "max_attempts": 5,
-      "model": "gemini-3.5",
+      "model": "gemini-2.5-flash",
       "openai_endpoint": null,
       "prompt": "hi",
       "schema": null,
       "timeout": 180
     }
   },
-  "name": "antigravity-agent",
+  "name": "gemini-api-auth",
   "op": "plan"
 }

@@ -42,6 +42,11 @@ TRANSIENT_WITH_COST = Response(
 )
 
 
+def patch_plan_argv(monkeypatch: pytest.MonkeyPatch, backend: ClaudeCliBackend, argv: list[str]) -> None:
+    core_plan = backend.core_plan
+    monkeypatch.setattr(backend, "core_plan", lambda spec: core_plan(spec) | {"argv": argv})
+
+
 class ScriptedBackend(LlmBackend):
     models = {}
     provider = "claude"
@@ -61,7 +66,7 @@ class ScriptedBackend(LlmBackend):
     def execute(self, spec: RunSpec) -> Response:
         return self._next()
 
-    def env(self) -> dict[str, str]:
+    def env(self, spec: RunSpec) -> dict[str, str]:
         return {}
 
     def is_authenticated(self, *, timeout: int) -> bool:
@@ -163,7 +168,7 @@ class TestFileBackedStdout:
         payload = "z" * self.LARGE
         backend = ClaudeCliBackend()
         script = f"import sys; sys.stdout.write({payload!r}); sys.stdout.flush()"
-        monkeypatch.setattr(backend, "build_command", lambda spec: [sys.executable, "-c", script])
+        patch_plan_argv(monkeypatch, backend, [sys.executable, "-c", script])
         resp = await backend.aexecute(RunSpec(prompt="hi", model="haiku", isolated=False))
         assert resp.error is None
         assert resp.output.raw == payload
@@ -172,10 +177,36 @@ class TestFileBackedStdout:
         payload = "w" * self.LARGE
         backend = ClaudeCliBackend()
         script = f"import sys; sys.stdout.write({payload!r}); sys.stdout.flush()"
-        monkeypatch.setattr(backend, "build_command", lambda spec: [sys.executable, "-c", script])
+        patch_plan_argv(monkeypatch, backend, [sys.executable, "-c", script])
         resp = backend.execute(RunSpec(prompt="hi", model="haiku", isolated=False))
         assert resp.error is None
         assert resp.output.raw == payload
+
+
+class TestCliBackendEnvironment:
+    async def test_aexecute_uses_overridden_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        class CustomEnvBackend(ClaudeCliBackend):
+            def env(self, spec: RunSpec) -> dict[str, str]:
+                return {"CUSTOM_KEY": "custom-value"}
+
+        backend = CustomEnvBackend()
+        script = "import os; print(os.environ.get('CUSTOM_KEY'))"
+        patch_plan_argv(monkeypatch, backend, [sys.executable, "-c", script])
+        resp = await backend.aexecute(RunSpec(prompt="hi", model="haiku", isolated=False))
+        assert resp.error is None
+        assert resp.output.raw == "custom-value\n"
+
+    def test_execute_uses_overridden_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        class CustomEnvBackend(ClaudeCliBackend):
+            def env(self, spec: RunSpec) -> dict[str, str]:
+                return {"CUSTOM_KEY": "custom-value"}
+
+        backend = CustomEnvBackend()
+        script = "import os; print(os.environ.get('CUSTOM_KEY'))"
+        patch_plan_argv(monkeypatch, backend, [sys.executable, "-c", script])
+        resp = backend.execute(RunSpec(prompt="hi", model="haiku", isolated=False))
+        assert resp.error is None
+        assert resp.output.raw == "custom-value\n"
 
 
 class TestTimeoutTermination:
@@ -206,7 +237,7 @@ class TestTimeoutTermination:
         pid_file = tmp_path / "pid"
         backend = ClaudeCliBackend()
         script = self.SLEEPER.format(path=str(pid_file))
-        monkeypatch.setattr(backend, "build_command", lambda spec: [sys.executable, "-c", script])
+        patch_plan_argv(monkeypatch, backend, [sys.executable, "-c", script])
         captured: dict[str, str] = {}
         real_invocation = backend.invocation
 

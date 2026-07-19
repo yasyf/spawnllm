@@ -3,6 +3,9 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::auth::{
+    ANTIGRAVITY_API_KEY_VARS, CLAUDE_API_KEY_VARS, CODEX_API_KEY_VARS, GEMINI_API_KEY_VARS,
+};
 use crate::{OpError, OpResult};
 
 const PROVIDERS: [&str; 4] = ["claude", "codex", "antigravity", "gemini"];
@@ -19,6 +22,7 @@ pub struct Capabilities {
     pub providers: Vec<&'static str>,
     pub priority: Vec<&'static str>,
     pub auto_select_excludes: Vec<&'static str>,
+    pub api_key_vars: BTreeMap<&'static str, Vec<&'static str>>,
     pub specialties: BTreeMap<&'static str, &'static str>,
     pub models: BTreeMap<&'static str, ModelTiers>,
     pub binaries: BTreeMap<&'static str, &'static str>,
@@ -30,6 +34,12 @@ pub fn capabilities() -> Capabilities {
         providers: PROVIDERS.to_vec(),
         priority: PROVIDERS.to_vec(),
         auto_select_excludes: vec!["gemini"],
+        api_key_vars: BTreeMap::from([
+            ("claude", CLAUDE_API_KEY_VARS.to_vec()),
+            ("codex", CODEX_API_KEY_VARS.to_vec()),
+            ("gemini", GEMINI_API_KEY_VARS.to_vec()),
+            ("antigravity", ANTIGRAVITY_API_KEY_VARS.to_vec()),
+        ]),
         specialties: BTreeMap::from([
             ("debugging", "codex"),
             ("review", "codex"),

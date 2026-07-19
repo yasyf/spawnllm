@@ -4,17 +4,13 @@
       "agy",
       "--model",
       "gemini-3.5",
-      "--dangerously-skip-permissions",
       "--print-timeout",
       "120s",
       "-p",
       "hi"
     ],
     "env": {},
-    "env_unset": [
-      "GEMINI_API_KEY",
-      "ANTIGRAVITY_API_KEY"
-    ],
+    "env_unset": [],
     "files": [],
     "kind": "exec",
     "needs_claude_isolation": false,
@@ -28,8 +24,8 @@
     },
     "provider": "antigravity",
     "spec": {
-      "agent": true,
-      "api_auth": false,
+      "agent": false,
+      "api_auth": true,
       "claude": null,
       "codex": null,
       "gemini": null,
@@ -42,6 +38,6 @@
       "timeout": 180
     }
   },
-  "name": "antigravity-agent",
+  "name": "antigravity-api-auth",
   "op": "plan"
 }

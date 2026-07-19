@@ -3,6 +3,7 @@ use std::fmt::Write;
 
 use serde_json::{Map, Value};
 
+use crate::auth::CODEX_API_KEY_VARS;
 use crate::wire::{ExecPlan, FileId, InvocationPlan, PlanFile, ReadResultFrom, RunSpec};
 
 pub(super) fn plan(spec: &RunSpec) -> InvocationPlan {
@@ -86,6 +87,14 @@ pub(super) fn plan(spec: &RunSpec) -> InvocationPlan {
         stdout_to_file: false,
         read_result_from: ReadResultFrom::FileResult,
         env: BTreeMap::new(),
+        env_unset: if spec.api_auth {
+            Vec::new()
+        } else {
+            CODEX_API_KEY_VARS
+                .iter()
+                .map(|var| (*var).to_owned())
+                .collect()
+        },
         needs_claude_isolation: false,
     })
 }

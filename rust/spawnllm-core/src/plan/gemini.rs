@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use serde_json::Value;
 
+use crate::auth::GEMINI_API_KEY_VARS;
 use crate::wire::{ExecPlan, InvocationPlan, ReadResultFrom, RunSpec};
 
 const SCHEMA_PROMPT: &str = "Respond with ONLY a single JSON object that conforms to this JSON Schema. No prose, no explanation, no markdown code fences.\nJSON Schema:";
@@ -48,6 +49,14 @@ pub(super) fn plan(spec: &RunSpec) -> InvocationPlan {
         stdout_to_file: false,
         read_result_from: ReadResultFrom::Stdout,
         env: BTreeMap::new(),
+        env_unset: if spec.api_auth {
+            Vec::new()
+        } else {
+            GEMINI_API_KEY_VARS
+                .iter()
+                .map(|var| (*var).to_owned())
+                .collect()
+        },
         needs_claude_isolation: false,
     })
 }

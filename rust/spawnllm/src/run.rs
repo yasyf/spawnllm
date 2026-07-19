@@ -110,6 +110,7 @@ fn portable(spec: &RunSpec, endpoint: Option<&Value>) -> Value {
         "model": spec.model,
         "schema": spec.schema,
         "agent": spec.agent,
+        "api_auth": spec.api_auth,
         "isolated": spec.isolated,
         "timeout": spec.timeout.as_secs() as i64,
         "max_attempts": spec.max_attempts as i64,
@@ -278,5 +279,19 @@ fn error_response(spec: RunSpec, error: Error, discarded: Vec<DiscardedAttempt>)
         output: String::new(),
         outcome: Err(RunError { msg, source: error }),
         discarded_attempts: discarded,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn portable_includes_api_auth() {
+        let default = portable(&RunSpec::new("p", "m"), None);
+        assert_eq!(default.get("api_auth"), Some(&Value::Bool(false)));
+
+        let api_auth = portable(&RunSpec::new("p", "m").api_auth(true), None);
+        assert_eq!(api_auth.get("api_auth"), Some(&Value::Bool(true)));
     }
 }

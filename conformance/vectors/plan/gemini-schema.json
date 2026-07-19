@@ -14,6 +14,10 @@
       "hi\n\nRespond with ONLY a single JSON object that conforms to this JSON Schema. No prose, no explanation, no markdown code fences.\nJSON Schema:\n{\"type\": \"object\", \"properties\": {\"answer\": {\"type\": \"string\"}}, \"required\": [\"answer\"]}"
     ],
     "env": {},
+    "env_unset": [
+      "GEMINI_API_KEY",
+      "GOOGLE_API_KEY"
+    ],
     "files": [],
     "kind": "exec",
     "needs_claude_isolation": false,
@@ -28,6 +32,7 @@
     "provider": "gemini",
     "spec": {
       "agent": false,
+      "api_auth": false,
       "claude": null,
       "codex": null,
       "gemini": null,

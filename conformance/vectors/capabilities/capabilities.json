@@ -1,5 +1,23 @@
 {
   "expected": {
+    "api_key_vars": {
+      "antigravity": [
+        "GEMINI_API_KEY",
+        "ANTIGRAVITY_API_KEY"
+      ],
+      "claude": [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN"
+      ],
+      "codex": [
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY"
+      ],
+      "gemini": [
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY"
+      ]
+    },
     "auto_select_excludes": [
       "gemini"
     ],

@@ -1,6 +1,6 @@
 # ![spawnllm](https://github.com/yasyf/spawnllm/raw/main/docs/assets/readme-banner.webp)
 
-**Delete your subprocess wrappers around claude, codex, and gemini.** spawnllm subshells all three CLIs plus local MLX and returns one Pydantic-validated Response, so the per-model plumbing you hand-rolled goes away.
+**Delete your subprocess wrappers around claude, codex, and gemini.** spawnllm subshells all three CLIs — or drives Claude in-process through the bundled Agent SDK — plus local MLX, and returns one Pydantic-validated Response, so the per-model plumbing you hand-rolled goes away.
 
 [![CI](https://github.com/yasyf/spawnllm/actions/workflows/ci.yml/badge.svg)](https://github.com/yasyf/spawnllm/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/spawnllm)](https://pypi.org/project/spawnllm/)
@@ -61,6 +61,28 @@ print(result.capital)  # Paris
 
 The backend turns `Capital` into a JSON-schema constraint on the call itself, and a non-conforming reply raises `pydantic.ValidationError` instead of sneaking downstream.
 
+### Keep billing on your subscription, not a stray API key
+
+An `ANTHROPIC_API_KEY` left in your shell silently flips the `claude` CLI from your logged-in plan to per-token API billing. spawnllm strips each provider's key vars from the child environment by default, so every run bills the login:
+
+```python
+from spawnllm import call_sync
+
+print(call_sync("Reply with just the word: pong"))
+```
+
+Prints `pong`, billed to your Claude plan even with `ANTHROPIC_API_KEY` exported. Pass `api_auth=True` to opt back into key auth. The same guard covers codex (`OPENAI_API_KEY`/`CODEX_API_KEY`) and the Gemini family, in Python, Go, and Rust alike; an explicit `RunSpec.env` entry always wins.
+
+### Call Claude with zero installs
+
+The `sdk` extra adds a backend over the Claude Agent SDK, whose wheel bundles the Claude Code CLI — no separate `claude` install:
+
+```bash
+uv add "spawnllm[sdk]"
+```
+
+`claude-sdk` registers first in the auto-selection chain and signs in with your existing subscription credentials (keychain login or `CLAUDE_CODE_OAUTH_TOKEN`), so the `call_sync` above works on a machine that has never installed the CLI.
+
 ### Run Apple-Silicon MLX models with fused adapters and prompt-cache reuse
 
 Shipping a LoRA-tuned local model means hand-rolling adapter fusion, model caching, and worker-thread lifecycle. The MLX extra owns all three:
@@ -85,7 +107,7 @@ Both expose `Call`/`call` and typed `Extract`/`extract` against your existing CL
 ## More in the docs
 
 - **Spec-driven runs** — a literal model id, per-provider flag passthrough, and envelope-aware retry via `RunSpec` — [Running reference](https://yasyf.github.io/spawnllm/reference/#running)
-- **Backend selection** — the priority chain, plus `specialty=` routing (`debugging` and `review` go to Codex, `general` to Claude) — [Backends reference](https://yasyf.github.io/spawnllm/reference/#backends)
+- **Backend selection** — the priority chain, plus `specialty=` routing (`debugging` and `review` go to Codex, `general` to the Claude Agent SDK backend) — [Backends reference](https://yasyf.github.io/spawnllm/reference/#backends)
 - **Transport helpers** — `run_cli`, `collect_process`, and `map_concurrent`, the subprocess plumbing shared by every CLI backend — [Transport reference](https://yasyf.github.io/spawnllm/reference/#transport)
 - **The CLI** — `spawnllm call`, `status`, and `backends` from any shell — [CLI reference](https://yasyf.github.io/spawnllm/reference/cli/)
 - **MLX internals** — the adapter codec, fuser, and runtime patches behind the local engine — [MLX reference](https://yasyf.github.io/spawnllm/reference/#mlx)

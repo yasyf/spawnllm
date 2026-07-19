@@ -96,6 +96,8 @@ class Invocation:
             when set, stdout goes to this regular file instead of a pipe and is
             read back as the capture, dodging a Node child's async-pipe truncation.
         cleanup_paths: Temp files to remove once the invocation completes.
+        env: Environment entries supplied by the core plan.
+        env_unset: Parent environment keys to omit before applying explicit entries.
     """
 
     argv: list[str]
@@ -103,6 +105,8 @@ class Invocation:
     result_path: str | None = None
     stdout_path: str | None = None
     cleanup_paths: tuple[str, ...] = ()
+    env: dict[str, str] = dataclasses.field(default_factory=dict)
+    env_unset: tuple[str, ...] = ()
 
 
 def run_probe(probe: dict[str, Any], *, timeout: int) -> bool:
@@ -256,6 +260,7 @@ class LlmBackend(ABC):
             "schema": self.wire_schema(spec),
             "agent": spec.agent,
             "isolated": spec.isolated,
+            "api_auth": spec.api_auth,
             "timeout": spec.timeout,
             "max_attempts": spec.max_attempts,
             "claude": dataclasses.asdict(c) if (c := spec.config_for(ClaudeConfig)) is not None else None,
@@ -375,10 +380,12 @@ class CliBackend(LlmBackend):
                 finally:
                     os.close(fd)
             tokens = {f"${{file:{file_id}}}": path for file_id, path in paths.items()}
-            argv = [tokens.get(arg, arg) for arg in self.build_command(spec)]
+            argv = [tokens.get(arg, arg) for arg in plan["argv"]]
+            env = plan["env"]
             if plan["needs_claude_isolation"]:
                 directory = self.claude_isolation()
                 argv = [arg.replace("${isolated_config_dir}", directory) for arg in argv]
+                env = {key: value.replace("${isolated_config_dir}", directory) for key, value in env.items()}
         except BaseException:
             for path in paths.values():
                 Path(path).unlink(missing_ok=True)
@@ -389,6 +396,8 @@ class CliBackend(LlmBackend):
             result_path=paths.get("result") if plan["read_result_from"] == "file:result" else None,
             stdout_path=paths.get("stdout") if plan["stdout_to_file"] else None,
             cleanup_paths=tuple(paths.values()),
+            env=env,
+            env_unset=tuple(plan["env_unset"]),
         )
 
     def env(self, spec: RunSpec) -> dict[str, str]:
@@ -439,7 +448,9 @@ class CliBackend(LlmBackend):
                 rr = await acapture_cli(
                     inv.argv,
                     input=inv.stdin,
-                    env=os.environ | self.env(spec) | (spec.env or {}),
+                    env={key: value for key, value in os.environ.items() if key not in inv.env_unset}
+                    | self.env(spec)
+                    | (spec.env or {}),
                     cwd=spec.cwd,
                     timeout=spec.timeout,
                     stdout_path=inv.stdout_path,
@@ -459,7 +470,9 @@ class CliBackend(LlmBackend):
                 rr = capture_cli(
                     inv.argv,
                     input=inv.stdin,
-                    env=os.environ | self.env(spec) | (spec.env or {}),
+                    env={key: value for key, value in os.environ.items() if key not in inv.env_unset}
+                    | self.env(spec)
+                    | (spec.env or {}),
                     cwd=spec.cwd,
                     timeout=spec.timeout,
                     stdout_path=inv.stdout_path,

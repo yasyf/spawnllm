@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use serde_json::Value;
 
+use crate::auth::CLAUDE_API_KEY_VARS;
 use crate::wire::{
     ClaudeConfig, ExecPlan, FileId, InvocationPlan, PlanFile, ReadResultFrom, RunSpec,
 };
@@ -67,6 +68,14 @@ pub(super) fn plan(spec: &RunSpec) -> InvocationPlan {
         stdout_to_file: true,
         read_result_from: ReadResultFrom::Stdout,
         env,
+        env_unset: if spec.api_auth {
+            Vec::new()
+        } else {
+            CLAUDE_API_KEY_VARS
+                .iter()
+                .map(|var| (*var).to_owned())
+                .collect()
+        },
         needs_claude_isolation: spec.isolated,
     })
 }

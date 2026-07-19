@@ -13,8 +13,6 @@
       "gpt-5.5",
       "-c",
       "service_tier=fast",
-      "-c",
-      "developer_instructions=\"true\"",
       "--ignore-user-config",
       "-c",
       "features.hooks=false",
@@ -24,10 +22,7 @@
       "${file:result}"
     ],
     "env": {},
-    "env_unset": [
-      "OPENAI_API_KEY",
-      "CODEX_API_KEY"
-    ],
+    "env_unset": [],
     "files": [
       {
         "content": null,
@@ -48,15 +43,9 @@
     "provider": "codex",
     "spec": {
       "agent": false,
-      "api_auth": false,
+      "api_auth": true,
       "claude": null,
-      "codex": {
-        "developer_instructions": "true",
-        "enable_hooks": false,
-        "enable_mcp": false,
-        "sandbox": null,
-        "service_tier": "fast"
-      },
+      "codex": null,
       "gemini": null,
       "isolated": true,
       "max_attempts": 5,
@@ -67,6 +56,6 @@
       "timeout": 180
     }
   },
-  "name": "codex-dev-instructions-literal-true",
+  "name": "codex-api-auth",
   "op": "plan"
 }

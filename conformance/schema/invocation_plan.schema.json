@@ -16,6 +16,12 @@
           },
           "type": "object"
         },
+        "env_unset": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "files": {
           "items": {
             "properties": {
@@ -72,6 +78,7 @@
         "stdout_to_file",
         "read_result_from",
         "env",
+        "env_unset",
         "needs_claude_isolation"
       ],
       "type": "object"

@@ -12,6 +12,8 @@ pub struct RunSpec {
     pub timeout: i64,
     pub max_attempts: i64,
     #[serde(default)]
+    pub api_auth: bool,
+    #[serde(default)]
     pub schema: Option<Value>,
     #[serde(default)]
     pub claude: Option<ClaudeConfig>,
@@ -77,6 +79,7 @@ pub struct ExecPlan {
     pub stdout_to_file: bool,
     pub read_result_from: ReadResultFrom,
     pub env: BTreeMap<String, String>,
+    pub env_unset: Vec<String>,
     pub needs_claude_isolation: bool,
 }
 

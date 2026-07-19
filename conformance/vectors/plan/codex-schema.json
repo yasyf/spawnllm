@@ -24,6 +24,10 @@
       "${file:result}"
     ],
     "env": {},
+    "env_unset": [
+      "OPENAI_API_KEY",
+      "CODEX_API_KEY"
+    ],
     "files": [
       {
         "content": "{\"type\": \"object\", \"properties\": {\"answer\": {\"type\": \"string\"}}, \"required\": [\"answer\"]}",
@@ -49,6 +53,7 @@
     "provider": "codex",
     "spec": {
       "agent": false,
+      "api_auth": false,
       "claude": null,
       "codex": null,
       "gemini": null,

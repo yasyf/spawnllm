@@ -29,13 +29,14 @@ type attempt struct {
 var retrySleep = sleepCtx
 
 // CallOpts configures Call and Extract. Backend overrides auto-selection;
-// Specialty scopes auto-selection; Model "" resolves to Small; Timeout is
-// per-attempt (0 → 180s).
+// Specialty scopes auto-selection; Model "" resolves to Small; APIAuth requests
+// API-credential authentication; Timeout is per-attempt (0 → 180s).
 type CallOpts struct {
 	Backend   Backend
 	Specialty Specialty
 	Model     ModelTier
 	Agent     bool
+	APIAuth   bool
 	Dir       string
 	Timeout   time.Duration
 }
@@ -75,7 +76,7 @@ func Call(ctx context.Context, prompt string, opts CallOpts) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	spec := RunSpec{Prompt: prompt, Model: model, Agent: opts.Agent, Dir: opts.Dir, Timeout: opts.Timeout}
+	spec := RunSpec{Prompt: prompt, Model: model, Agent: opts.Agent, APIAuth: opts.APIAuth, Dir: opts.Dir, Timeout: opts.Timeout}
 	resp, err := RunOn(ctx, backend, spec)
 	if err != nil {
 		return "", err
@@ -104,7 +105,7 @@ func Extract[T any](ctx context.Context, prompt string, opts CallOpts) (T, error
 	if err != nil {
 		return zero, err
 	}
-	spec := RunSpec{Prompt: prompt, Model: model, Schema: schema, Agent: opts.Agent, Dir: opts.Dir, Timeout: opts.Timeout}
+	spec := RunSpec{Prompt: prompt, Model: model, Schema: schema, Agent: opts.Agent, APIAuth: opts.APIAuth, Dir: opts.Dir, Timeout: opts.Timeout}
 	resp, err := runOn(ctx, backend, spec, true)
 	if err != nil {
 		return zero, err

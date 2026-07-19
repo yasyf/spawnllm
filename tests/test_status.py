@@ -12,6 +12,7 @@ from spawnllm import (
     BackendReady,
     BackendUnavailable,
     ClaudeCliBackend,
+    ClaudeSdkBackend,
     CodexCliBackend,
     GeminiCliBackend,
     select_backend,
@@ -150,17 +151,22 @@ def unauthenticated(self: LlmBackend, *, timeout: int = 10) -> BackendNotAuthent
     return BackendNotAuthenticated(self.binary)
 
 
+def not_installed(self: LlmBackend, *, timeout: int = 10) -> BackendNotInstalled:
+    return BackendNotInstalled(self.binary, "install")
+
+
 def timed_out(self: LlmBackend, *, timeout: int = 10):
     raise subprocess.TimeoutExpired(cmd=[self.binary], timeout=timeout)
 
 
 class TestSelectBackend:
     def test_all_ready_returns_first_in_priority(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        for cls in (ClaudeCliBackend, CodexCliBackend, AntigravityCliBackend, GeminiCliBackend):
+        for cls in (ClaudeSdkBackend, ClaudeCliBackend, CodexCliBackend, AntigravityCliBackend, GeminiCliBackend):
             monkeypatch.setattr(cls, "check_status", ready)
-        assert isinstance(select_backend(), ClaudeCliBackend)
+        assert isinstance(select_backend(), ClaudeSdkBackend)
 
     def test_falls_through_to_antigravity(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(ClaudeSdkBackend, "check_status", unauthenticated)
         monkeypatch.setattr(ClaudeCliBackend, "check_status", unauthenticated)
         monkeypatch.setattr(CodexCliBackend, "check_status", unauthenticated)
         monkeypatch.setattr(AntigravityCliBackend, "check_status", ready)
@@ -168,17 +174,24 @@ class TestSelectBackend:
         assert isinstance(select_backend(), AntigravityCliBackend)
 
     def test_none_ready_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        for cls in (ClaudeCliBackend, CodexCliBackend, AntigravityCliBackend, GeminiCliBackend):
+        for cls in (ClaudeSdkBackend, ClaudeCliBackend, CodexCliBackend, AntigravityCliBackend, GeminiCliBackend):
             monkeypatch.setattr(cls, "check_status", unauthenticated)
         with pytest.raises(BackendUnavailable):
             select_backend()
 
     def test_specialty_promotes_codex(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(ClaudeSdkBackend, "check_status", ready)
         monkeypatch.setattr(ClaudeCliBackend, "check_status", ready)
         monkeypatch.setattr(CodexCliBackend, "check_status", ready)
         assert isinstance(select_backend(specialty="debugging"), CodexCliBackend)
 
     def test_timeout_is_skipped(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(ClaudeSdkBackend, "check_status", unauthenticated)
         monkeypatch.setattr(ClaudeCliBackend, "check_status", timed_out)
         monkeypatch.setattr(CodexCliBackend, "check_status", ready)
         assert isinstance(select_backend(), CodexCliBackend)
+
+    def test_sdk_not_installed_falls_through_to_claude(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(ClaudeSdkBackend, "check_status", not_installed)
+        monkeypatch.setattr(ClaudeCliBackend, "check_status", ready)
+        assert isinstance(select_backend(), ClaudeCliBackend)

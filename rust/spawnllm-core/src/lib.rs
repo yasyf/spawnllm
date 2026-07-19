@@ -1,3 +1,4 @@
+mod auth;
 mod extract;
 mod isolate;
 mod plan;

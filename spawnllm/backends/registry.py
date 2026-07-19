@@ -1,4 +1,4 @@
-"""Specialty-to-backend registry and the priority-ordered backend selector."""
+"""Specialty registry and selector, prioritizing Claude SDK before native CLIs."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from spawnllm.backends.base import BackendReady, BackendUnavailable, LlmBackend
 from spawnllm.backends.claude import ClaudeCliBackend
+from spawnllm.backends.claude_sdk import ClaudeSdkBackend
 from spawnllm.backends.codex import CodexCliBackend
 from spawnllm.backends.gemini import AntigravityCliBackend, GeminiCliBackend
 
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from spawnllm.types import TSpecialty
 
 BACKENDS_BY_NAME: dict[str, LlmBackend] = {
+    "claude-sdk": ClaudeSdkBackend(),
     "claude": ClaudeCliBackend(),
     "codex": CodexCliBackend(),
     "antigravity": AntigravityCliBackend(),
@@ -25,8 +27,8 @@ PRIORITY: tuple[LlmBackend, ...] = tuple(BACKENDS_BY_NAME.values())
 class LlmBackends:
     """Registry mapping each specialty to the `LlmBackend` that serves it.
 
-    `debugging` and `review` route to `CodexCliBackend`; `general` routes to
-    `ClaudeCliBackend`.
+    `debugging` and `review` route to `CodexCliBackend`; `general` routes to the
+    first-priority `ClaudeSdkBackend`.
 
     Attributes:
         LLM_BACKENDS: Mapping from specialty to its backend instance.
@@ -35,7 +37,7 @@ class LlmBackends:
     LLM_BACKENDS: ClassVar[dict[TSpecialty, LlmBackend]] = {
         "debugging": CodexCliBackend(),
         "review": CodexCliBackend(),
-        "general": ClaudeCliBackend(),
+        "general": ClaudeSdkBackend(),
     }
 
     @classmethod

@@ -28,6 +28,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "anyio>=4",
+    "claude-agent-sdk>=0.2",
     "pytest>=8.0",
     "ruff>=0.8",
     "ty>=0.0.44",
@@ -41,6 +42,10 @@ dev = [
     # SDK-private, so the floors pin verified-working versions.
     "openai>=2.43",
     "anthropic>=0.111",
+]
+# The wheel bundles the Claude Code CLI (~70MB), so keep it optional.
+sdk = [
+    "claude-agent-sdk>=0.2",
 ]
 # Cross-platform LoRA adapter codec (zstd + numpy); imported without mlx.
 adapter = [

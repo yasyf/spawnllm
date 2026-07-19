@@ -23,6 +23,7 @@ async def call(
     model: TModel = "small",
     agent: bool = False,
     cwd: str | None = None,
+    api_auth: bool = False,
     timeout: int = 180,
 ) -> str:
     """Run one LLM call asynchronously and return its text response.
@@ -40,6 +41,7 @@ async def call(
         model: Abstract model tier (`small`/`medium`/`large`).
         agent: Whether the call may use tools / agent capabilities.
         cwd: Working directory for the backend process; `None` inherits the caller's.
+        api_auth: Whether to inherit provider API-key environment variables.
         timeout: Seconds to wait before the backend process is killed.
 
     Returns:
@@ -50,7 +52,15 @@ async def call(
     """
     backend = backend or select_backend(specialty=specialty)
     resp = await run(
-        RunSpec(prompt=prompt, model=backend.models[model], agent=agent, cwd=cwd, timeout=timeout), backend=backend
+        RunSpec(
+            prompt=prompt,
+            model=backend.models[model],
+            agent=agent,
+            cwd=cwd,
+            api_auth=api_auth,
+            timeout=timeout,
+        ),
+        backend=backend,
     )
     if resp.error is not None:
         raise resp.error.ex
@@ -65,6 +75,7 @@ def call_sync(
     model: TModel = "small",
     agent: bool = False,
     cwd: str | None = None,
+    api_auth: bool = False,
     timeout: int = 180,
 ) -> str:
     """Run one LLM call synchronously and return its text response.
@@ -82,6 +93,7 @@ def call_sync(
         model: Abstract model tier (`small`/`medium`/`large`).
         agent: Whether the call may use tools / agent capabilities.
         cwd: Working directory for the backend process; `None` inherits the caller's.
+        api_auth: Whether to inherit provider API-key environment variables.
         timeout: Seconds to wait before the backend process is killed.
 
     Returns:
@@ -92,7 +104,15 @@ def call_sync(
     """
     backend = backend or select_backend(specialty=specialty)
     resp = run_sync(
-        RunSpec(prompt=prompt, model=backend.models[model], agent=agent, cwd=cwd, timeout=timeout), backend=backend
+        RunSpec(
+            prompt=prompt,
+            model=backend.models[model],
+            agent=agent,
+            cwd=cwd,
+            api_auth=api_auth,
+            timeout=timeout,
+        ),
+        backend=backend,
     )
     if resp.error is not None:
         raise resp.error.ex

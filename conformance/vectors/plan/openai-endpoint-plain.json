@@ -23,6 +23,7 @@
     "provider": "openai_endpoint",
     "spec": {
       "agent": false,
+      "api_auth": false,
       "claude": null,
       "codex": null,
       "gemini": null,

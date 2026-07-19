@@ -92,10 +92,12 @@ class RunSpec:
     `model` is a literal provider model id (`opus`, `sonnet`, …) passed straight
     through with no tier mapping. `isolated` (default `True`) runs the backend
     against a fresh, host-free config home so a spawned CLI ignores ambient
-    settings, MCP servers, and hooks. Structured output comes from either a
-    `response_model` (validated to a model) or a raw `schema` (a JSON-Schema dict
-    or pre-serialized string, passed to the provider verbatim, with nothing to
-    validate); setting both raises `ValueError`.
+    settings, MCP servers, and hooks. `api_auth` (default `False`) strips the
+    provider's API-key environment variables from the child process so the CLI
+    bills the logged-in subscription; `True` inherits the environment untouched.
+    Structured output comes from either a `response_model` (validated to a model)
+    or a raw `schema` (a JSON-Schema dict or pre-serialized string, passed to the
+    provider verbatim, with nothing to validate); setting both raises `ValueError`.
 
     Example:
         >>> RunSpec(prompt="ping", model="opus")
@@ -109,6 +111,7 @@ class RunSpec:
     isolated: bool = True
     cwd: str | None = None
     env: dict[str, str] | None = None
+    api_auth: bool = False
     timeout: int = 180
     max_attempts: int = 5
     provider_configs: dict[ProviderName, ProviderConfig] = field(default_factory=dict)

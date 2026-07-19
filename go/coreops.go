@@ -20,6 +20,7 @@ type execPlan struct {
 	StdoutToFile         bool              `json:"stdout_to_file"`
 	ReadResultFrom       string            `json:"read_result_from"`
 	Env                  map[string]string `json:"env"`
+	EnvUnset             []string          `json:"env_unset"`
 	NeedsClaudeIsolation bool              `json:"needs_claude_isolation"`
 }
 

@@ -13,6 +13,7 @@ from spawnllm.backends.base import (
     LlmBackend,
 )
 from spawnllm.backends.claude import ClaudeCliBackend
+from spawnllm.backends.claude_sdk import ClaudeSdkBackend
 from spawnllm.backends.codex import CodexCliBackend
 from spawnllm.backends.gemini import AntigravityCliBackend, GeminiCliBackend
 from spawnllm.backends.mlx import MlxBackend
@@ -28,6 +29,7 @@ __all__ = [
     "BackendStatus",
     "BackendUnavailable",
     "ClaudeCliBackend",
+    "ClaudeSdkBackend",
     "CliBackend",
     "CodexCliBackend",
     "GeminiCliBackend",

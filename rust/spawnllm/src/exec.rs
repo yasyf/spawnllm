@@ -60,6 +60,9 @@ pub(crate) async fn exec_attempt(
     cmd.args(&argv[1..]);
     cmd.stdin(Stdio::piped());
     cmd.stderr(Stdio::piped());
+    for key in &plan.env_unset {
+        cmd.env_remove(key);
+    }
     for (key, value) in &plan.env {
         let value = match isolated_dir {
             Some(dir) => value.replace("${isolated_config_dir}", &dir.to_string_lossy()),

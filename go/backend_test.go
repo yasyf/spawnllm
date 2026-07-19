@@ -81,6 +81,22 @@ func TestCoreSpecUseHostConfig(t *testing.T) {
 	}
 }
 
+func TestCoreSpecAPIAuth(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		apiAuth bool
+	}{
+		{name: "true", apiAuth: true},
+		{name: "false", apiAuth: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := (RunSpec{APIAuth: tt.apiAuth}).core().APIAuth; got != tt.apiAuth {
+				t.Errorf("APIAuth = %t, want %t", got, tt.apiAuth)
+			}
+		})
+	}
+}
+
 func TestCodexServiceTierDefault(t *testing.T) {
 	cs := RunSpec{Providers: ProviderConfigs{Codex: &CodexConfig{}}}.core()
 	if cs.Codex.ServiceTier == nil || *cs.Codex.ServiceTier != "fast" {
@@ -111,6 +127,61 @@ func TestCallRejectsUnknownModelTier(t *testing.T) {
 	_, err := Call(context.Background(), "ping", CallOpts{Backend: ClaudeBackend(), Model: ModelTier("unknown")})
 	if err == nil || !strings.Contains(err.Error(), `unknown model tier "unknown"`) {
 		t.Fatalf("Call error = %v, want unknown model tier", err)
+	}
+}
+
+type capturingBackend struct {
+	spec RunSpec
+}
+
+func (*capturingBackend) Provider() Provider { return ProviderCodex }
+
+func (*capturingBackend) CheckStatus(context.Context) BackendStatus {
+	return BackendStatus{State: BackendReady}
+}
+
+func (b *capturingBackend) execute(_ context.Context, spec RunSpec, wantsValue bool) (*attempt, error) {
+	b.spec = spec
+	result := &Result{Raw: "ok"}
+	if wantsValue {
+		result.Parsed = json.RawMessage(`{"value":"ok"}`)
+	}
+	return &attempt{resp: &Response{Spec: spec, Result: result}}, nil
+}
+
+func TestCallOptsAPIAuth(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func(Backend) error
+	}{
+		{
+			name: "Call",
+			run: func(backend Backend) error {
+				_, err := Call(context.Background(), "ping", CallOpts{Backend: backend, APIAuth: true})
+				return err
+			},
+		},
+		{
+			name: "Extract",
+			run: func(backend Backend) error {
+				_, err := Extract[struct {
+					Value string `json:"value"`
+				}](context.Background(), "ping", CallOpts{Backend: backend, APIAuth: true})
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			backend := &capturingBackend{}
+			if err := tt.run(backend); err != nil {
+				t.Fatalf("%s: %v", tt.name, err)
+			}
+			if !backend.spec.APIAuth {
+				t.Fatal("RunSpec.APIAuth = false, want true")
+			}
+		})
 	}
 }
 

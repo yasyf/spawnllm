@@ -79,6 +79,7 @@ type RunSpec struct {
 	Schema        json.RawMessage
 	Agent         bool
 	UseHostConfig bool
+	APIAuth       bool
 	Dir           string
 	Env           map[string]string
 	Timeout       time.Duration
@@ -108,6 +109,7 @@ type coreSpec struct {
 	Model          string          `json:"model"`
 	Agent          bool            `json:"agent"`
 	Isolated       bool            `json:"isolated"`
+	APIAuth        bool            `json:"api_auth"`
 	Timeout        int64           `json:"timeout"`
 	MaxAttempts    int64           `json:"max_attempts"`
 	Schema         json.RawMessage `json:"schema"`
@@ -183,6 +185,7 @@ func (s RunSpec) core() coreSpec {
 		Model:       s.Model,
 		Agent:       s.Agent,
 		Isolated:    !s.UseHostConfig,
+		APIAuth:     s.APIAuth,
 		Timeout:     int64(s.timeout() / time.Second),
 		MaxAttempts: int64(s.maxAttempts()),
 		Schema:      schema,

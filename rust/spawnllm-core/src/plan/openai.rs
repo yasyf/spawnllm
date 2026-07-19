@@ -59,6 +59,7 @@ mod tests {
             isolated: true,
             timeout: 180,
             max_attempts: 5,
+            api_auth: false,
             schema,
             claude: None,
             codex: None,

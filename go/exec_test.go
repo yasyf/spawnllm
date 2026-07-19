@@ -110,6 +110,110 @@ func TestSubstituteFilesOnlyReplacesWholeArgument(t *testing.T) {
 	}
 }
 
+func TestMergeEnv(t *testing.T) {
+	const ambientKey = "SPAWNLLM_TEST_ENV_UNSET"
+	const foldedAmbientKey = "spawnllm_test_env_unset"
+	t.Setenv(ambientKey, "ambient")
+	tests := []struct {
+		name            string
+		goos            string
+		planEnv         map[string]string
+		specEnv         map[string]string
+		envUnset        []string
+		wantKey         string
+		want            string
+		wantPresent     bool
+		wantFoldedCount int
+	}{
+		{name: "strips ambient unset", envUnset: []string{ambientKey}},
+		{
+			name:            "keeps ambient with nil unset",
+			want:            "ambient",
+			wantPresent:     true,
+			wantFoldedCount: 1,
+		},
+		{
+			name:            "spec override survives unset",
+			specEnv:         map[string]string{ambientKey: "explicit"},
+			envUnset:        []string{ambientKey},
+			want:            "explicit",
+			wantPresent:     true,
+			wantFoldedCount: 1,
+		},
+		{
+			name:     "windows strips ambient unset with different case",
+			goos:     "windows",
+			envUnset: []string{foldedAmbientKey},
+		},
+		{
+			name:            "windows plan overlay evicts ambient with different case",
+			goos:            "windows",
+			planEnv:         map[string]string{foldedAmbientKey: "plan"},
+			wantKey:         foldedAmbientKey,
+			want:            "plan",
+			wantPresent:     true,
+			wantFoldedCount: 1,
+		},
+		{
+			name:            "windows spec overlay evicts plan with different case",
+			goos:            "windows",
+			planEnv:         map[string]string{foldedAmbientKey: "plan"},
+			specEnv:         map[string]string{ambientKey: "spec"},
+			want:            "spec",
+			wantPresent:     true,
+			wantFoldedCount: 1,
+		},
+		{
+			name:            "non-windows keeps differently cased keys distinct",
+			goos:            "linux",
+			planEnv:         map[string]string{foldedAmbientKey: "plan"},
+			want:            "ambient",
+			wantPresent:     true,
+			wantFoldedCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []string
+			if tt.goos == "" {
+				got = mergeEnv(tt.planEnv, tt.specEnv, tt.envUnset)
+			} else {
+				got = mergeEnvForOS(tt.planEnv, tt.specEnv, tt.envUnset, tt.goos)
+			}
+			wantKey := tt.wantKey
+			if wantKey == "" {
+				wantKey = ambientKey
+			}
+			var value string
+			found := false
+			foldedCount := 0
+			for _, kv := range got {
+				key, candidate, ok := strings.Cut(kv, "=")
+				if !ok {
+					continue
+				}
+				if strings.EqualFold(key, ambientKey) {
+					foldedCount++
+				}
+				if key == wantKey {
+					value = candidate
+					found = true
+				}
+			}
+			if found != tt.wantPresent {
+				t.Fatalf("key %q presence = %v, want %v", wantKey, found, tt.wantPresent)
+			}
+			if found && value != tt.want {
+				t.Fatalf("key %q value = %q, want %q", wantKey, value, tt.want)
+			}
+			if foldedCount != tt.wantFoldedCount {
+				t.Fatalf("equal-folded key count = %d, want %d", foldedCount, tt.wantFoldedCount)
+			}
+		})
+	}
+}
+
 func TestTimeoutKillsSleepingFake(t *testing.T) {
 	withFakeBin(t)
 	start := time.Now()

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::auth::{ANTIGRAVITY_API_KEY_VARS, GEMINI_API_KEY_VARS};
 use crate::{OpError, OpResult, from_input};
 
 #[derive(Debug, Deserialize)]
@@ -75,7 +76,7 @@ pub(crate) fn dispatch(input: Value) -> OpResult {
                     path: format!("{}/.gemini/oauth_creds.json", input.host.home),
                 },
                 Probe::EnvAny {
-                    vars: vec!["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+                    vars: GEMINI_API_KEY_VARS.to_vec(),
                 },
             ],
         },
@@ -88,7 +89,7 @@ pub(crate) fn dispatch(input: Value) -> OpResult {
                 });
             }
             probes.push(Probe::EnvAny {
-                vars: vec!["GEMINI_API_KEY", "ANTIGRAVITY_API_KEY"],
+                vars: ANTIGRAVITY_API_KEY_VARS.to_vec(),
             });
             AuthProbes {
                 binary: "agy",

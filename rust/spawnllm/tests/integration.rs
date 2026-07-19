@@ -1,6 +1,8 @@
 mod common;
 
 use std::collections::HashMap;
+use std::ffi::OsString;
+use std::sync::PoisonError;
 use std::time::{Duration, Instant};
 
 use schemars::JsonSchema;
@@ -32,6 +34,19 @@ fn env(pairs: &[(&str, &str)]) -> HashMap<String, String> {
         .iter()
         .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
         .collect()
+}
+
+fn set_process_env(key: &str, value: &str) {
+    // SAFETY: callers hold ENV_LOCK across the child run and restoration.
+    unsafe { std::env::set_var(key, value) };
+}
+
+fn restore_process_env(key: &str, value: Option<OsString>) {
+    // SAFETY: callers hold ENV_LOCK across the child run and restoration.
+    match value {
+        Some(value) => unsafe { std::env::set_var(key, value) },
+        None => unsafe { std::env::remove_var(key) },
+    }
 }
 
 #[cfg(unix)]
@@ -92,6 +107,127 @@ async fn run_on_delivers_the_prompt_over_stdin() {
     assert_eq!(
         std::fs::read_to_string(&stdin_path).unwrap(),
         "the-secret-prompt"
+    );
+}
+
+#[allow(clippy::await_holding_lock)]
+#[tokio::test]
+async fn default_claude_run_strips_parent_api_auth_env() {
+    common::fixtures();
+    let _guard = common::ENV_LOCK
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    let api_key = std::env::var_os("ANTHROPIC_API_KEY");
+    let auth_token = std::env::var_os("ANTHROPIC_AUTH_TOKEN");
+    let env_out = tempfile::NamedTempFile::new().unwrap();
+    let env_path = env_out.path().to_str().unwrap().to_owned();
+
+    set_process_env("ANTHROPIC_API_KEY", "parent-api-key");
+    set_process_env("ANTHROPIC_AUTH_TOKEN", "parent-auth-token");
+    let spec = RunSpec::new("hi", "haiku")
+        .isolated(false)
+        .env(env(&[("SPAWNLLM_FAKE_ENV_OUT", &env_path)]));
+    let response = spawnllm::run_on(&Backend::Claude, spec).await;
+    restore_process_env("ANTHROPIC_API_KEY", api_key);
+    restore_process_env("ANTHROPIC_AUTH_TOKEN", auth_token);
+
+    response.outcome.expect("claude run succeeds");
+    assert_eq!(
+        std::fs::read_to_string(&env_path).unwrap(),
+        "ANTHROPIC_API_KEY=<unset>\nANTHROPIC_AUTH_TOKEN=<unset>\n"
+    );
+}
+
+#[allow(clippy::await_holding_lock)]
+#[tokio::test]
+async fn api_auth_claude_run_keeps_parent_api_auth_env() {
+    common::fixtures();
+    let _guard = common::ENV_LOCK
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    let api_key = std::env::var_os("ANTHROPIC_API_KEY");
+    let auth_token = std::env::var_os("ANTHROPIC_AUTH_TOKEN");
+    let env_out = tempfile::NamedTempFile::new().unwrap();
+    let env_path = env_out.path().to_str().unwrap().to_owned();
+
+    set_process_env("ANTHROPIC_API_KEY", "parent-api-key");
+    set_process_env("ANTHROPIC_AUTH_TOKEN", "parent-auth-token");
+    let spec = RunSpec::new("hi", "haiku")
+        .api_auth(true)
+        .isolated(false)
+        .env(env(&[("SPAWNLLM_FAKE_ENV_OUT", &env_path)]));
+    let response = spawnllm::run_on(&Backend::Claude, spec).await;
+    restore_process_env("ANTHROPIC_API_KEY", api_key);
+    restore_process_env("ANTHROPIC_AUTH_TOKEN", auth_token);
+
+    response.outcome.expect("claude run succeeds");
+    assert_eq!(
+        std::fs::read_to_string(&env_path).unwrap(),
+        "ANTHROPIC_API_KEY=parent-api-key\nANTHROPIC_AUTH_TOKEN=parent-auth-token\n"
+    );
+}
+
+#[allow(clippy::await_holding_lock)]
+#[tokio::test]
+async fn call_opts_api_auth_claude_keeps_parent_api_auth_env() {
+    common::fixtures();
+    let _guard = common::ENV_LOCK
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    let api_key = std::env::var_os("ANTHROPIC_API_KEY");
+    let auth_token = std::env::var_os("ANTHROPIC_AUTH_TOKEN");
+    let fake_env_out = std::env::var_os("SPAWNLLM_FAKE_ENV_OUT");
+    let env_dir = tempfile::tempdir().unwrap();
+    let cwd = env_dir.path().parent().unwrap().to_owned();
+    let env_out = tempfile::NamedTempFile::new_in(env_dir.path()).unwrap();
+    let env_path = env_out
+        .path()
+        .strip_prefix(&cwd)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+
+    set_process_env("ANTHROPIC_API_KEY", "parent-api-key");
+    set_process_env("ANTHROPIC_AUTH_TOKEN", "parent-auth-token");
+    set_process_env("SPAWNLLM_FAKE_ENV_OUT", &env_path);
+    let result = spawnllm::call(
+        "hi",
+        CallOpts {
+            backend: Some(Backend::Claude),
+            api_auth: true,
+            cwd: Some(cwd),
+            ..Default::default()
+        },
+    )
+    .await;
+    restore_process_env("ANTHROPIC_API_KEY", api_key);
+    restore_process_env("ANTHROPIC_AUTH_TOKEN", auth_token);
+    restore_process_env("SPAWNLLM_FAKE_ENV_OUT", fake_env_out);
+
+    result.expect("claude call succeeds");
+    assert_eq!(
+        std::fs::read_to_string(env_out.path()).unwrap(),
+        "ANTHROPIC_API_KEY=parent-api-key\nANTHROPIC_AUTH_TOKEN=parent-auth-token\n"
+    );
+}
+
+#[tokio::test]
+async fn explicit_spec_env_restores_stripped_api_auth_key() {
+    common::fixtures();
+    let env_out = tempfile::NamedTempFile::new().unwrap();
+    let env_path = env_out.path().to_str().unwrap().to_owned();
+    let spec = RunSpec::new("hi", "haiku").isolated(false).env(env(&[
+        ("SPAWNLLM_FAKE_ENV_OUT", &env_path),
+        ("ANTHROPIC_API_KEY", "spec-api-key"),
+    ]));
+
+    let response = spawnllm::run_on(&Backend::Claude, spec).await;
+
+    response.outcome.expect("claude run succeeds");
+    assert_eq!(
+        std::fs::read_to_string(&env_path).unwrap(),
+        "ANTHROPIC_API_KEY=spec-api-key\nANTHROPIC_AUTH_TOKEN=<unset>\n"
     );
 }
 

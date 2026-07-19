@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-07-19
+
+### Added
+- `ClaudeSdkBackend` (`claude-sdk`): an in-process Claude backend over the
+  `claude-agent-sdk` package, whose wheel bundles the Claude Code CLI — no
+  install beyond `uv add "spawnllm[sdk]"`. It authenticates with the same
+  ambient subscription OAuth as the standalone CLI (keychain login or
+  `CLAUDE_CODE_OAUTH_TOKEN`), registers first in the auto-selection chain, and
+  takes the `general` specialty; schema strictification and result resolution
+  still dispatch through the core's claude dialect. Python-only, like MLX —
+  the core and the Go/Rust bindings never learn the provider.
+- `RunSpec.api_auth` (default `False`), threaded through `call`/`extract`, the
+  `spawnllm call --api-auth` flag, the Rust builder, and the Go spec.
+- The `capabilities` op exposes each provider's API-key env vars as
+  `api_key_vars`.
+
+### Changed
+- **Child processes no longer inherit provider API-key env vars by default**,
+  in all three languages: every exec plan carries `env_unset` (claude:
+  `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN`; codex:
+  `OPENAI_API_KEY`/`CODEX_API_KEY`; gemini: `GEMINI_API_KEY`/`GOOGLE_API_KEY`;
+  antigravity: `GEMINI_API_KEY`/`ANTIGRAVITY_API_KEY`), and each host strips
+  those keys from the inherited environment before the plan and spec overlays.
+  A stray exported key can no longer silently switch billing from your CLI
+  login to API credits; opt back in with `api_auth=True`. An explicit
+  `RunSpec.env` entry always survives the strip. Auth probes still read the
+  ambient environment, so a Gemini-family backend that reports ready via an
+  API key alone needs `api_auth=True` at run time.
+
 ## [0.9.1] - 2026-07-19
 
 ### Fixed

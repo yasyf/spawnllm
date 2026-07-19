@@ -22,6 +22,10 @@
       "${file:result}"
     ],
     "env": {},
+    "env_unset": [
+      "OPENAI_API_KEY",
+      "CODEX_API_KEY"
+    ],
     "files": [
       {
         "content": null,
@@ -42,6 +46,7 @@
     "provider": "codex",
     "spec": {
       "agent": false,
+      "api_auth": false,
       "claude": null,
       "codex": {
         "developer_instructions": null,

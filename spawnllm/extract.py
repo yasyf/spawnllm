@@ -26,6 +26,7 @@ async def extract[T: BaseModel](
     model: TModel = "small",
     agent: bool = False,
     cwd: str | None = None,
+    api_auth: bool = False,
     timeout: int = 180,
 ) -> T:
     """Run one LLM call asynchronously and return a validated `response_model`.
@@ -45,6 +46,7 @@ async def extract[T: BaseModel](
         model: Abstract model tier (`small`/`medium`/`large`).
         agent: Whether the call may use tools / agent capabilities.
         cwd: Working directory for the backend process; `None` inherits the caller's.
+        api_auth: Whether to inherit provider API-key environment variables.
         timeout: Seconds to wait before the backend process is killed.
 
     Returns:
@@ -61,6 +63,7 @@ async def extract[T: BaseModel](
         response_model=response_model,
         agent=agent,
         cwd=cwd,
+        api_auth=api_auth,
         timeout=timeout,
     )
     resp = await run(spec, backend=backend)
@@ -78,6 +81,7 @@ def extract_sync[T: BaseModel](
     model: TModel = "small",
     agent: bool = False,
     cwd: str | None = None,
+    api_auth: bool = False,
     timeout: int = 180,
 ) -> T:
     """Run one LLM call synchronously and return a validated `response_model`.
@@ -97,6 +101,7 @@ def extract_sync[T: BaseModel](
         model: Abstract model tier (`small`/`medium`/`large`).
         agent: Whether the call may use tools / agent capabilities.
         cwd: Working directory for the backend process; `None` inherits the caller's.
+        api_auth: Whether to inherit provider API-key environment variables.
         timeout: Seconds to wait before the backend process is killed.
 
     Returns:
@@ -113,6 +118,7 @@ def extract_sync[T: BaseModel](
         response_model=response_model,
         agent=agent,
         cwd=cwd,
+        api_auth=api_auth,
         timeout=timeout,
     )
     resp = run_sync(spec, backend=backend)

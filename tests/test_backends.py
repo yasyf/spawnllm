@@ -15,6 +15,7 @@ from spawnllm import (
     BackendReady,
     ClaudeCliBackend,
     ClaudeConfig,
+    ClaudeSdkBackend,
     CodexCliBackend,
     CodexConfig,
     GeminiCliBackend,
@@ -26,6 +27,8 @@ from spawnllm import (
     call_sync,
     extract_sync,
 )
+from spawnllm.backends import base
+from spawnllm.proc import RunResult
 
 ENDPOINT = "http://local.test/v1"
 
@@ -44,6 +47,7 @@ class TestWireSpec:
             "schema": None,
             "agent": False,
             "isolated": True,
+            "api_auth": False,
             "timeout": 180,
             "max_attempts": 5,
             "claude": None,
@@ -59,6 +63,7 @@ class TestWireSpec:
             schema={"type": "object", "properties": {}, "additionalProperties": False},
             agent=True,
             isolated=False,
+            api_auth=True,
             timeout=42,
             max_attempts=2,
             provider_configs={"claude": ClaudeConfig(tools=("Bash", "Read"))},
@@ -69,6 +74,7 @@ class TestWireSpec:
             "schema": {"type": "object", "properties": {}, "additionalProperties": False},
             "agent": True,
             "isolated": False,
+            "api_auth": True,
             "timeout": 42,
             "max_attempts": 2,
             "claude": dataclasses.asdict(ClaudeConfig(tools=("Bash", "Read"))),
@@ -186,6 +192,100 @@ class TestInvocationMaterialization:
         assert json.loads(inv.argv[-1].splitlines()[-1]) == {"type": "object"}
 
 
+class TestCliEnvironment:
+    def test_execute_strips_planned_keys_with_two_plan_calls(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-key")
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "inherited-token")
+        monkeypatch.setenv("SPAWNLLM_KEEP", "kept")
+        backend = ClaudeCliBackend()
+        original_core_plan = backend.core_plan
+        plan_calls = 0
+        captured: dict[str, object] = {}
+
+        def counted_core_plan(spec: RunSpec) -> dict[str, object]:
+            nonlocal plan_calls
+            plan_calls += 1
+            return original_core_plan(spec)
+
+        def fake_capture_cli(argv: list[str], **kwargs: object) -> RunResult:
+            captured.update(kwargs)
+            return RunResult(json.dumps({"type": "result", "is_error": False, "result": "ok"}), "", 0)
+
+        monkeypatch.setattr(backend, "core_plan", counted_core_plan)
+        monkeypatch.setattr(base, "capture_cli", fake_capture_cli)
+        backend.execute(RunSpec(prompt="hi", model="haiku", isolated=False))
+
+        env = captured["env"]
+        assert isinstance(env, dict)
+        assert "ANTHROPIC_API_KEY" not in env
+        assert "ANTHROPIC_AUTH_TOKEN" not in env
+        assert env["SPAWNLLM_KEEP"] == "kept"
+        assert plan_calls == 2
+
+    async def test_aexecute_api_auth_preserves_parent_env_with_two_plan_calls(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-key")
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "inherited-token")
+        backend = ClaudeCliBackend()
+        original_core_plan = backend.core_plan
+        plan_calls = 0
+        captured: dict[str, object] = {}
+
+        def counted_core_plan(spec: RunSpec) -> dict[str, object]:
+            nonlocal plan_calls
+            plan_calls += 1
+            return original_core_plan(spec)
+
+        async def fake_acapture_cli(argv: list[str], **kwargs: object) -> RunResult:
+            captured.update(kwargs)
+            return RunResult(json.dumps({"type": "result", "is_error": False, "result": "ok"}), "", 0)
+
+        monkeypatch.setattr(backend, "core_plan", counted_core_plan)
+        monkeypatch.setattr(base, "acapture_cli", fake_acapture_cli)
+        await backend.aexecute(RunSpec(prompt="hi", model="haiku", isolated=False, api_auth=True))
+
+        env = captured["env"]
+        assert isinstance(env, dict)
+        assert env["ANTHROPIC_API_KEY"] == "inherited-key"
+        assert env["ANTHROPIC_AUTH_TOKEN"] == "inherited-token"
+        assert plan_calls == 2
+
+    def test_execute_explicit_env_restores_stripped_key_with_two_plan_calls(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-key")
+        backend = ClaudeCliBackend()
+        original_core_plan = backend.core_plan
+        plan_calls = 0
+        captured: dict[str, object] = {}
+
+        def counted_core_plan(spec: RunSpec) -> dict[str, object]:
+            nonlocal plan_calls
+            plan_calls += 1
+            return original_core_plan(spec)
+
+        def fake_capture_cli(argv: list[str], **kwargs: object) -> RunResult:
+            captured.update(kwargs)
+            return RunResult(json.dumps({"type": "result", "is_error": False, "result": "ok"}), "", 0)
+
+        monkeypatch.setattr(backend, "core_plan", counted_core_plan)
+        monkeypatch.setattr(base, "capture_cli", fake_capture_cli)
+        backend.execute(
+            RunSpec(
+                prompt="hi",
+                model="haiku",
+                isolated=False,
+                env={"ANTHROPIC_API_KEY": "explicit-key"},
+            )
+        )
+
+        env = captured["env"]
+        assert isinstance(env, dict)
+        assert env["ANTHROPIC_API_KEY"] == "explicit-key"
+        assert plan_calls == 2
+
+
 class TestClaudeIsolation:
     def test_env_isolates_and_seeds_config_dir_from_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
@@ -273,8 +373,8 @@ class TestModels:
 class TestRegistry:
     @pytest.mark.parametrize(
         "specialty, backend_cls",
-        [("general", ClaudeCliBackend), ("debugging", CodexCliBackend), ("review", CodexCliBackend)],
-        ids=["general-claude", "debugging-codex", "review-codex"],
+        [("general", ClaudeSdkBackend), ("debugging", CodexCliBackend), ("review", CodexCliBackend)],
+        ids=["general-claude-sdk", "debugging-codex", "review-codex"],
     )
     def test_for_specialty(self, specialty: str, backend_cls: type) -> None:
         assert isinstance(LlmBackends.for_specialty(specialty), backend_cls)
@@ -286,7 +386,7 @@ class TestRegistry:
         def absent(self: object, *, timeout: int = 10) -> BackendNotInstalled:
             return BackendNotInstalled(binary=self.binary, install_hint="x")
 
-        for cls in (ClaudeCliBackend, CodexCliBackend, AntigravityCliBackend):
+        for cls in (ClaudeSdkBackend, ClaudeCliBackend, CodexCliBackend, AntigravityCliBackend):
             monkeypatch.setattr(cls, "check_status", absent)
         monkeypatch.setattr(GeminiCliBackend, "check_status", lambda self, *, timeout=10: BackendReady(binary="gemini"))
         with pytest.raises(BackendUnavailable):
@@ -296,14 +396,21 @@ class TestRegistry:
         from spawnllm.backends.registry import BACKENDS_BY_NAME, PRIORITY, LlmBackends
 
         caps = _core.dispatch("capabilities")
-        name_by_type = {type(b): name for name, b in BACKENDS_BY_NAME.items()}
-        assert caps["providers"] == list(BACKENDS_BY_NAME)
-        assert caps["priority"] == [name_by_type[type(b)] for b in PRIORITY]
-        assert caps["specialties"] == {s: name_by_type[type(b)] for s, b in LlmBackends.LLM_BACKENDS.items()}
-        assert caps["models"] == {name: dict(b.models) for name, b in BACKENDS_BY_NAME.items()}
-        assert caps["binaries"] == {name: b.binary for name, b in BACKENDS_BY_NAME.items()}
-        assert caps["install_hints"] == {name: b.install_hint for name, b in BACKENDS_BY_NAME.items()}
+        core_providers = set(caps["providers"])
+        native_backends = {name: backend for name, backend in BACKENDS_BY_NAME.items() if name in core_providers}
+        specialty_aliases = {"claude-sdk": "claude"}
+        assert set(BACKENDS_BY_NAME) - core_providers == {"claude-sdk"}
+        assert caps["providers"] == list(native_backends)
+        assert caps["priority"] == [backend.provider for backend in PRIORITY if backend.provider in core_providers]
+        assert caps["specialties"] == {
+            specialty: specialty_aliases.get(backend.provider, backend.provider)
+            for specialty, backend in LlmBackends.LLM_BACKENDS.items()
+        }
+        assert caps["models"] == {name: dict(backend.models) for name, backend in native_backends.items()}
+        assert caps["binaries"] == {name: backend.binary for name, backend in native_backends.items()}
+        assert caps["install_hints"] == {name: backend.install_hint for name, backend in native_backends.items()}
         assert caps["auto_select_excludes"] == ["gemini"]
+        assert caps["api_key_vars"]["claude"] == ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]
 
 
 def completion(content: str) -> dict[str, object]:

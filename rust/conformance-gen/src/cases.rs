@@ -26,6 +26,7 @@ fn spec(prompt: &str, model: &str) -> RunSpec {
         isolated: true,
         timeout: 180,
         max_attempts: 5,
+        api_auth: false,
         schema: None,
         claude: None,
         codex: None,
@@ -133,6 +134,14 @@ fn endpoint_case(name: &str, schema: Option<Value>) -> Case {
 fn plan_cases() -> Vec<Case> {
     vec![
         plan_case("claude-default", "claude", spec("hi", "haiku")),
+        plan_case(
+            "claude-api-auth",
+            "claude",
+            RunSpec {
+                api_auth: true,
+                ..spec("hi", "haiku")
+            },
+        ),
         plan_case(
             "claude-isolated-false",
             "claude",
@@ -287,6 +296,14 @@ fn plan_cases() -> Vec<Case> {
         ),
         plan_case("codex-default", "codex", spec("hi", "gpt-5.5")),
         plan_case(
+            "codex-api-auth",
+            "codex",
+            RunSpec {
+                api_auth: true,
+                ..spec("hi", "gpt-5.5")
+            },
+        ),
+        plan_case(
             "codex-isolated-false",
             "codex",
             RunSpec {
@@ -373,6 +390,14 @@ fn plan_cases() -> Vec<Case> {
         ),
         plan_case("gemini-default", "gemini", spec("hi", "gemini-2.5-flash")),
         plan_case(
+            "gemini-api-auth",
+            "gemini",
+            RunSpec {
+                api_auth: true,
+                ..spec("hi", "gemini-2.5-flash")
+            },
+        ),
+        plan_case(
             "gemini-agent",
             "gemini",
             RunSpec {
@@ -413,6 +438,14 @@ fn plan_cases() -> Vec<Case> {
             "antigravity-default",
             "antigravity",
             spec("hi", "gemini-3.5"),
+        ),
+        plan_case(
+            "antigravity-api-auth",
+            "antigravity",
+            RunSpec {
+                api_auth: true,
+                ..spec("hi", "gemini-3.5")
+            },
         ),
         plan_case(
             "antigravity-agent",

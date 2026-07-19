@@ -5,6 +5,9 @@
     "agent": {
       "type": "boolean"
     },
+    "api_auth": {
+      "type": "boolean"
+    },
     "claude": {
       "type": [
         "object",

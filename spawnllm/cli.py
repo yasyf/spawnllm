@@ -39,11 +39,14 @@ def backends() -> None:
 @click.option("--backend", type=click.Choice(list(BACKEND_NAMES)), required=True)
 @click.option("--model", type=click.Choice(["small", "medium", "large"]), default="small")
 @click.option("--agent", is_flag=True, help="Allow tools / agent capabilities.")
+@click.option("--api-auth", is_flag=True, help="Inherit provider API-key environment variables.")
 @click.argument("prompt", required=False)
-def call(backend: str, model: str, agent: bool, prompt: str | None) -> None:
+def call(backend: str, model: str, agent: bool, api_auth: bool, prompt: str | None) -> None:
     """Make a one-off LLM call (reads PROMPT or stdin) and print the response."""
     text = prompt if prompt is not None else sys.stdin.read()
-    result = call_sync(text, backend=BACKENDS_BY_NAME[backend], model=cast(TModel, model), agent=agent)
+    result = call_sync(
+        text, backend=BACKENDS_BY_NAME[backend], model=cast(TModel, model), agent=agent, api_auth=api_auth
+    )
     click.echo(result)
 
 

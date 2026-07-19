@@ -108,6 +108,7 @@ pub struct RunSpec {
     pub model: String,
     pub schema: Option<Value>,
     pub agent: bool,
+    pub api_auth: bool,
     pub isolated: bool,
     pub cwd: Option<PathBuf>,
     pub env: Option<HashMap<String, String>>,
@@ -125,6 +126,7 @@ impl RunSpec {
             model: model.into(),
             schema: None,
             agent: false,
+            api_auth: false,
             isolated: true,
             cwd: None,
             env: None,
@@ -146,6 +148,11 @@ impl RunSpec {
 
     pub fn agent(mut self, agent: bool) -> Self {
         self.agent = agent;
+        self
+    }
+
+    pub fn api_auth(mut self, api_auth: bool) -> Self {
+        self.api_auth = api_auth;
         self
     }
 
@@ -212,6 +219,7 @@ pub struct CallOpts {
     pub specialty: Option<Specialty>,
     pub model: ModelTier,
     pub agent: bool,
+    pub api_auth: bool,
     pub cwd: Option<PathBuf>,
     pub timeout: Option<Duration>,
 }
@@ -249,7 +257,9 @@ pub struct DiscardedAttempt {
 
 impl RunSpec {
     pub(crate) fn call_spec(prompt: impl Into<String>, model: String, opts: &CallOpts) -> Self {
-        let mut spec = RunSpec::new(prompt, model).agent(opts.agent);
+        let mut spec = RunSpec::new(prompt, model)
+            .agent(opts.agent)
+            .api_auth(opts.api_auth);
         if let Some(cwd) = &opts.cwd {
             spec = spec.cwd(cwd.clone());
         }

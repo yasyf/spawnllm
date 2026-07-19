@@ -16,6 +16,10 @@
       "hi"
     ],
     "env": {},
+    "env_unset": [
+      "GEMINI_API_KEY",
+      "GOOGLE_API_KEY"
+    ],
     "files": [],
     "kind": "exec",
     "needs_claude_isolation": false,
@@ -30,6 +34,7 @@
     "provider": "gemini",
     "spec": {
       "agent": false,
+      "api_auth": false,
       "claude": null,
       "codex": null,
       "gemini": {

@@ -37,6 +37,10 @@
     "env": {
       "CLAUDE_CONFIG_DIR": "${isolated_config_dir}"
     },
+    "env_unset": [
+      "ANTHROPIC_API_KEY",
+      "ANTHROPIC_AUTH_TOKEN"
+    ],
     "files": [
       {
         "content": null,
@@ -57,6 +61,7 @@
     "provider": "claude",
     "spec": {
       "agent": true,
+      "api_auth": false,
       "claude": {
         "append_system_prompt": "extra",
         "disable_slash_commands": true,

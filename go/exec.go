@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -66,7 +67,7 @@ func runExecPlan(ctx context.Context, plan execPlan, spec RunSpec) (output strin
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 	cmd.WaitDelay = 2 * time.Second
 	cmd.Dir = spec.Dir
-	cmd.Env = mergeEnv(env, spec.Env)
+	cmd.Env = mergeEnv(env, spec.Env, plan.EnvUnset)
 	cmd.Stdin = strings.NewReader(plan.Stdin)
 
 	var stderrBuf, stdoutBuf bytes.Buffer
@@ -151,17 +152,31 @@ func substituteFiles(argv []string, paths map[string]string) []string {
 	return out
 }
 
-func mergeEnv(planEnv, specEnv map[string]string) []string {
+func mergeEnv(planEnv, specEnv map[string]string, envUnset []string) []string {
+	return mergeEnvForOS(planEnv, specEnv, envUnset, runtime.GOOS)
+}
+
+func mergeEnvForOS(planEnv, specEnv map[string]string, envUnset []string, goos string) []string {
+	unset := make(map[string]struct{}, len(envUnset))
+	for _, key := range envUnset {
+		unset[key] = struct{}{}
+	}
 	merged := map[string]string{}
 	for _, kv := range os.Environ() {
 		if i := strings.IndexByte(kv, '='); i >= 0 {
-			merged[kv[:i]] = kv[i+1:]
+			key := kv[:i]
+			if envKeyIn(key, envUnset, unset, goos) {
+				continue
+			}
+			merged[key] = kv[i+1:]
 		}
 	}
 	for k, v := range planEnv {
+		deleteEqualFoldedEnvKey(merged, k, goos)
 		merged[k] = v
 	}
 	for k, v := range specEnv {
+		deleteEqualFoldedEnvKey(merged, k, goos)
 		merged[k] = v
 	}
 	out := make([]string, 0, len(merged))
@@ -169,6 +184,37 @@ func mergeEnv(planEnv, specEnv map[string]string) []string {
 		out = append(out, k+"="+v)
 	}
 	return out
+}
+
+func envKeyIn(key string, envUnset []string, unset map[string]struct{}, goos string) bool {
+	if goos != "windows" {
+		_, ok := unset[key]
+		return ok
+	}
+	for _, candidate := range envUnset {
+		if envKeyEquals(key, candidate, goos) {
+			return true
+		}
+	}
+	return false
+}
+
+func deleteEqualFoldedEnvKey(env map[string]string, key, goos string) {
+	if goos != "windows" {
+		return
+	}
+	for candidate := range env {
+		if envKeyEquals(candidate, key, goos) {
+			delete(env, candidate)
+		}
+	}
+}
+
+func envKeyEquals(a, b, goos string) bool {
+	if goos == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
 }
 
 func readFileString(path string) (string, error) {
