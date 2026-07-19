@@ -499,6 +499,22 @@ fn resolve_cases() -> Vec<Case> {
             false,
         ),
         resolve_case(
+            "claude-exit-envelope",
+            "claude",
+            r#"{"type": "result", "is_error": true, "result": "Failed to authenticate: OAuth session expired and could not be refreshed", "total_cost_usd": 0, "usage": {"input_tokens": 0, "output_tokens": 0}}"#,
+            1,
+            "",
+            false,
+        ),
+        resolve_case(
+            "claude-exit-raw-tail",
+            "claude",
+            "panic: mid-stream crash tail",
+            1,
+            "",
+            false,
+        ),
+        resolve_case(
             "claude-float-cost",
             "claude",
             r#"{"type": "result", "is_error": false, "result": "hi", "total_cost_usd": 0.0123, "usage": {"input_tokens": 12, "output_tokens": 7}}"#,
@@ -530,6 +546,14 @@ fn resolve_cases() -> Vec<Case> {
             "",
             42,
             "codex exec failed",
+            false,
+        ),
+        resolve_case(
+            "codex-exit-raw-tail",
+            "codex",
+            "stream tail before the crash",
+            1,
+            "",
             false,
         ),
         resolve_case(

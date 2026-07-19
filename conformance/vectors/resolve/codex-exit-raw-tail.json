@@ -1,0 +1,19 @@
+{
+  "expected": {
+    "cost_usd": null,
+    "kind": "exit",
+    "msg": "codex exited 1: stream tail before the crash",
+    "status": "error",
+    "transient": false,
+    "usage": null
+  },
+  "input": {
+    "provider": "codex",
+    "raw": "stream tail before the crash",
+    "returncode": 1,
+    "stderr": "",
+    "wants_value": false
+  },
+  "name": "codex-exit-raw-tail",
+  "op": "resolve"
+}

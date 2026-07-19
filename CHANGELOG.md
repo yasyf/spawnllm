@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-07-19
+
+### Fixed
+- A nonzero-exit `claude` run now surfaces the CLI's own failure reason: the
+  core's `resolve` op reads the error envelope claude writes to *stdout* on
+  failure ("Failed to authenticate: OAuth session expired and could not be
+  refreshed", "You've hit your session limit · resets 9pm") instead of the
+  usually-empty stderr, which rendered every such failure as a blank
+  `claude exited 1: `. Envelope cost/usage accounting on the exit path is
+  unchanged. When no error envelope is present the stderr tail is used as
+  before, now falling back to the raw stdout tail when stderr is empty (all
+  providers).
+
 ## [0.9.0] - 2026-07-19
 
 ### Changed

@@ -123,22 +123,25 @@ fn claude_accounting(
     (cost_usd, usage)
 }
 
+fn claude_error_reason(event: Option<&Map<String, Value>>) -> Option<String> {
+    let event = event?;
+    if event.get("is_error").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    Some(
+        event
+            .get("result")
+            .and_then(Value::as_str)
+            .unwrap_or("claude reported an error")
+            .to_owned(),
+    )
+}
+
 fn resolve_claude(raw: &str, wants_value: bool) -> Resolved {
     let event = claude_result_event(raw);
     let (cost_usd, usage) = claude_accounting(event.as_ref());
 
-    if event
-        .as_ref()
-        .and_then(|event| event.get("is_error"))
-        .and_then(Value::as_bool)
-        == Some(true)
-    {
-        let msg = event
-            .as_ref()
-            .and_then(|event| event.get("result"))
-            .and_then(Value::as_str)
-            .unwrap_or("claude reported an error")
-            .to_owned();
+    if let Some(msg) = claude_error_reason(event.as_ref()) {
         return error(ResolveErrorKind::Envelope, msg, cost_usd, usage);
     }
 
@@ -256,17 +259,22 @@ fn resolve_openai(raw: &str, wants_value: bool) -> Resolved {
 
 fn resolve(input: ResolveInput) -> Resolved {
     if input.returncode != 0 {
-        let (cost_usd, usage) = if matches!(input.provider, Provider::Claude) {
+        let (reason, cost_usd, usage) = if matches!(input.provider, Provider::Claude) {
             let event = claude_result_event(&input.raw);
-            claude_accounting(event.as_ref())
+            let (cost_usd, usage) = claude_accounting(event.as_ref());
+            (claude_error_reason(event.as_ref()), cost_usd, usage)
         } else {
-            (None, None)
+            (None, None, None)
         };
+        let reason = reason.unwrap_or_else(|| match tail_2000(&input.stderr) {
+            stderr if stderr.is_empty() => tail_2000(&input.raw),
+            stderr => stderr,
+        });
         let msg = format!(
             "{} exited {}: {}",
             input.provider.as_str(),
             input.returncode,
-            tail_2000(&input.stderr)
+            reason
         );
         return error(ResolveErrorKind::Exit, msg, cost_usd, usage);
     }
