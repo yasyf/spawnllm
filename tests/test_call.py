@@ -173,6 +173,19 @@ def test_call_sync_maps_tier_to_literal_model(monkeypatch: pytest.MonkeyPatch) -
     assert captured["argv"][captured["argv"].index("--model") + 1] == "opus"
 
 
+def test_call_sync_passes_concrete_model_through_verbatim(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, list[str]] = {}
+
+    def fake_capture_cli(argv: list[str], **_: object) -> RunResult:
+        captured["argv"] = argv
+        return RunResult("ok", "", 0)
+
+    monkeypatch.setattr(base, "capture_cli", fake_capture_cli)
+
+    assert call_sync("hi", backend=ClaudeCliBackend(), model="claude-fable-5") == "ok"
+    assert captured["argv"][captured["argv"].index("--model") + 1] == "claude-fable-5"
+
+
 def test_failed_codex_surfaces_stderr_not_eof_on_call(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(base, "capture_cli", lambda argv, **_: RunResult("", "codex: not found", 127))
 

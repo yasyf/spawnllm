@@ -43,7 +43,8 @@ async def extract[T: BaseModel](
             ready backend via the priority chain, optionally scoped by `specialty`.
         specialty: Specialty used to scope auto-selection when `backend` is
             `None`; ignored when `backend` is given.
-        model: Abstract model tier (`small`/`medium`/`large`).
+        model: Abstract model tier (`small`/`medium`/`large`), or a concrete
+            provider model id passed through unchanged.
         agent: Whether the call may use tools / agent capabilities.
         cwd: Working directory for the backend process; `None` inherits the caller's.
         api_auth: Whether to inherit provider API-key environment variables.
@@ -59,7 +60,7 @@ async def extract[T: BaseModel](
     backend = backend or select_backend(specialty=specialty)
     spec = RunSpec(
         prompt=prompt,
-        model=backend.models[model],
+        model=backend.resolve_model(model),
         response_model=response_model,
         agent=agent,
         cwd=cwd,
@@ -98,7 +99,8 @@ def extract_sync[T: BaseModel](
             ready backend via the priority chain, optionally scoped by `specialty`.
         specialty: Specialty used to scope auto-selection when `backend` is
             `None`; ignored when `backend` is given.
-        model: Abstract model tier (`small`/`medium`/`large`).
+        model: Abstract model tier (`small`/`medium`/`large`), or a concrete
+            provider model id passed through unchanged.
         agent: Whether the call may use tools / agent capabilities.
         cwd: Working directory for the backend process; `None` inherits the caller's.
         api_auth: Whether to inherit provider API-key environment variables.
@@ -114,7 +116,7 @@ def extract_sync[T: BaseModel](
     backend = backend or select_backend(specialty=specialty)
     spec = RunSpec(
         prompt=prompt,
-        model=backend.models[model],
+        model=backend.resolve_model(model),
         response_model=response_model,
         agent=agent,
         cwd=cwd,

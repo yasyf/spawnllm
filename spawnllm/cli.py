@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from typing import cast
 
 import click
 from loguru import logger
@@ -16,7 +15,6 @@ from spawnllm.backends import (
 )
 from spawnllm.backends.registry import BACKENDS_BY_NAME, PRIORITY, select_backend
 from spawnllm.call import call_sync
-from spawnllm.types import TModel
 
 BACKEND_NAMES = tuple(BACKENDS_BY_NAME)
 
@@ -37,16 +35,18 @@ def backends() -> None:
 
 @main.command()
 @click.option("--backend", type=click.Choice(list(BACKEND_NAMES)), required=True)
-@click.option("--model", type=click.Choice(["small", "medium", "large"]), default="small")
+@click.option(
+    "--model",
+    default="small",
+    help="Abstract tier (small/medium/large) or a concrete provider model id, e.g. claude-fable-5.",
+)
 @click.option("--agent", is_flag=True, help="Allow tools / agent capabilities.")
 @click.option("--api-auth", is_flag=True, help="Inherit provider API-key environment variables.")
 @click.argument("prompt", required=False)
 def call(backend: str, model: str, agent: bool, api_auth: bool, prompt: str | None) -> None:
     """Make a one-off LLM call (reads PROMPT or stdin) and print the response."""
     text = prompt if prompt is not None else sys.stdin.read()
-    result = call_sync(
-        text, backend=BACKENDS_BY_NAME[backend], model=cast(TModel, model), agent=agent, api_auth=api_auth
-    )
+    result = call_sync(text, backend=BACKENDS_BY_NAME[backend], model=model, agent=agent, api_auth=api_auth)
     click.echo(result)
 
 

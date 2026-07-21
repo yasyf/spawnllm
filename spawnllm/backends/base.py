@@ -222,6 +222,21 @@ class LlmBackend(ABC):
             backend is not available, else `BackendNotAuthenticated`.
         """
 
+    def resolve_model(self, model: str) -> str:
+        """Resolve an abstract tier to this backend's provider model id, passing a concrete id through unchanged.
+
+        A tier (`small`/`medium`/`large`) maps through `models`; any other string
+        — a literal provider model id such as `claude-fable-5` — returns unchanged,
+        so a caller can pin an exact model anywhere a tier is accepted.
+
+        Args:
+            model: An abstract tier or a concrete provider model id.
+
+        Returns:
+            The provider model id to run.
+        """
+        return next((name for tier, name in self.models.items() if tier == model), model)
+
     def schema_for(self, model: type[BaseModel]) -> str:
         """Serialize a Pydantic model into the JSON-schema string this backend expects.
 

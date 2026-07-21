@@ -20,7 +20,7 @@ async def call(
     *,
     backend: LlmBackend | None = None,
     specialty: TSpecialty | None = None,
-    model: TModel = "small",
+    model: TModel | str = "small",
     agent: bool = False,
     cwd: str | None = None,
     api_auth: bool = False,
@@ -38,7 +38,8 @@ async def call(
             ready backend via the priority chain, optionally scoped by `specialty`.
         specialty: Specialty used to scope auto-selection when `backend` is
             `None`; ignored when `backend` is given.
-        model: Abstract model tier (`small`/`medium`/`large`).
+        model: Abstract model tier (`small`/`medium`/`large`), or a concrete
+            provider model id passed through unchanged.
         agent: Whether the call may use tools / agent capabilities.
         cwd: Working directory for the backend process; `None` inherits the caller's.
         api_auth: Whether to inherit provider API-key environment variables.
@@ -54,7 +55,7 @@ async def call(
     resp = await run(
         RunSpec(
             prompt=prompt,
-            model=backend.models[model],
+            model=backend.resolve_model(model),
             agent=agent,
             cwd=cwd,
             api_auth=api_auth,
@@ -72,7 +73,7 @@ def call_sync(
     *,
     backend: LlmBackend | None = None,
     specialty: TSpecialty | None = None,
-    model: TModel = "small",
+    model: TModel | str = "small",
     agent: bool = False,
     cwd: str | None = None,
     api_auth: bool = False,
@@ -90,7 +91,8 @@ def call_sync(
             ready backend via the priority chain, optionally scoped by `specialty`.
         specialty: Specialty used to scope auto-selection when `backend` is
             `None`; ignored when `backend` is given.
-        model: Abstract model tier (`small`/`medium`/`large`).
+        model: Abstract model tier (`small`/`medium`/`large`), or a concrete
+            provider model id passed through unchanged.
         agent: Whether the call may use tools / agent capabilities.
         cwd: Working directory for the backend process; `None` inherits the caller's.
         api_auth: Whether to inherit provider API-key environment variables.
@@ -106,7 +108,7 @@ def call_sync(
     resp = run_sync(
         RunSpec(
             prompt=prompt,
-            model=backend.models[model],
+            model=backend.resolve_model(model),
             agent=agent,
             cwd=cwd,
             api_auth=api_auth,
