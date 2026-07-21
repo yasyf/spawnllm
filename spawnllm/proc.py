@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import subprocess
-from collections.abc import Awaitable, Callable, Sequence
+import tempfile
+from collections.abc import Awaitable, Callable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -171,6 +173,28 @@ async def _reap(proc: asyncio.subprocess.Process, *, grace: float = 2.0) -> None
         await proc.wait()
 
 
+@contextlib.contextmanager
+def _stdin_file(payload: str | None) -> Iterator[int | None]:
+    """Yield a read-only fd holding `payload`, or `None` to inherit the parent's stdin.
+
+    The payload lands in a temp file the child reads as a regular fd, so its stdin
+    is complete the instant it execs. A pipe would leave the parent to write and
+    drain it after the spawn — a step a saturated event loop can delay past a CLI's
+    stdin-arrival deadline (`claude --print` aborts after 3s of empty stdin).
+    """
+    if payload is None:
+        yield None
+        return
+    fd, path = tempfile.mkstemp(prefix="spawnllm-stdin-")
+    os.close(fd)
+    try:
+        Path(path).write_bytes(payload.encode())
+        with open(path, "rb") as handle:
+            yield handle.fileno()
+    finally:
+        os.unlink(path)
+
+
 async def arun_cli(
     argv: list[str],
     *,
@@ -194,20 +218,16 @@ async def arun_cli(
     Raises:
         subprocess.CalledProcessError: On a nonzero exit code.
     """
-    proc = await asyncio.create_subprocess_exec(
-        *argv,
-        stdin=asyncio.subprocess.PIPE if input is not None else None,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=env,
-        cwd=cwd,
-    )
-    if input is not None:
-        assert proc.stdin is not None, "create_subprocess_exec was called with stdin=PIPE"
-        proc.stdin.write(input.encode())
-        await proc.stdin.drain()
-        proc.stdin.close()
-    stdout, stderr, rc = await collect_process(proc, stderr_tee=stderr_tee)
+    with _stdin_file(input) as stdin_fd:
+        proc = await asyncio.create_subprocess_exec(
+            *argv,
+            stdin=stdin_fd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+            cwd=cwd,
+        )
+        stdout, stderr, rc = await collect_process(proc, stderr_tee=stderr_tee)
     if rc != 0:
         raise subprocess.CalledProcessError(rc, argv, output=stdout, stderr=stderr)
     return stdout
@@ -245,21 +265,19 @@ async def acapture_cli(
     Raises:
         TimeoutError: When the process outlives `timeout`.
     """
-    with open(stdout_path, "wb") if stdout_path is not None else contextlib.nullcontext() as stdout_file:
+    with (
+        open(stdout_path, "wb") if stdout_path is not None else contextlib.nullcontext() as stdout_file,
+        _stdin_file(input) as stdin_fd,
+    ):
         proc = await asyncio.create_subprocess_exec(
             *argv,
-            stdin=asyncio.subprocess.PIPE if input is not None else None,
+            stdin=stdin_fd,
             stdout=stdout_file if stdout_file is not None else asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
             cwd=cwd,
         )
         try:
-            if input is not None:
-                assert proc.stdin is not None, "create_subprocess_exec was called with stdin=PIPE"
-                proc.stdin.write(input.encode())
-                await proc.stdin.drain()
-                proc.stdin.close()
             collect = collect_process(proc)
             stdout, stderr, rc = await (asyncio.wait_for(collect, timeout) if timeout is not None else collect)
         finally:

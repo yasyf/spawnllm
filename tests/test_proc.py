@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 import json
 import os
 import subprocess
 import sys
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -17,6 +19,7 @@ if TYPE_CHECKING:
     from spawnllm.backends.base import BackendStatus
 
 RUN_MODULE = importlib.import_module("spawnllm.run")
+PROC_MODULE = importlib.import_module("spawnllm.proc")
 
 SPEC = RunSpec(prompt="hi", model="haiku", max_attempts=3)
 TRANSIENT = Response(
@@ -181,6 +184,74 @@ class TestFileBackedStdout:
         resp = backend.execute(RunSpec(prompt="hi", model="haiku", isolated=False))
         assert resp.error is None
         assert resp.output.raw == payload
+
+
+class TestFileBackedStdin:
+    # The child tags its stdin by fd-0 kind, so a regression to a pipe (whose write the
+    # parent must schedule after the spawn) fails loudly on the REG: assertion.
+    KIND_ECHO = (
+        "import os, stat, sys; "
+        "sys.stdout.write(('REG:' if stat.S_ISREG(os.fstat(0).st_mode) else 'PIPE:') + sys.stdin.read())"
+    )
+
+    async def test_acapture_feeds_stdin_as_regular_file(self) -> None:
+        rr = await acapture_cli([sys.executable, "-c", self.KIND_ECHO], input="ping")
+        assert rr.returncode == 0
+        assert rr.stdout == "REG:ping"
+
+    async def test_arun_feeds_stdin_as_regular_file(self) -> None:
+        assert await arun_cli([sys.executable, "-c", self.KIND_ECHO], input="ping") == b"REG:ping"
+
+    async def test_acapture_large_stdin_survives_pipe_boundary(self) -> None:
+        payload = "s" * 100_000  # a single feed past the 64 KiB pipe-drain boundary
+        rr = await acapture_cli([sys.executable, "-c", self.KIND_ECHO], input=payload)
+        assert rr.stdout == "REG:" + payload
+
+
+class TestStdinSurvivesSaturatedLoop:
+    """The child aborts if stdin has no data within `deadline`s of exec, as `claude --print` does.
+
+    A file-backed stdin is complete at exec, so the child clears its deadline even when a
+    saturated event loop cannot run the parent's post-spawn steps for `BLOCK` seconds.
+    """
+
+    DEADLINE = 0.5
+    BLOCK = 1.0
+    FAKE_CLI = (
+        "import os, select, stat, sys\n"
+        "deadline = float(sys.argv[1])\n"
+        "kind = 'REG:' if stat.S_ISREG(os.fstat(0).st_mode) else 'PIPE:'\n"
+        "if not select.select([sys.stdin], [], [], deadline)[0]:\n"
+        "    sys.stderr.write('no stdin data received')\n"
+        "    sys.exit(1)\n"
+        "sys.stdout.write(kind + sys.stdin.read())\n"
+    )
+
+    def saturate_after_spawn(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        real_create = PROC_MODULE.asyncio.create_subprocess_exec
+
+        async def saturated_create(*args: object, **kwargs: object) -> asyncio.subprocess.Process:
+            proc = await real_create(*args, **kwargs)
+            time.sleep(self.BLOCK)  # the loop is jammed past the child's stdin deadline before the parent resumes
+            return proc
+
+        monkeypatch.setattr(PROC_MODULE.asyncio, "create_subprocess_exec", saturated_create)
+
+    async def test_acapture_stdin_survives_loop_block_after_spawn(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        cli = tmp_path / "deadline_cli.py"
+        cli.write_text(self.FAKE_CLI)
+        self.saturate_after_spawn(monkeypatch)
+        rr = await acapture_cli([sys.executable, str(cli), str(self.DEADLINE)], input="payload")
+        assert rr.returncode == 0
+        assert rr.stdout == "REG:payload"
+
+    async def test_arun_stdin_survives_loop_block_after_spawn(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+        cli = tmp_path / "deadline_cli.py"
+        cli.write_text(self.FAKE_CLI)
+        self.saturate_after_spawn(monkeypatch)
+        assert await arun_cli([sys.executable, str(cli), str(self.DEADLINE)], input="payload") == b"REG:payload"
 
 
 class TestCliBackendEnvironment:
