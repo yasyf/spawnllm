@@ -18,7 +18,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: yasyf/homebrew-tap/.github/actions/verify-tag-on-main@v1
+      - uses: yasyf/homebrew-tap/.github/actions/verify-tag-on-main@4afbb78f9e1814af04f9686ccf101ecafd5aa295
 
       - uses: actions/setup-go@v6
         with:
