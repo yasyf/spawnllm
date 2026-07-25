@@ -3,9 +3,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
-HOME_BREW_TAP_SHA = "4afbb78f9e1814af04f9686ccf101ecafd5aa295"
+HOME_BREW_TAP_SHA = "a4179241558456339fa2e41b97693a6cebae2e36"
 PYPI_PUBLISH_SHA = "ba38be9e461d3875417946c167d0b5f3d385a247"
-PYPI_BUILD_SHA = "8f422c652d836c40f9cc5a9d893d4120b26bc681"
+PYPI_BUILD_SHA = "7cc8a6c981cbec10fcb7f19bd75b36e9ee65ea7e"
 
 
 def workflow(name: str) -> str:
