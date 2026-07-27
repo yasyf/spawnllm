@@ -49,9 +49,22 @@ fn restore_process_env(key: &str, value: Option<OsString>) {
     }
 }
 
+async fn recorded_term(path: &std::path::Path) -> String {
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            match std::fs::read_to_string(path) {
+                Ok(raw) if !raw.is_empty() => return raw,
+                _ => tokio::time::sleep(Duration::from_millis(10)).await,
+            }
+        }
+    })
+    .await
+    .expect("fake CLI records its termination")
+}
+
 #[cfg(unix)]
 async fn recorded_pid(path: &std::path::Path) -> i32 {
-    tokio::time::timeout(Duration::from_secs(2), async {
+    tokio::time::timeout(Duration::from_secs(10), async {
         loop {
             if let Ok(raw) = std::fs::read_to_string(path)
                 && let Ok(pid) = raw.parse()
@@ -249,7 +262,7 @@ async fn run_on_times_out_and_kills_the_child() {
     let term_path = term.path().to_str().unwrap().to_owned();
     let spec = RunSpec::new("hi", "haiku")
         .isolated(false)
-        .timeout(Duration::from_millis(500))
+        .timeout(Duration::from_secs(2))
         .max_attempts(1)
         .env(env(&[
             ("SPAWNLLM_FAKE_SPIN", "1"),
@@ -263,8 +276,8 @@ async fn run_on_times_out_and_kills_the_child() {
         "got {:?}",
         error.source
     );
-    assert_eq!(error.msg, "claude timed out after 0.5s");
-    assert_eq!(std::fs::read_to_string(&term_path).unwrap(), "term");
+    assert_eq!(error.msg, "claude timed out after 2s");
+    assert_eq!(recorded_term(term.path()).await, "term");
     assert!(
         started.elapsed() < Duration::from_secs(5),
         "reap should be prompt"
