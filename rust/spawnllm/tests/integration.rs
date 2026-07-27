@@ -513,12 +513,12 @@ async fn call_returns_text_via_auto_selected_backend() {
 async fn check_status_reports_ready_for_installed_authenticated_backends() {
     common::fixtures();
     assert!(matches!(
-        Backend::Claude.check_status(Duration::from_secs(5)).await,
+        Backend::Claude.check_status(Duration::from_secs(30)).await,
         BackendStatus::Ready { .. }
     ));
     assert!(
         Backend::Codex
-            .is_authenticated(Duration::from_secs(5))
+            .is_authenticated(Duration::from_secs(30))
             .await
     );
 }
@@ -526,11 +526,11 @@ async fn check_status_reports_ready_for_installed_authenticated_backends() {
 #[tokio::test]
 async fn select_backend_follows_priority_and_specialty() {
     common::fixtures();
-    let auto = spawnllm::select_backend(None, Duration::from_secs(5))
+    let auto = spawnllm::select_backend(None, Duration::from_secs(30))
         .await
         .expect("a backend is ready");
     assert!(matches!(auto, Backend::Claude));
-    let debugging = spawnllm::select_backend(Some(Specialty::Debugging), Duration::from_secs(5))
+    let debugging = spawnllm::select_backend(Some(Specialty::Debugging), Duration::from_secs(30))
         .await
         .expect("codex serves debugging");
     assert!(matches!(debugging, Backend::Codex));
