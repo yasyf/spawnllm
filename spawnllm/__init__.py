@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from spawnllm.backends import (
     AntigravityCliBackend,
+    AppleBackend,
     BackendCallError,
     BackendNotAuthenticated,
     BackendNotInstalled,
@@ -32,11 +33,13 @@ from spawnllm.call import call, call_sync
 from spawnllm.extract import extract, extract_sync
 from spawnllm.response import DiscardedAttempt, Error, Output, Response, Result
 from spawnllm.run import run, run_sync
-from spawnllm.spec import ClaudeConfig, CodexConfig, GeminiConfig, RunSpec
+from spawnllm.spec import AppleConfig, ClaudeConfig, CodexConfig, GeminiConfig, RunSpec
 from spawnllm.types import ProviderName, TModel, TSpecialty
 
 __all__ = [
     "AntigravityCliBackend",
+    "AppleBackend",
+    "AppleConfig",
     "BackendCallError",
     "BackendNotAuthenticated",
     "BackendNotInstalled",

@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 from spawnllm import (
     AntigravityCliBackend,
+    AppleBackend,
     BackendNotAuthenticated,
     BackendNotInstalled,
     BackendReady,
@@ -34,7 +35,7 @@ def test_help_exits_cleanly() -> None:
 def test_backends_lists_available() -> None:
     result = CliRunner().invoke(main, ["backends"])
     assert result.exit_code == 0
-    assert result.output.splitlines() == ["claude-sdk", "claude", "codex", "antigravity", "gemini", "mlx"]
+    assert result.output.splitlines() == ["claude-sdk", "claude", "codex", "antigravity", "gemini", "apple", "mlx"]
 
 
 @pytest.mark.parametrize(
@@ -73,6 +74,7 @@ def test_status_reports_per_backend_and_selection(monkeypatch: pytest.MonkeyPatc
             CodexCliBackend: BackendNotInstalled(binary="codex", install_hint="npm install -g @openai/codex"),
             AntigravityCliBackend: BackendNotAuthenticated("agy"),
             GeminiCliBackend: BackendNotAuthenticated("gemini"),
+            AppleBackend: BackendReady("apple"),
         },
     )
     result = CliRunner().invoke(main, ["status"])
@@ -84,9 +86,36 @@ def test_status_reports_per_backend_and_selection(monkeypatch: pytest.MonkeyPatc
         "codex: not installed — install with: npm install -g @openai/codex",
         "agy: not authenticated",
         "gemini: not authenticated",
+        "apple: ready",
         "selected: claude-sdk",
     ]
     assert re.fullmatch(r"core: \d+\.\d+\.\d+@[0-9a-f]{12}", core_line)
+
+
+def test_status_selects_apple_when_it_is_the_only_ready_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_statuses(
+        monkeypatch,
+        {
+            ClaudeSdkBackend: BackendNotAuthenticated("claude-sdk"),
+            ClaudeCliBackend: BackendNotAuthenticated("claude"),
+            CodexCliBackend: BackendNotAuthenticated("codex"),
+            AntigravityCliBackend: BackendNotAuthenticated("agy"),
+            GeminiCliBackend: BackendNotAuthenticated("gemini"),
+            AppleBackend: BackendReady("apple"),
+        },
+    )
+    result = CliRunner().invoke(main, ["status"])
+    assert result.exit_code == 0
+    *lines, _ = result.output.splitlines()
+    assert lines == [
+        "claude-sdk: not authenticated",
+        "claude: not authenticated",
+        "codex: not authenticated",
+        "agy: not authenticated",
+        "gemini: not authenticated",
+        "apple: ready",
+        "selected: apple",
+    ]
 
 
 def test_status_reports_none_available(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -98,6 +127,7 @@ def test_status_reports_none_available(monkeypatch: pytest.MonkeyPatch) -> None:
             CodexCliBackend: BackendNotAuthenticated("codex"),
             AntigravityCliBackend: BackendNotAuthenticated("agy"),
             GeminiCliBackend: BackendNotAuthenticated("gemini"),
+            AppleBackend: BackendNotAuthenticated("apple"),
         },
     )
     result = CliRunner().invoke(main, ["status"])
@@ -109,6 +139,7 @@ def test_status_reports_none_available(monkeypatch: pytest.MonkeyPatch) -> None:
         "codex: not authenticated",
         "agy: not authenticated",
         "gemini: not authenticated",
+        "apple: not authenticated",
         "selected: none available",
     ]
     assert re.fullmatch(r"core: \d+\.\d+\.\d+@[0-9a-f]{12}", core_line)

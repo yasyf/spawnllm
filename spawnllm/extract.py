@@ -57,7 +57,7 @@ async def extract[T: BaseModel](
         BackendCallError: When the backend returns a provider error.
         pydantic.ValidationError: When the model's output fails validation.
     """
-    backend = backend or select_backend(specialty=specialty)
+    backend = backend or select_backend(specialty=specialty, model=model)
     spec = RunSpec(
         prompt=prompt,
         model=backend.resolve_model(model),
@@ -113,7 +113,7 @@ def extract_sync[T: BaseModel](
         BackendCallError: When the backend returns a provider error.
         pydantic.ValidationError: When the model's output fails validation.
     """
-    backend = backend or select_backend(specialty=specialty)
+    backend = backend or select_backend(specialty=specialty, model=model)
     spec = RunSpec(
         prompt=prompt,
         model=backend.resolve_model(model),

@@ -14,7 +14,7 @@ from spawnllm.backends import (
     BackendUnavailable,
 )
 from spawnllm.backends.registry import BACKENDS_BY_NAME, PRIORITY, select_backend
-from spawnllm.call import call_sync
+from spawnllm.call import DEFAULT_MODEL, call_sync
 
 BACKEND_NAMES = tuple(BACKENDS_BY_NAME)
 
@@ -37,7 +37,7 @@ def backends() -> None:
 @click.option("--backend", type=click.Choice(list(BACKEND_NAMES)), required=True)
 @click.option(
     "--model",
-    default="small",
+    default=DEFAULT_MODEL,
     help="Abstract tier (small/medium/large) or a concrete provider model id, e.g. claude-fable-5.",
 )
 @click.option("--agent", is_flag=True, help="Allow tools / agent capabilities.")
@@ -65,7 +65,7 @@ def status() -> None:
         except subprocess.TimeoutExpired:
             click.echo(f"{backend.binary}: timed out")
     try:
-        click.echo(f"selected: {select_backend().binary}")
+        click.echo(f"selected: {select_backend(model=DEFAULT_MODEL).binary}")
     except BackendUnavailable:
         click.echo("selected: none available")
     click.echo(f"core: {(v := _core.version())['core_version']}@{v['source_hash'][:12]}")

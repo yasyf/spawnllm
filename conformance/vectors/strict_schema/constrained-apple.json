@@ -1,0 +1,54 @@
+{
+  "name": "constrained-apple",
+  "op": "strict_schema",
+  "input": {
+    "dialect": "apple",
+    "schema": {
+      "properties": {
+        "label": {
+          "minLength": 2,
+          "title": "Label",
+          "type": "string"
+        },
+        "n": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "N",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "n",
+        "label"
+      ],
+      "title": "Constrained",
+      "type": "object"
+    }
+  },
+  "expected": {
+    "schema": {
+      "properties": {
+        "label": {
+          "minLength": 2,
+          "type": "string"
+        },
+        "n": {
+          "maximum": 10,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "n",
+        "label"
+      ],
+      "title": "Constrained",
+      "type": "object",
+      "additionalProperties": false,
+      "x-order": [
+        "label",
+        "n"
+      ]
+    }
+  }
+}

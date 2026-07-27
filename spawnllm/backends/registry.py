@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 from typing import TYPE_CHECKING, ClassVar
 
+from spawnllm.backends.apple import AppleBackend
 from spawnllm.backends.base import BackendReady, BackendUnavailable, LlmBackend
 from spawnllm.backends.claude import ClaudeCliBackend
 from spawnllm.backends.claude_sdk import ClaudeSdkBackend
@@ -12,7 +13,7 @@ from spawnllm.backends.codex import CodexCliBackend
 from spawnllm.backends.gemini import AntigravityCliBackend, GeminiCliBackend
 
 if TYPE_CHECKING:
-    from spawnllm.types import TSpecialty
+    from spawnllm.types import TModel, TSpecialty
 
 BACKENDS_BY_NAME: dict[str, LlmBackend] = {
     "claude-sdk": ClaudeSdkBackend(),
@@ -20,6 +21,7 @@ BACKENDS_BY_NAME: dict[str, LlmBackend] = {
     "codex": CodexCliBackend(),
     "antigravity": AntigravityCliBackend(),
     "gemini": GeminiCliBackend(),
+    "apple": AppleBackend(),
 }
 PRIORITY: tuple[LlmBackend, ...] = tuple(BACKENDS_BY_NAME.values())
 
@@ -53,18 +55,23 @@ class LlmBackends:
         return cls.LLM_BACKENDS[specialty]
 
 
-def select_backend(*, specialty: TSpecialty | None = None, timeout: int = 10) -> LlmBackend:
+def select_backend(
+    *, specialty: TSpecialty | None = None, model: TModel | str | None = None, timeout: int = 10
+) -> LlmBackend:
     """Return the first installed, authenticated backend in priority order.
 
     A `specialty`, when given, promotes its registered backend to the front of
     the chain; the chain otherwise follows `PRIORITY`, minus `GeminiCliBackend`
     (its Code Assist OAuth tier is retired, so it reports ready yet fails at call
-    time — reach it only via an explicit `backend=`). The first backend whose
-    `check_status` reports `BackendReady` wins, short-circuiting the rest;
-    backends that time out are skipped.
+    time — reach it only via an explicit `backend=`) and minus any backend whose
+    `auto_select_tiers` excludes `model`. The first backend whose `check_status`
+    reports `BackendReady` wins, short-circuiting the rest; backends that time
+    out are skipped.
 
     Args:
         specialty: Specialty whose backend is tried first, or `None`.
+        model: The abstract tier the run wants, gating tier-restricted backends;
+            a concrete provider model id or `None` excludes every one of them.
         timeout: Seconds to wait for each backend's authentication probe.
 
     Returns:
@@ -75,7 +82,13 @@ def select_backend(*, specialty: TSpecialty | None = None, timeout: int = 10) ->
     """
     preferred = [LlmBackends.LLM_BACKENDS[specialty]] if specialty else []
     seen = {type(b) for b in preferred}
-    auto = (b for b in PRIORITY if type(b) not in seen and not isinstance(b, GeminiCliBackend))
+    auto = (
+        b
+        for b in PRIORITY
+        if type(b) not in seen
+        and not isinstance(b, GeminiCliBackend)
+        and (b.auto_select_tiers is None or model in b.auto_select_tiers)
+    )
     for backend in (*preferred, *auto):
         try:
             if isinstance(backend.check_status(timeout=timeout), BackendReady):

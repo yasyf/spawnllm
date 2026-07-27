@@ -14,13 +14,16 @@ if TYPE_CHECKING:
 
 __all__ = ["call", "call_sync"]
 
+DEFAULT_MODEL: TModel = "small"
+"""Abstract tier `call`/`call_sync` resolve a backend against when the caller names none."""
+
 
 async def call(
     prompt: str,
     *,
     backend: LlmBackend | None = None,
     specialty: TSpecialty | None = None,
-    model: TModel | str = "small",
+    model: TModel | str = DEFAULT_MODEL,
     agent: bool = False,
     cwd: str | None = None,
     api_auth: bool = False,
@@ -51,7 +54,7 @@ async def call(
     Raises:
         BackendCallError: When the backend returns a provider error.
     """
-    backend = backend or select_backend(specialty=specialty)
+    backend = backend or select_backend(specialty=specialty, model=model)
     resp = await run(
         RunSpec(
             prompt=prompt,
@@ -73,7 +76,7 @@ def call_sync(
     *,
     backend: LlmBackend | None = None,
     specialty: TSpecialty | None = None,
-    model: TModel | str = "small",
+    model: TModel | str = DEFAULT_MODEL,
     agent: bool = False,
     cwd: str | None = None,
     api_auth: bool = False,
@@ -104,7 +107,7 @@ def call_sync(
     Raises:
         BackendCallError: When the backend returns a provider error.
     """
-    backend = backend or select_backend(specialty=specialty)
+    backend = backend or select_backend(specialty=specialty, model=model)
     resp = run_sync(
         RunSpec(
             prompt=prompt,

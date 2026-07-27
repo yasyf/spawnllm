@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-07-27
+
+### Added
+- `AppleBackend` (`apple`): an in-process backend over Apple's on-device
+  Foundation Models framework, via the optional `apple-fm-sdk` package
+  (`uv pip install 'spawnllm[apple]'`). No credential, no network, no model
+  download — generation runs against the model Apple Intelligence keeps
+  resident on the device, so it needs macOS 26+ on Apple Silicon with Apple
+  Intelligence enabled; the SDK is sdist-only and compiles a Swift dylib at
+  install time, and its build backend rejects the Command Line Tools, so
+  installing needs full Xcode 26+. Auto-selection tries it last, after every
+  CLI backend, and only for `model="small"` — `medium`, `large`, a concrete
+  provider model id, or no model never reach it automatically; an explicit
+  `backend=AppleBackend()` always does. Generation is Python-only, like MLX.
+- `AppleConfig`: the session and decoding knobs the Apple backend applies —
+  `use_case` (`"general"`/`"content_tagging"`), `guardrails`
+  (`"default"`/`"permissive_content_transformations"`), `instructions`,
+  `temperature`, `maximum_response_tokens`, and the flat sampling knobs
+  (`sampling` as `"greedy"`/`"random"` plus `sampling_top`,
+  `sampling_probability_threshold`, `sampling_seed`). Passed via
+  `RunSpec(provider_configs={"apple": AppleConfig(...)})`.
+- Structured output on the Apple backend dispatches through the core's new
+  `apple` strict-schema dialect, nested response models included. Apple's
+  schema importer rejects JSON Schema `pattern`, so the dialect strips it: a
+  `Field(pattern=...)` constraint is not enforced during generation and can
+  still fail `model_validate` afterward. Recursive/self-referential models
+  are unsupported by Apple.
+
 ## [0.10.0] - 2026-07-19
 
 ### Added
@@ -275,7 +303,12 @@ First release, published to PyPI as `spawnllm`.
   generation.
 - Click CLI: `spawnllm backends` and `spawnllm call`.
 
-[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/yasyf/spawnllm/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/yasyf/spawnllm/compare/v0.9.1...v0.10.0
+[0.9.1]: https://github.com/yasyf/spawnllm/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/yasyf/spawnllm/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/yasyf/spawnllm/compare/v0.6.2...v0.8.0
 [0.6.2]: https://github.com/yasyf/spawnllm/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/yasyf/spawnllm/compare/v0.6.0...v0.6.1
 [0.5.5]: https://github.com/yasyf/spawnllm/compare/v0.5.4...v0.5.5

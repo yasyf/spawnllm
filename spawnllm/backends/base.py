@@ -156,11 +156,15 @@ class LlmBackend(ABC):
         provider: Provider identifier keying a `RunSpec`'s `provider_configs`.
         schema_dialect: Strict-schema dialect the core applies to a `response_model`
             (`"anthropic"`, `"openai"`, or `None` to emit the plain JSON schema).
+        auto_select_tiers: Model tiers this backend may be auto-selected for; `None`
+            (the default) leaves it eligible for every tier, and an explicit
+            `backend=` reaches it regardless.
     """
 
     models: ClassVar[dict[TModel, str]]
     provider: ClassVar[ProviderName]
     schema_dialect: ClassVar[str | None] = None
+    auto_select_tiers: ClassVar[frozenset[TModel] | None] = None
 
     @abstractmethod
     async def aexecute(self, spec: RunSpec) -> Response:

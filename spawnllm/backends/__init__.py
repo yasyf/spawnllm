@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from spawnllm.backends.apple import AppleBackend
 from spawnllm.backends.base import (
     BackendCallError,
     BackendNotAuthenticated,
@@ -22,6 +23,7 @@ from spawnllm.backends.registry import LlmBackends, select_backend
 
 __all__ = [
     "AntigravityCliBackend",
+    "AppleBackend",
     "BackendCallError",
     "BackendNotAuthenticated",
     "BackendNotInstalled",

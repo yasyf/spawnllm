@@ -3,12 +3,51 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from spawnllm.types import ProviderName
+
+
+@dataclass(frozen=True, slots=True)
+class AppleConfig:
+    """Apple Foundation Models knobs applied only by the Apple backend.
+
+    `use_case` and `guardrails` name the `SystemLanguageModelUseCase` and
+    `SystemLanguageModelGuardrails` members the session is built with, upcased
+    from these literals. The sampling knobs are flat rather than a nested mode
+    because Apple exposes `SamplingMode` as a factory (`greedy()` / `random()`)
+    that no serializable value can carry: `sampling` picks the factory and
+    `sampling_top`, `sampling_probability_threshold`, and `sampling_seed` are the
+    arguments `random` takes. `None` everywhere leaves the framework default.
+
+    Example:
+        >>> AppleConfig(use_case="content_tagging", sampling="random", sampling_top=20)
+
+    Raises:
+        ValueError: When a `random`-only argument is set without `sampling="random"`,
+            a combination the framework would silently discard.
+    """
+
+    use_case: Literal["general", "content_tagging"] = "general"
+    guardrails: Literal["default", "permissive_content_transformations"] = "default"
+    instructions: str | None = None
+    temperature: float | None = None
+    maximum_response_tokens: int | None = None
+    sampling: Literal["greedy", "random"] | None = None
+    sampling_top: int | None = None
+    sampling_probability_threshold: float | None = None
+    sampling_seed: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.sampling != "random" and any(
+            knob is not None for knob in (self.sampling_top, self.sampling_probability_threshold, self.sampling_seed)
+        ):
+            raise ValueError(
+                "AppleConfig sampling_top, sampling_probability_threshold, and sampling_seed require sampling='random'"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,7 +119,7 @@ class GeminiConfig:
     extensions: tuple[str, ...] | None = None
 
 
-type ProviderConfig = ClaudeConfig | CodexConfig | GeminiConfig
+type ProviderConfig = AppleConfig | ClaudeConfig | CodexConfig | GeminiConfig
 
 
 @dataclass(frozen=True, slots=True)

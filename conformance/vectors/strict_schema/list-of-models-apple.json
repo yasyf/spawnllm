@@ -1,0 +1,88 @@
+{
+  "name": "list-of-models-apple",
+  "op": "strict_schema",
+  "input": {
+    "dialect": "apple",
+    "schema": {
+      "$defs": {
+        "Inner": {
+          "properties": {
+            "a": {
+              "title": "A",
+              "type": "integer"
+            },
+            "b": {
+              "default": "default",
+              "title": "B",
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "title": "Inner",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/Inner"
+          },
+          "title": "Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "rows"
+      ],
+      "title": "ListOfModels",
+      "type": "object"
+    }
+  },
+  "expected": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/Inner"
+          },
+          "title": "Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "rows"
+      ],
+      "title": "ListOfModels",
+      "$defs": {
+        "Inner": {
+          "properties": {
+            "a": {
+              "type": "integer"
+            },
+            "b": {
+              "default": "default",
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "title": "Inner",
+          "type": "object",
+          "additionalProperties": false,
+          "x-order": [
+            "a",
+            "b"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "x-order": [
+        "rows"
+      ]
+    }
+  }
+}

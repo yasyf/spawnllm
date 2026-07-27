@@ -61,7 +61,7 @@ mod tests {
             max_attempts: 5,
             api_auth: false,
             schema,
-            claude: None,
+                claude: None,
             codex: None,
             gemini: None,
             openai_endpoint: Some(OpenAiEndpoint {

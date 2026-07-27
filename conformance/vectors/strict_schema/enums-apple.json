@@ -1,0 +1,57 @@
+{
+  "name": "enums-apple",
+  "op": "strict_schema",
+  "input": {
+    "dialect": "apple",
+    "schema": {
+      "$defs": {
+        "Color": {
+          "enum": [
+            "red",
+            "blue"
+          ],
+          "title": "Color",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        }
+      },
+      "required": [
+        "color"
+      ],
+      "title": "Enums",
+      "type": "object"
+    }
+  },
+  "expected": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        }
+      },
+      "required": [
+        "color"
+      ],
+      "title": "Enums",
+      "$defs": {
+        "Color": {
+          "enum": [
+            "red",
+            "blue"
+          ],
+          "title": "Color",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "x-order": [
+        "color"
+      ]
+    }
+  }
+}

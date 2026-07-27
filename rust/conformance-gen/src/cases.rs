@@ -713,7 +713,7 @@ fn strict_schema_cases() -> Vec<Case> {
         .iter()
         .flat_map(|(case, src)| {
             let schema: Value = serde_json::from_str(src).unwrap();
-            ["anthropic", "openai"]
+            ["anthropic", "openai", "apple"]
                 .into_iter()
                 .map(move |dialect| Case {
                     op: "strict_schema",

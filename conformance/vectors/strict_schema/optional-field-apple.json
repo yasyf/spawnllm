@@ -1,0 +1,63 @@
+{
+  "name": "optional-field-apple",
+  "op": "strict_schema",
+  "input": {
+    "dialect": "apple",
+    "schema": {
+      "properties": {
+        "a": {
+          "title": "A",
+          "type": "integer"
+        },
+        "b": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "B"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "OptionalField",
+      "type": "object"
+    }
+  },
+  "expected": {
+    "schema": {
+      "properties": {
+        "a": {
+          "type": "integer"
+        },
+        "b": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "B"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "OptionalField",
+      "type": "object",
+      "additionalProperties": false,
+      "x-order": [
+        "a",
+        "b"
+      ]
+    }
+  }
+}

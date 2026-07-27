@@ -1,6 +1,6 @@
 # ![spawnllm](https://github.com/yasyf/spawnllm/raw/main/docs/assets/readme-banner.webp)
 
-**Delete your subprocess wrappers around claude, codex, and gemini.** spawnllm subshells all three CLIs — or drives Claude in-process through the bundled Agent SDK — plus local MLX, and returns one Pydantic-validated Response, so the per-model plumbing you hand-rolled goes away.
+**Delete your subprocess wrappers around claude, codex, and gemini.** spawnllm subshells all three CLIs — or drives Claude in-process through the bundled Agent SDK — plus local MLX and Apple's on-device Foundation Models, and returns one Pydantic-validated Response, so the per-model plumbing you hand-rolled goes away.
 
 [![CI](https://github.com/yasyf/spawnllm/actions/workflows/ci.yml/badge.svg)](https://github.com/yasyf/spawnllm/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/spawnllm)](https://pypi.org/project/spawnllm/)
@@ -38,7 +38,7 @@ from spawnllm import call_sync
 print(call_sync("Reply with just the word: pong"))
 ```
 
-Prints `pong`. With no `backend=`, spawnllm auto-selects the first installed, authenticated CLI, pipes the prompt over stdin, and retries transient 529/overloaded/rate-limit failures with capped backoff.
+Prints `pong`. With no `backend=`, spawnllm auto-selects the first installed, authenticated backend — a CLI backend gets the prompt over stdin — and retries transient 529/overloaded/rate-limit failures with capped backoff.
 
 ### Get a validated Pydantic object back, not a string to parse
 
@@ -93,6 +93,22 @@ uv add "spawnllm[mlx]"
 
 `AdapterFuser.ensure_fused` fuses your compressed adapter into the base model once and caches the result in the Hugging Face hub layout; `MlxEngine` loads it on a dedicated worker thread, precomputes a prompt cache for your shared prefix messages, and batches generation. Wrap the engine in an `MlxBackend` and the same `run_sync` call works.
 
+### Call Apple's on-device model with zero downloads
+
+Even local MLX starts with a multi-gigabyte model fetch. On a Mac with Apple Intelligence, the `apple` extra skips that too: `AppleBackend` generates in-process through Apple's Foundation Models framework, against the model already resident on the device. No credentials, no network, nothing to download:
+
+```bash
+uv pip install 'spawnllm[apple]'
+```
+
+```python
+from spawnllm import AppleBackend, call_sync
+
+print(call_sync("Reply with just the word: pong", backend=AppleBackend()))
+```
+
+Auto-selection tries this backend last, after every CLI backend, and only for `model="small"`; an explicit `backend=AppleBackend()` always reaches it. Session and decoding knobs (`use_case`, `guardrails`, `instructions`, `temperature`, sampling) ride in via `RunSpec(provider_configs={"apple": AppleConfig(...)})`. Structured `extract_sync` works too, nested models included, with two Apple-imposed limits: the schema dialect strips JSON Schema `pattern` because Apple's importer rejects it, so a `Field(pattern=...)` constraint goes unenforced during generation and only fails `model_validate` afterward; and recursive models are unsupported. Requires macOS 26+ on Apple Silicon with Apple Intelligence enabled. Installing needs full Xcode 26+: `apple-fm-sdk` ships as an sdist that compiles a Swift dylib, and its build backend rejects the Command Line Tools.
+
 ### Call the same backends from Go or Rust
 
 All three languages run the identical engine: argv planning, output parsing, schema strictification, and retry policy live once in a Rust core — linked natively by the Rust crate, embedded as WASM by the Go module and the Python package — pinned by a shared golden-vector suite and released in lockstep.
@@ -102,7 +118,7 @@ go get github.com/yasyf/spawnllm/go   # pure Go, no cgo — the core embeds as W
 cargo add spawnllm                    # async-first, with a blocking mirror
 ```
 
-Both expose `Call`/`call` and typed `Extract`/`extract` against your existing CLI logins — see the [Go README](https://github.com/yasyf/spawnllm/tree/main/go) and the [Rust README](https://github.com/yasyf/spawnllm/tree/main/rust/spawnllm). MLX stays Python-only.
+Both expose `Call`/`call` and typed `Extract`/`extract` against your existing CLI logins — see the [Go README](https://github.com/yasyf/spawnllm/tree/main/go) and the [Rust README](https://github.com/yasyf/spawnllm/tree/main/rust/spawnllm). MLX and the Apple backend stay Python-only.
 
 ## More in the docs
 

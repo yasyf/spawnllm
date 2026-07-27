@@ -1,0 +1,53 @@
+{
+  "name": "union-apple",
+  "op": "strict_schema",
+  "input": {
+    "dialect": "apple",
+    "schema": {
+      "properties": {
+        "val": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Val"
+        }
+      },
+      "required": [
+        "val"
+      ],
+      "title": "Union",
+      "type": "object"
+    }
+  },
+  "expected": {
+    "schema": {
+      "properties": {
+        "val": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Val"
+        }
+      },
+      "required": [
+        "val"
+      ],
+      "title": "Union",
+      "type": "object",
+      "additionalProperties": false,
+      "x-order": [
+        "val"
+      ]
+    }
+  }
+}

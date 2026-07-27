@@ -1,0 +1,55 @@
+{
+  "name": "defaults-apple",
+  "op": "strict_schema",
+  "input": {
+    "dialect": "apple",
+    "schema": {
+      "properties": {
+        "a": {
+          "default": 1,
+          "title": "A",
+          "type": "integer"
+        },
+        "b": {
+          "default": "hi",
+          "title": "B",
+          "type": "string"
+        },
+        "c": {
+          "default": false,
+          "title": "C",
+          "type": "boolean"
+        }
+      },
+      "title": "Defaults",
+      "type": "object"
+    }
+  },
+  "expected": {
+    "schema": {
+      "properties": {
+        "a": {
+          "default": 1,
+          "type": "integer"
+        },
+        "b": {
+          "default": "hi",
+          "type": "string"
+        },
+        "c": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "title": "Defaults",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "x-order": [
+        "a",
+        "b",
+        "c"
+      ]
+    }
+  }
+}

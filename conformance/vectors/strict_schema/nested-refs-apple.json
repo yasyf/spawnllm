@@ -1,0 +1,157 @@
+{
+  "name": "nested-refs-apple",
+  "op": "strict_schema",
+  "input": {
+    "dialect": "apple",
+    "schema": {
+      "$defs": {
+        "Color": {
+          "enum": [
+            "red",
+            "blue"
+          ],
+          "title": "Color",
+          "type": "string"
+        },
+        "Inner": {
+          "properties": {
+            "a": {
+              "title": "A",
+              "type": "integer"
+            },
+            "b": {
+              "default": "default",
+              "title": "B",
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "title": "Inner",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "inner": {
+          "$ref": "#/$defs/Inner"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "opt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Opt"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "inner",
+        "tags",
+        "color"
+      ],
+      "title": "NestedRefs",
+      "type": "object"
+    }
+  },
+  "expected": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "inner": {
+          "$ref": "#/$defs/Inner"
+        },
+        "name": {
+          "type": "string"
+        },
+        "opt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Opt"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "inner",
+        "tags",
+        "color"
+      ],
+      "title": "NestedRefs",
+      "$defs": {
+        "Color": {
+          "enum": [
+            "red",
+            "blue"
+          ],
+          "title": "Color",
+          "type": "string"
+        },
+        "Inner": {
+          "properties": {
+            "a": {
+              "type": "integer"
+            },
+            "b": {
+              "default": "default",
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "title": "Inner",
+          "type": "object",
+          "additionalProperties": false,
+          "x-order": [
+            "a",
+            "b"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "x-order": [
+        "color",
+        "inner",
+        "name",
+        "opt",
+        "tags"
+      ]
+    }
+  }
+}

@@ -399,7 +399,7 @@ class TestRegistry:
         core_providers = set(caps["providers"])
         native_backends = {name: backend for name, backend in BACKENDS_BY_NAME.items() if name in core_providers}
         specialty_aliases = {"claude-sdk": "claude"}
-        assert set(BACKENDS_BY_NAME) - core_providers == {"claude-sdk"}
+        assert set(BACKENDS_BY_NAME) - core_providers == {"claude-sdk", "apple"}
         assert caps["providers"] == list(native_backends)
         assert caps["priority"] == [backend.provider for backend in PRIORITY if backend.provider in core_providers]
         assert caps["specialties"] == {
