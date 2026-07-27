@@ -1,15 +1,6 @@
 {
-  "expected": {
-    "cost_usd": 0.0,
-    "kind": "exit",
-    "msg": "claude exited 1: Failed to authenticate: OAuth session expired and could not be refreshed",
-    "status": "error",
-    "transient": false,
-    "usage": {
-      "input_tokens": 0,
-      "output_tokens": 0
-    }
-  },
+  "name": "claude-exit-envelope",
+  "op": "resolve",
   "input": {
     "provider": "claude",
     "raw": "{\"type\": \"result\", \"is_error\": true, \"result\": \"Failed to authenticate: OAuth session expired and could not be refreshed\", \"total_cost_usd\": 0, \"usage\": {\"input_tokens\": 0, \"output_tokens\": 0}}",
@@ -17,6 +8,15 @@
     "stderr": "",
     "wants_value": false
   },
-  "name": "claude-exit-envelope",
-  "op": "resolve"
+  "expected": {
+    "status": "error",
+    "kind": "exit",
+    "msg": "claude exited 1: Failed to authenticate: OAuth session expired and could not be refreshed",
+    "transient": false,
+    "cost_usd": 0.0,
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  }
 }

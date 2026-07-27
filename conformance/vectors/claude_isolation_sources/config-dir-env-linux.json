@@ -1,16 +1,16 @@
 {
+  "name": "config-dir-env-linux",
+  "op": "claude_isolation_sources",
+  "input": {
+    "host": {
+      "platform": "linux",
+      "home": "/home/testuser",
+      "claude_config_dir_env": "/home/testuser/.acct"
+    }
+  },
   "expected": {
     "account_path": "/home/testuser/.acct/.claude.json",
     "credentials_path": "/home/testuser/.acct/.credentials.json",
     "keychain_service": null
-  },
-  "input": {
-    "host": {
-      "claude_config_dir_env": "/home/testuser/.acct",
-      "home": "/home/testuser",
-      "platform": "linux"
-    }
-  },
-  "name": "config-dir-env-linux",
-  "op": "claude_isolation_sources"
+  }
 }

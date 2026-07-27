@@ -1,48 +1,17 @@
 {
-  "expected": {
-    "argv": [
-      "claude",
-      "-p",
-      "--no-session-persistence",
-      "--model",
-      "haiku",
-      "--setting-sources",
-      "",
-      "--strict-mcp-config",
-      "--system-prompt",
-      "",
-      "--tools",
-      "Bash",
-      "Read"
-    ],
-    "env": {
-      "CLAUDE_CONFIG_DIR": "${isolated_config_dir}"
-    },
-    "env_unset": [
-      "ANTHROPIC_API_KEY",
-      "ANTHROPIC_AUTH_TOKEN"
-    ],
-    "files": [
-      {
-        "content": null,
-        "id": "stdout",
-        "suffix": ".json"
-      }
-    ],
-    "kind": "exec",
-    "needs_claude_isolation": true,
-    "read_result_from": "stdout",
-    "stdin": "hi",
-    "stdout_to_file": true
-  },
+  "name": "claude-tools-list",
+  "op": "plan",
   "input": {
-    "host": {
-      "platform": "darwin"
-    },
     "provider": "claude",
     "spec": {
+      "prompt": "hi",
+      "model": "haiku",
       "agent": false,
+      "isolated": true,
+      "timeout": 180,
+      "max_attempts": 5,
       "api_auth": false,
+      "schema": null,
       "claude": {
         "append_system_prompt": null,
         "disable_slash_commands": false,
@@ -63,15 +32,46 @@
       },
       "codex": null,
       "gemini": null,
-      "isolated": true,
-      "max_attempts": 5,
-      "model": "haiku",
-      "openai_endpoint": null,
-      "prompt": "hi",
-      "schema": null,
-      "timeout": 180
+      "openai_endpoint": null
+    },
+    "host": {
+      "platform": "darwin"
     }
   },
-  "name": "claude-tools-list",
-  "op": "plan"
+  "expected": {
+    "kind": "exec",
+    "argv": [
+      "claude",
+      "-p",
+      "--no-session-persistence",
+      "--model",
+      "haiku",
+      "--setting-sources",
+      "",
+      "--strict-mcp-config",
+      "--system-prompt",
+      "",
+      "--tools",
+      "Bash",
+      "Read"
+    ],
+    "stdin": "hi",
+    "files": [
+      {
+        "id": "stdout",
+        "suffix": ".json",
+        "content": null
+      }
+    ],
+    "stdout_to_file": true,
+    "read_result_from": "stdout",
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${isolated_config_dir}"
+    },
+    "env_unset": [
+      "ANTHROPIC_API_KEY",
+      "ANTHROPIC_AUTH_TOKEN"
+    ],
+    "needs_claude_isolation": true
+  }
 }

@@ -1,4 +1,13 @@
 {
+  "name": "antigravity-linux",
+  "op": "auth_probes",
+  "input": {
+    "provider": "antigravity",
+    "host": {
+      "platform": "linux",
+      "home": "/home/testuser"
+    }
+  },
   "expected": {
     "binary": "agy",
     "install_hint": "curl -fsSL https://antigravity.google/cli/install.sh | bash",
@@ -11,14 +20,5 @@
         ]
       }
     ]
-  },
-  "input": {
-    "host": {
-      "home": "/home/testuser",
-      "platform": "linux"
-    },
-    "provider": "antigravity"
-  },
-  "name": "antigravity-linux",
-  "op": "auth_probes"
+  }
 }

@@ -1,13 +1,13 @@
 {
+  "name": "transient-rate-limit-attempt-1",
+  "op": "retry_decision",
+  "input": {
+    "attempt": 1,
+    "max_attempts": 5,
+    "error_msg": "hit rate limit, retry later"
+  },
   "expected": {
     "retry": true,
     "sleep_s": 15.0
-  },
-  "input": {
-    "attempt": 1,
-    "error_msg": "hit rate limit, retry later",
-    "max_attempts": 5
-  },
-  "name": "transient-rate-limit-attempt-1",
-  "op": "retry_decision"
+  }
 }

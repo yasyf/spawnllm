@@ -1,12 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "kind": "exit",
-    "msg": "claude exited 1: panic: mid-stream crash tail",
-    "status": "error",
-    "transient": false,
-    "usage": null
-  },
+  "name": "claude-exit-raw-tail",
+  "op": "resolve",
   "input": {
     "provider": "claude",
     "raw": "panic: mid-stream crash tail",
@@ -14,6 +8,12 @@
     "stderr": "",
     "wants_value": false
   },
-  "name": "claude-exit-raw-tail",
-  "op": "resolve"
+  "expected": {
+    "status": "error",
+    "kind": "exit",
+    "msg": "claude exited 1: panic: mid-stream crash tail",
+    "transient": false,
+    "cost_usd": null,
+    "usage": null
+  }
 }

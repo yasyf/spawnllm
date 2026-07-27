@@ -1,44 +1,6 @@
 {
-  "expected": {
-    "schema": {
-      "$defs": {
-        "Inner": {
-          "additionalProperties": false,
-          "properties": {
-            "a": {
-              "title": "A",
-              "type": "integer"
-            },
-            "b": {
-              "description": "{default: default}",
-              "title": "B",
-              "type": "string"
-            }
-          },
-          "required": [
-            "a"
-          ],
-          "title": "Inner",
-          "type": "object"
-        }
-      },
-      "additionalProperties": false,
-      "properties": {
-        "rows": {
-          "items": {
-            "$ref": "#/$defs/Inner"
-          },
-          "title": "Rows",
-          "type": "array"
-        }
-      },
-      "required": [
-        "rows"
-      ],
-      "title": "ListOfModels",
-      "type": "object"
-    }
-  },
+  "name": "list-of-models-anthropic",
+  "op": "strict_schema",
   "input": {
     "dialect": "anthropic",
     "schema": {
@@ -78,6 +40,44 @@
       "type": "object"
     }
   },
-  "name": "list-of-models-anthropic",
-  "op": "strict_schema"
+  "expected": {
+    "schema": {
+      "$defs": {
+        "Inner": {
+          "type": "object",
+          "title": "Inner",
+          "properties": {
+            "a": {
+              "type": "integer",
+              "title": "A"
+            },
+            "b": {
+              "type": "string",
+              "title": "B",
+              "description": "{default: default}"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "a"
+          ]
+        }
+      },
+      "type": "object",
+      "title": "ListOfModels",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "title": "Rows",
+          "items": {
+            "$ref": "#/$defs/Inner"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "rows"
+      ]
+    }
+  }
 }

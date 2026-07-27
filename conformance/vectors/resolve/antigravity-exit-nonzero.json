@@ -1,12 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "kind": "exit",
-    "msg": "antigravity exited 1: agy print failed",
-    "status": "error",
-    "transient": false,
-    "usage": null
-  },
+  "name": "antigravity-exit-nonzero",
+  "op": "resolve",
   "input": {
     "provider": "antigravity",
     "raw": "",
@@ -14,6 +8,12 @@
     "stderr": "agy print failed",
     "wants_value": false
   },
-  "name": "antigravity-exit-nonzero",
-  "op": "resolve"
+  "expected": {
+    "status": "error",
+    "kind": "exit",
+    "msg": "antigravity exited 1: agy print failed",
+    "transient": false,
+    "cost_usd": null,
+    "usage": null
+  }
 }

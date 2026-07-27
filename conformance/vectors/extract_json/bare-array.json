@@ -1,14 +1,14 @@
 {
+  "name": "bare-array",
+  "op": "extract_json",
+  "input": {
+    "text": "[1, 2, 3]"
+  },
   "expected": {
     "value": [
       1,
       2,
       3
     ]
-  },
-  "input": {
-    "text": "[1, 2, 3]"
-  },
-  "name": "bare-array",
-  "op": "extract_json"
+  }
 }

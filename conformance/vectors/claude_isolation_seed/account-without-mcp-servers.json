@@ -1,17 +1,17 @@
 {
-  "expected": {
-    "files": [
-      {
-        "content": "{\"oauthAccount\": {\"accountUuid\": \"c\"}}",
-        "mode": "0644",
-        "name": ".claude.json"
-      }
-    ]
-  },
+  "name": "account-without-mcp-servers",
+  "op": "claude_isolation_seed",
   "input": {
     "account_json": "{\"oauthAccount\": {\"accountUuid\": \"c\"}}",
     "credentials_json": null
   },
-  "name": "account-without-mcp-servers",
-  "op": "claude_isolation_seed"
+  "expected": {
+    "files": [
+      {
+        "name": ".claude.json",
+        "content": "{\"oauthAccount\": {\"accountUuid\": \"c\"}}",
+        "mode": "0644"
+      }
+    ]
+  }
 }

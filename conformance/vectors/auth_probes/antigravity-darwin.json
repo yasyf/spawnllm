@@ -1,12 +1,21 @@
 {
+  "name": "antigravity-darwin",
+  "op": "auth_probes",
+  "input": {
+    "provider": "antigravity",
+    "host": {
+      "platform": "darwin",
+      "home": "/Users/testuser"
+    }
+  },
   "expected": {
     "binary": "agy",
     "install_hint": "curl -fsSL https://antigravity.google/cli/install.sh | bash",
     "probes": [
       {
-        "account": "antigravity",
         "kind": "keychain_exists",
-        "service": "gemini"
+        "service": "gemini",
+        "account": "antigravity"
       },
       {
         "kind": "env_any",
@@ -16,14 +25,5 @@
         ]
       }
     ]
-  },
-  "input": {
-    "host": {
-      "home": "/Users/testuser",
-      "platform": "darwin"
-    },
-    "provider": "antigravity"
-  },
-  "name": "antigravity-darwin",
-  "op": "auth_probes"
+  }
 }

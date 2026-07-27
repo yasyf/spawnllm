@@ -1,12 +1,12 @@
 {
+  "name": "leading-prose",
+  "op": "extract_json",
+  "input": {
+    "text": "Here is the result: {\"x\": 4} — done."
+  },
   "expected": {
     "value": {
       "x": 4
     }
-  },
-  "input": {
-    "text": "Here is the result: {\"x\": 4} — done."
-  },
-  "name": "leading-prose",
-  "op": "extract_json"
+  }
 }

@@ -1,27 +1,6 @@
 {
-  "expected": {
-    "schema": {
-      "additionalProperties": false,
-      "properties": {
-        "val": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "string"
-            }
-          ],
-          "title": "Val"
-        }
-      },
-      "required": [
-        "val"
-      ],
-      "title": "Union",
-      "type": "object"
-    }
-  },
+  "name": "union-openai",
+  "op": "strict_schema",
   "input": {
     "dialect": "openai",
     "schema": {
@@ -45,6 +24,27 @@
       "type": "object"
     }
   },
-  "name": "union-openai",
-  "op": "strict_schema"
+  "expected": {
+    "schema": {
+      "properties": {
+        "val": {
+          "title": "Val",
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "val"
+      ],
+      "title": "Union",
+      "type": "object",
+      "additionalProperties": false
+    }
+  }
 }

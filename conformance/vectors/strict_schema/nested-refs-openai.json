@@ -1,78 +1,6 @@
 {
-  "expected": {
-    "schema": {
-      "$defs": {
-        "Color": {
-          "enum": [
-            "red",
-            "blue"
-          ],
-          "title": "Color",
-          "type": "string"
-        },
-        "Inner": {
-          "additionalProperties": false,
-          "properties": {
-            "a": {
-              "title": "A",
-              "type": "integer"
-            },
-            "b": {
-              "default": "default",
-              "title": "B",
-              "type": "string"
-            }
-          },
-          "required": [
-            "a",
-            "b"
-          ],
-          "title": "Inner",
-          "type": "object"
-        }
-      },
-      "additionalProperties": false,
-      "properties": {
-        "color": {
-          "$ref": "#/$defs/Color"
-        },
-        "inner": {
-          "$ref": "#/$defs/Inner"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "opt": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Opt"
-        },
-        "tags": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Tags",
-          "type": "array"
-        }
-      },
-      "required": [
-        "name",
-        "inner",
-        "tags",
-        "color",
-        "opt"
-      ],
-      "title": "NestedRefs",
-      "type": "object"
-    }
-  },
+  "name": "nested-refs-openai",
+  "op": "strict_schema",
   "input": {
     "dialect": "openai",
     "schema": {
@@ -145,6 +73,78 @@
       "type": "object"
     }
   },
-  "name": "nested-refs-openai",
-  "op": "strict_schema"
+  "expected": {
+    "schema": {
+      "$defs": {
+        "Color": {
+          "enum": [
+            "red",
+            "blue"
+          ],
+          "title": "Color",
+          "type": "string"
+        },
+        "Inner": {
+          "properties": {
+            "a": {
+              "title": "A",
+              "type": "integer"
+            },
+            "b": {
+              "default": "default",
+              "title": "B",
+              "type": "string"
+            }
+          },
+          "required": [
+            "a",
+            "b"
+          ],
+          "title": "Inner",
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "inner": {
+          "$ref": "#/$defs/Inner"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "opt": {
+          "title": "Opt",
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "title": "Tags",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "inner",
+        "tags",
+        "color",
+        "opt"
+      ],
+      "title": "NestedRefs",
+      "type": "object",
+      "additionalProperties": false
+    }
+  }
 }

@@ -1,13 +1,13 @@
 {
+  "name": "transient-overloaded-attempt-0",
+  "op": "retry_decision",
+  "input": {
+    "attempt": 0,
+    "max_attempts": 5,
+    "error_msg": "the service is overloaded"
+  },
   "expected": {
     "retry": true,
     "sleep_s": 5.0
-  },
-  "input": {
-    "attempt": 0,
-    "error_msg": "the service is overloaded",
-    "max_attempts": 5
-  },
-  "name": "transient-overloaded-attempt-0",
-  "op": "retry_decision"
+  }
 }

@@ -1,32 +1,6 @@
 {
-  "expected": {
-    "schema": {
-      "additionalProperties": false,
-      "properties": {
-        "a": {
-          "title": "A",
-          "type": "integer"
-        },
-        "b": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "B"
-        }
-      },
-      "required": [
-        "a",
-        "b"
-      ],
-      "title": "OptionalField",
-      "type": "object"
-    }
-  },
+  "name": "optional-field-openai",
+  "op": "strict_schema",
   "input": {
     "dialect": "openai",
     "schema": {
@@ -55,6 +29,32 @@
       "type": "object"
     }
   },
-  "name": "optional-field-openai",
-  "op": "strict_schema"
+  "expected": {
+    "schema": {
+      "properties": {
+        "a": {
+          "title": "A",
+          "type": "integer"
+        },
+        "b": {
+          "title": "B",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "title": "OptionalField",
+      "type": "object",
+      "additionalProperties": false
+    }
+  }
 }

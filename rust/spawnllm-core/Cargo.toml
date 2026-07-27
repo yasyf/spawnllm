@@ -9,6 +9,6 @@ readme = "README.md"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["arbitrary_precision"] }
+serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order"] }
 regex-lite = "0.1"
 sha2 = "0.10"

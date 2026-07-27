@@ -1,27 +1,6 @@
 {
-  "expected": {
-    "schema": {
-      "additionalProperties": false,
-      "properties": {
-        "label": {
-          "description": "{minLength: 2}",
-          "title": "Label",
-          "type": "string"
-        },
-        "n": {
-          "description": "{maximum: 10, minimum: 1}",
-          "title": "N",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "n",
-        "label"
-      ],
-      "title": "Constrained",
-      "type": "object"
-    }
-  },
+  "name": "constrained-anthropic",
+  "op": "strict_schema",
   "input": {
     "dialect": "anthropic",
     "schema": {
@@ -46,6 +25,27 @@
       "type": "object"
     }
   },
-  "name": "constrained-anthropic",
-  "op": "strict_schema"
+  "expected": {
+    "schema": {
+      "type": "object",
+      "title": "Constrained",
+      "properties": {
+        "label": {
+          "type": "string",
+          "title": "Label",
+          "description": "{minLength: 2}"
+        },
+        "n": {
+          "type": "integer",
+          "title": "N",
+          "description": "{maximum: 10, minimum: 1}"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "n",
+        "label"
+      ]
+    }
+  }
 }

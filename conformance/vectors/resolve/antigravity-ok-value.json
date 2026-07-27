@@ -1,13 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "status": "ok",
-    "text": "```json\n{\"answer\": \"7\"}\n```",
-    "usage": null,
-    "value": {
-      "answer": "7"
-    }
-  },
+  "name": "antigravity-ok-value",
+  "op": "resolve",
   "input": {
     "provider": "antigravity",
     "raw": "```json\n{\"answer\": \"7\"}\n```",
@@ -15,6 +8,13 @@
     "stderr": "",
     "wants_value": true
   },
-  "name": "antigravity-ok-value",
-  "op": "resolve"
+  "expected": {
+    "status": "ok",
+    "text": "```json\n{\"answer\": \"7\"}\n```",
+    "value": {
+      "answer": "7"
+    },
+    "cost_usd": null,
+    "usage": null
+  }
 }

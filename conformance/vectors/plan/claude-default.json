@@ -1,5 +1,28 @@
 {
+  "name": "claude-default",
+  "op": "plan",
+  "input": {
+    "provider": "claude",
+    "spec": {
+      "prompt": "hi",
+      "model": "haiku",
+      "agent": false,
+      "isolated": true,
+      "timeout": 180,
+      "max_attempts": 5,
+      "api_auth": false,
+      "schema": null,
+      "claude": null,
+      "codex": null,
+      "gemini": null,
+      "openai_endpoint": null
+    },
+    "host": {
+      "platform": "darwin"
+    }
+  },
   "expected": {
+    "kind": "exec",
     "argv": [
       "claude",
       "-p",
@@ -12,6 +35,16 @@
       "--system-prompt",
       ""
     ],
+    "stdin": "hi",
+    "files": [
+      {
+        "id": "stdout",
+        "suffix": ".json",
+        "content": null
+      }
+    ],
+    "stdout_to_file": true,
+    "read_result_from": "stdout",
     "env": {
       "CLAUDE_CONFIG_DIR": "${isolated_config_dir}"
     },
@@ -19,39 +52,6 @@
       "ANTHROPIC_API_KEY",
       "ANTHROPIC_AUTH_TOKEN"
     ],
-    "files": [
-      {
-        "content": null,
-        "id": "stdout",
-        "suffix": ".json"
-      }
-    ],
-    "kind": "exec",
-    "needs_claude_isolation": true,
-    "read_result_from": "stdout",
-    "stdin": "hi",
-    "stdout_to_file": true
-  },
-  "input": {
-    "host": {
-      "platform": "darwin"
-    },
-    "provider": "claude",
-    "spec": {
-      "agent": false,
-      "api_auth": false,
-      "claude": null,
-      "codex": null,
-      "gemini": null,
-      "isolated": true,
-      "max_attempts": 5,
-      "model": "haiku",
-      "openai_endpoint": null,
-      "prompt": "hi",
-      "schema": null,
-      "timeout": 180
-    }
-  },
-  "name": "claude-default",
-  "op": "plan"
+    "needs_claude_isolation": true
+  }
 }

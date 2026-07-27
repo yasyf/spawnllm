@@ -1,12 +1,12 @@
 {
+  "name": "fenced-json",
+  "op": "extract_json",
+  "input": {
+    "text": "```json\n{\"x\": 1}\n```"
+  },
   "expected": {
     "value": {
       "x": 1
     }
-  },
-  "input": {
-    "text": "```json\n{\"x\": 1}\n```"
-  },
-  "name": "fenced-json",
-  "op": "extract_json"
+  }
 }

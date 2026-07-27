@@ -1,13 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "status": "ok",
-    "text": "{\"answer\": \"9\"}",
-    "usage": null,
-    "value": {
-      "answer": "9"
-    }
-  },
+  "name": "openai-ok-value",
+  "op": "resolve",
   "input": {
     "provider": "openai_endpoint",
     "raw": "{\"choices\": [{\"message\": {\"role\": \"assistant\", \"content\": \"{\\\"answer\\\": \\\"9\\\"}\"}}]}",
@@ -15,6 +8,13 @@
     "stderr": "",
     "wants_value": true
   },
-  "name": "openai-ok-value",
-  "op": "resolve"
+  "expected": {
+    "status": "ok",
+    "text": "{\"answer\": \"9\"}",
+    "value": {
+      "answer": "9"
+    },
+    "cost_usd": null,
+    "usage": null
+  }
 }

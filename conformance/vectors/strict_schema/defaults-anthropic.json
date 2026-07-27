@@ -1,28 +1,6 @@
 {
-  "expected": {
-    "schema": {
-      "additionalProperties": false,
-      "properties": {
-        "a": {
-          "description": "{default: 1}",
-          "title": "A",
-          "type": "integer"
-        },
-        "b": {
-          "description": "{default: hi}",
-          "title": "B",
-          "type": "string"
-        },
-        "c": {
-          "description": "{default: False}",
-          "title": "C",
-          "type": "boolean"
-        }
-      },
-      "title": "Defaults",
-      "type": "object"
-    }
-  },
+  "name": "defaults-anthropic",
+  "op": "strict_schema",
   "input": {
     "dialect": "anthropic",
     "schema": {
@@ -47,6 +25,28 @@
       "type": "object"
     }
   },
-  "name": "defaults-anthropic",
-  "op": "strict_schema"
+  "expected": {
+    "schema": {
+      "type": "object",
+      "title": "Defaults",
+      "properties": {
+        "a": {
+          "type": "integer",
+          "title": "A",
+          "description": "{default: 1}"
+        },
+        "b": {
+          "type": "string",
+          "title": "B",
+          "description": "{default: hi}"
+        },
+        "c": {
+          "type": "boolean",
+          "title": "C",
+          "description": "{default: False}"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
 }

@@ -1,11 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "status": "ok",
-    "text": "pong",
-    "usage": null,
-    "value": null
-  },
+  "name": "openai-ok",
+  "op": "resolve",
   "input": {
     "provider": "openai_endpoint",
     "raw": "{\"choices\": [{\"message\": {\"role\": \"assistant\", \"content\": \"pong\"}}]}",
@@ -13,6 +8,11 @@
     "stderr": "",
     "wants_value": false
   },
-  "name": "openai-ok",
-  "op": "resolve"
+  "expected": {
+    "status": "ok",
+    "text": "pong",
+    "value": null,
+    "cost_usd": null,
+    "usage": null
+  }
 }

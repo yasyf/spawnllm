@@ -1,11 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "status": "ok",
-    "text": "hello world",
-    "usage": null,
-    "value": null
-  },
+  "name": "claude-ok-dict",
+  "op": "resolve",
   "input": {
     "provider": "claude",
     "raw": "{\"type\": \"result\", \"is_error\": false, \"result\": \"hello world\"}",
@@ -13,6 +8,11 @@
     "stderr": "",
     "wants_value": false
   },
-  "name": "claude-ok-dict",
-  "op": "resolve"
+  "expected": {
+    "status": "ok",
+    "text": "hello world",
+    "value": null,
+    "cost_usd": null,
+    "usage": null
+  }
 }

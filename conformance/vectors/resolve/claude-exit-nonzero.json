@@ -1,12 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "kind": "exit",
-    "msg": "claude exited 1: claude: fatal boom",
-    "status": "error",
-    "transient": false,
-    "usage": null
-  },
+  "name": "claude-exit-nonzero",
+  "op": "resolve",
   "input": {
     "provider": "claude",
     "raw": "",
@@ -14,6 +8,12 @@
     "stderr": "claude: fatal boom",
     "wants_value": false
   },
-  "name": "claude-exit-nonzero",
-  "op": "resolve"
+  "expected": {
+    "status": "error",
+    "kind": "exit",
+    "msg": "claude exited 1: claude: fatal boom",
+    "transient": false,
+    "cost_usd": null,
+    "usage": null
+  }
 }

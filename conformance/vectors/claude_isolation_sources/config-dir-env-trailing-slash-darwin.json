@@ -1,16 +1,16 @@
 {
+  "name": "config-dir-env-trailing-slash-darwin",
+  "op": "claude_isolation_sources",
+  "input": {
+    "host": {
+      "platform": "darwin",
+      "home": "/Users/testuser",
+      "claude_config_dir_env": "/Users/testuser/.acct/"
+    }
+  },
   "expected": {
     "account_path": "/Users/testuser/.acct/.claude.json",
     "credentials_path": "/Users/testuser/.acct/.credentials.json",
     "keychain_service": "Claude Code-credentials-c157f0be"
-  },
-  "input": {
-    "host": {
-      "claude_config_dir_env": "/Users/testuser/.acct/",
-      "home": "/Users/testuser",
-      "platform": "darwin"
-    }
-  },
-  "name": "config-dir-env-trailing-slash-darwin",
-  "op": "claude_isolation_sources"
+  }
 }

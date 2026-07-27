@@ -1,5 +1,28 @@
 {
+  "name": "codex-api-auth",
+  "op": "plan",
+  "input": {
+    "provider": "codex",
+    "spec": {
+      "prompt": "hi",
+      "model": "gpt-5.5",
+      "agent": false,
+      "isolated": true,
+      "timeout": 180,
+      "max_attempts": 5,
+      "api_auth": true,
+      "schema": null,
+      "claude": null,
+      "codex": null,
+      "gemini": null,
+      "openai_endpoint": null
+    },
+    "host": {
+      "platform": "darwin"
+    }
+  },
   "expected": {
+    "kind": "exec",
     "argv": [
       "codex",
       "exec",
@@ -21,41 +44,18 @@
       "-o",
       "${file:result}"
     ],
-    "env": {},
-    "env_unset": [],
+    "stdin": "hi",
     "files": [
       {
-        "content": null,
         "id": "result",
-        "suffix": ".json"
+        "suffix": ".json",
+        "content": null
       }
     ],
-    "kind": "exec",
-    "needs_claude_isolation": false,
+    "stdout_to_file": false,
     "read_result_from": "file:result",
-    "stdin": "hi",
-    "stdout_to_file": false
-  },
-  "input": {
-    "host": {
-      "platform": "darwin"
-    },
-    "provider": "codex",
-    "spec": {
-      "agent": false,
-      "api_auth": true,
-      "claude": null,
-      "codex": null,
-      "gemini": null,
-      "isolated": true,
-      "max_attempts": 5,
-      "model": "gpt-5.5",
-      "openai_endpoint": null,
-      "prompt": "hi",
-      "schema": null,
-      "timeout": 180
-    }
-  },
-  "name": "codex-api-auth",
-  "op": "plan"
+    "env": {},
+    "env_unset": [],
+    "needs_claude_isolation": false
+  }
 }

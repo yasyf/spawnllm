@@ -1,12 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "kind": "envelope",
-    "msg": "no such model",
-    "status": "error",
-    "transient": false,
-    "usage": null
-  },
+  "name": "openai-2xx-error-body",
+  "op": "resolve",
   "input": {
     "provider": "openai_endpoint",
     "raw": "{\"error\": {\"message\": \"no such model\"}}",
@@ -14,6 +8,12 @@
     "stderr": "",
     "wants_value": false
   },
-  "name": "openai-2xx-error-body",
-  "op": "resolve"
+  "expected": {
+    "status": "error",
+    "kind": "envelope",
+    "msg": "no such model",
+    "transient": false,
+    "cost_usd": null,
+    "usage": null
+  }
 }

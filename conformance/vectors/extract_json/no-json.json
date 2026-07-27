@@ -1,10 +1,10 @@
 {
-  "expected": {
-    "value": null
-  },
+  "name": "no-json",
+  "op": "extract_json",
   "input": {
     "text": "just some plain text with no json at all"
   },
-  "name": "no-json",
-  "op": "extract_json"
+  "expected": {
+    "value": null
+  }
 }

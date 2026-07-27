@@ -1,13 +1,13 @@
 {
+  "name": "non-transient-attempt-0",
+  "op": "retry_decision",
+  "input": {
+    "attempt": 0,
+    "max_attempts": 5,
+    "error_msg": "invalid request: bad schema"
+  },
   "expected": {
     "retry": false,
     "sleep_s": 0.0
-  },
-  "input": {
-    "attempt": 0,
-    "error_msg": "invalid request: bad schema",
-    "max_attempts": 5
-  },
-  "name": "non-transient-attempt-0",
-  "op": "retry_decision"
+  }
 }

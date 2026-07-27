@@ -1,12 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "kind": "envelope",
-    "msg": "gemini call failed: {\"response\": \"\", \"stats\": {\"models\": {\"g\": {\"api\": {\"totalErrors\": 1}}}}}",
-    "status": "error",
-    "transient": false,
-    "usage": null
-  },
+  "name": "gemini-total-errors",
+  "op": "resolve",
   "input": {
     "provider": "gemini",
     "raw": "{\"response\": \"\", \"stats\": {\"models\": {\"g\": {\"api\": {\"totalErrors\": 1}}}}}",
@@ -14,6 +8,12 @@
     "stderr": "",
     "wants_value": false
   },
-  "name": "gemini-total-errors",
-  "op": "resolve"
+  "expected": {
+    "status": "error",
+    "kind": "envelope",
+    "msg": "gemini call failed: {\"response\": \"\", \"stats\": {\"models\": {\"g\": {\"api\": {\"totalErrors\": 1}}}}}",
+    "transient": false,
+    "cost_usd": null,
+    "usage": null
+  }
 }

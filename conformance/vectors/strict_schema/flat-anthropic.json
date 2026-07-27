@@ -1,20 +1,6 @@
 {
-  "expected": {
-    "schema": {
-      "additionalProperties": false,
-      "properties": {
-        "x": {
-          "title": "X",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "x"
-      ],
-      "title": "Flat",
-      "type": "object"
-    }
-  },
+  "name": "flat-anthropic",
+  "op": "strict_schema",
   "input": {
     "dialect": "anthropic",
     "schema": {
@@ -31,6 +17,20 @@
       "type": "object"
     }
   },
-  "name": "flat-anthropic",
-  "op": "strict_schema"
+  "expected": {
+    "schema": {
+      "type": "object",
+      "title": "Flat",
+      "properties": {
+        "x": {
+          "type": "integer",
+          "title": "X"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "x"
+      ]
+    }
+  }
 }

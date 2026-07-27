@@ -1,4 +1,13 @@
 {
+  "name": "gemini-darwin",
+  "op": "auth_probes",
+  "input": {
+    "provider": "gemini",
+    "host": {
+      "platform": "darwin",
+      "home": "/Users/testuser"
+    }
+  },
   "expected": {
     "binary": "gemini",
     "install_hint": "npm install -g @google/gemini-cli",
@@ -15,14 +24,5 @@
         ]
       }
     ]
-  },
-  "input": {
-    "host": {
-      "home": "/Users/testuser",
-      "platform": "darwin"
-    },
-    "provider": "gemini"
-  },
-  "name": "gemini-darwin",
-  "op": "auth_probes"
+  }
 }

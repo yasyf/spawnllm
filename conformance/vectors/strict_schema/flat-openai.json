@@ -1,20 +1,6 @@
 {
-  "expected": {
-    "schema": {
-      "additionalProperties": false,
-      "properties": {
-        "x": {
-          "title": "X",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "x"
-      ],
-      "title": "Flat",
-      "type": "object"
-    }
-  },
+  "name": "flat-openai",
+  "op": "strict_schema",
   "input": {
     "dialect": "openai",
     "schema": {
@@ -31,6 +17,20 @@
       "type": "object"
     }
   },
-  "name": "flat-openai",
-  "op": "strict_schema"
+  "expected": {
+    "schema": {
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x"
+      ],
+      "title": "Flat",
+      "type": "object",
+      "additionalProperties": false
+    }
+  }
 }

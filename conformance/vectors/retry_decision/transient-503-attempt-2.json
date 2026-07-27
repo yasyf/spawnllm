@@ -1,13 +1,13 @@
 {
+  "name": "transient-503-attempt-2",
+  "op": "retry_decision",
+  "input": {
+    "attempt": 2,
+    "max_attempts": 5,
+    "error_msg": "upstream returned 503"
+  },
   "expected": {
     "retry": true,
     "sleep_s": 45.0
-  },
-  "input": {
-    "attempt": 2,
-    "error_msg": "upstream returned 503",
-    "max_attempts": 5
-  },
-  "name": "transient-503-attempt-2",
-  "op": "retry_decision"
+  }
 }

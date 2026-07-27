@@ -1,13 +1,13 @@
 {
+  "name": "transient-last-attempt-no-retry",
+  "op": "retry_decision",
+  "input": {
+    "attempt": 4,
+    "max_attempts": 5,
+    "error_msg": "529 overloaded"
+  },
   "expected": {
     "retry": false,
     "sleep_s": 0.0
-  },
-  "input": {
-    "attempt": 4,
-    "error_msg": "529 overloaded",
-    "max_attempts": 5
-  },
-  "name": "transient-last-attempt-no-retry",
-  "op": "retry_decision"
+  }
 }

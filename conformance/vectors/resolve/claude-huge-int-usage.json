@@ -1,14 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "status": "ok",
-    "text": "hi",
-    "usage": {
-      "input_tokens": 999999999999999999999,
-      "output_tokens": 7
-    },
-    "value": null
-  },
+  "name": "claude-huge-int-usage",
+  "op": "resolve",
   "input": {
     "provider": "claude",
     "raw": "{\"type\": \"result\", \"is_error\": false, \"result\": \"hi\", \"usage\": {\"input_tokens\": 999999999999999999999, \"output_tokens\": 7}}",
@@ -16,6 +8,14 @@
     "stderr": "",
     "wants_value": false
   },
-  "name": "claude-huge-int-usage",
-  "op": "resolve"
+  "expected": {
+    "status": "ok",
+    "text": "hi",
+    "value": null,
+    "cost_usd": null,
+    "usage": {
+      "input_tokens": 999999999999999999999,
+      "output_tokens": 7
+    }
+  }
 }

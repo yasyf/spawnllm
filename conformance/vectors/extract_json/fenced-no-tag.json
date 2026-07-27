@@ -1,12 +1,12 @@
 {
+  "name": "fenced-no-tag",
+  "op": "extract_json",
+  "input": {
+    "text": "```\n{\"x\": 2}\n```"
+  },
   "expected": {
     "value": {
       "x": 2
     }
-  },
-  "input": {
-    "text": "```\n{\"x\": 2}\n```"
-  },
-  "name": "fenced-no-tag",
-  "op": "extract_json"
+  }
 }

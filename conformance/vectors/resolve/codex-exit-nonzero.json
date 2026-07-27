@@ -1,12 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "kind": "exit",
-    "msg": "codex exited 42: codex exec failed",
-    "status": "error",
-    "transient": false,
-    "usage": null
-  },
+  "name": "codex-exit-nonzero",
+  "op": "resolve",
   "input": {
     "provider": "codex",
     "raw": "",
@@ -14,6 +8,12 @@
     "stderr": "codex exec failed",
     "wants_value": false
   },
-  "name": "codex-exit-nonzero",
-  "op": "resolve"
+  "expected": {
+    "status": "error",
+    "kind": "exit",
+    "msg": "codex exited 42: codex exec failed",
+    "transient": false,
+    "cost_usd": null,
+    "usage": null
+  }
 }

@@ -1,39 +1,17 @@
 {
-  "expected": {
-    "argv": [
-      "claude",
-      "-p",
-      "--no-session-persistence",
-      "--model",
-      "haiku",
-      "--strict-mcp-config"
-    ],
-    "env": {},
-    "env_unset": [
-      "ANTHROPIC_API_KEY",
-      "ANTHROPIC_AUTH_TOKEN"
-    ],
-    "files": [
-      {
-        "content": null,
-        "id": "stdout",
-        "suffix": ".json"
-      }
-    ],
-    "kind": "exec",
-    "needs_claude_isolation": false,
-    "read_result_from": "stdout",
-    "stdin": "hi",
-    "stdout_to_file": true
-  },
+  "name": "claude-strict-mcp",
+  "op": "plan",
   "input": {
-    "host": {
-      "platform": "darwin"
-    },
     "provider": "claude",
     "spec": {
+      "prompt": "hi",
+      "model": "haiku",
       "agent": false,
+      "isolated": false,
+      "timeout": 180,
+      "max_attempts": 5,
       "api_auth": false,
+      "schema": null,
       "claude": {
         "append_system_prompt": null,
         "disable_slash_commands": false,
@@ -51,15 +29,37 @@
       },
       "codex": null,
       "gemini": null,
-      "isolated": false,
-      "max_attempts": 5,
-      "model": "haiku",
-      "openai_endpoint": null,
-      "prompt": "hi",
-      "schema": null,
-      "timeout": 180
+      "openai_endpoint": null
+    },
+    "host": {
+      "platform": "darwin"
     }
   },
-  "name": "claude-strict-mcp",
-  "op": "plan"
+  "expected": {
+    "kind": "exec",
+    "argv": [
+      "claude",
+      "-p",
+      "--no-session-persistence",
+      "--model",
+      "haiku",
+      "--strict-mcp-config"
+    ],
+    "stdin": "hi",
+    "files": [
+      {
+        "id": "stdout",
+        "suffix": ".json",
+        "content": null
+      }
+    ],
+    "stdout_to_file": true,
+    "read_result_from": "stdout",
+    "env": {},
+    "env_unset": [
+      "ANTHROPIC_API_KEY",
+      "ANTHROPIC_AUTH_TOKEN"
+    ],
+    "needs_claude_isolation": false
+  }
 }

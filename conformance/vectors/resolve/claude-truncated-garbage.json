@@ -1,11 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "status": "ok",
-    "text": "{\"type\": \"result\", \"resu",
-    "usage": null,
-    "value": null
-  },
+  "name": "claude-truncated-garbage",
+  "op": "resolve",
   "input": {
     "provider": "claude",
     "raw": "{\"type\": \"result\", \"resu",
@@ -13,6 +8,11 @@
     "stderr": "",
     "wants_value": false
   },
-  "name": "claude-truncated-garbage",
-  "op": "resolve"
+  "expected": {
+    "status": "ok",
+    "text": "{\"type\": \"result\", \"resu",
+    "value": null,
+    "cost_usd": null,
+    "usage": null
+  }
 }

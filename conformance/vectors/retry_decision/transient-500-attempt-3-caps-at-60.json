@@ -1,13 +1,13 @@
 {
+  "name": "transient-500-attempt-3-caps-at-60",
+  "op": "retry_decision",
+  "input": {
+    "attempt": 3,
+    "max_attempts": 5,
+    "error_msg": "internal 500 error"
+  },
   "expected": {
     "retry": true,
     "sleep_s": 60.0
-  },
-  "input": {
-    "attempt": 3,
-    "error_msg": "internal 500 error",
-    "max_attempts": 5
-  },
-  "name": "transient-500-attempt-3-caps-at-60",
-  "op": "retry_decision"
+  }
 }

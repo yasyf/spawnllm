@@ -1,5 +1,34 @@
 {
+  "name": "codex-sandbox-override",
+  "op": "plan",
+  "input": {
+    "provider": "codex",
+    "spec": {
+      "prompt": "hi",
+      "model": "gpt-5.5",
+      "agent": false,
+      "isolated": true,
+      "timeout": 180,
+      "max_attempts": 5,
+      "api_auth": false,
+      "schema": null,
+      "claude": null,
+      "codex": {
+        "developer_instructions": null,
+        "enable_hooks": false,
+        "enable_mcp": false,
+        "sandbox": "workspace-write",
+        "service_tier": "fast"
+      },
+      "gemini": null,
+      "openai_endpoint": null
+    },
+    "host": {
+      "platform": "darwin"
+    }
+  },
   "expected": {
+    "kind": "exec",
     "argv": [
       "codex",
       "exec",
@@ -21,50 +50,21 @@
       "-o",
       "${file:result}"
     ],
+    "stdin": "hi",
+    "files": [
+      {
+        "id": "result",
+        "suffix": ".json",
+        "content": null
+      }
+    ],
+    "stdout_to_file": false,
+    "read_result_from": "file:result",
     "env": {},
     "env_unset": [
       "OPENAI_API_KEY",
       "CODEX_API_KEY"
     ],
-    "files": [
-      {
-        "content": null,
-        "id": "result",
-        "suffix": ".json"
-      }
-    ],
-    "kind": "exec",
-    "needs_claude_isolation": false,
-    "read_result_from": "file:result",
-    "stdin": "hi",
-    "stdout_to_file": false
-  },
-  "input": {
-    "host": {
-      "platform": "darwin"
-    },
-    "provider": "codex",
-    "spec": {
-      "agent": false,
-      "api_auth": false,
-      "claude": null,
-      "codex": {
-        "developer_instructions": null,
-        "enable_hooks": false,
-        "enable_mcp": false,
-        "sandbox": "workspace-write",
-        "service_tier": "fast"
-      },
-      "gemini": null,
-      "isolated": true,
-      "max_attempts": 5,
-      "model": "gpt-5.5",
-      "openai_endpoint": null,
-      "prompt": "hi",
-      "schema": null,
-      "timeout": 180
-    }
-  },
-  "name": "codex-sandbox-override",
-  "op": "plan"
+    "needs_claude_isolation": false
+  }
 }

@@ -1,5 +1,28 @@
 {
+  "name": "gemini-agent",
+  "op": "plan",
+  "input": {
+    "provider": "gemini",
+    "spec": {
+      "prompt": "hi",
+      "model": "gemini-2.5-flash",
+      "agent": true,
+      "isolated": true,
+      "timeout": 180,
+      "max_attempts": 5,
+      "api_auth": false,
+      "schema": null,
+      "claude": null,
+      "codex": null,
+      "gemini": null,
+      "openai_endpoint": null
+    },
+    "host": {
+      "platform": "darwin"
+    }
+  },
   "expected": {
+    "kind": "exec",
     "argv": [
       "gemini",
       "--model",
@@ -11,38 +34,15 @@
       "-p",
       "hi"
     ],
+    "stdin": "",
+    "files": [],
+    "stdout_to_file": false,
+    "read_result_from": "stdout",
     "env": {},
     "env_unset": [
       "GEMINI_API_KEY",
       "GOOGLE_API_KEY"
     ],
-    "files": [],
-    "kind": "exec",
-    "needs_claude_isolation": false,
-    "read_result_from": "stdout",
-    "stdin": "",
-    "stdout_to_file": false
-  },
-  "input": {
-    "host": {
-      "platform": "darwin"
-    },
-    "provider": "gemini",
-    "spec": {
-      "agent": true,
-      "api_auth": false,
-      "claude": null,
-      "codex": null,
-      "gemini": null,
-      "isolated": true,
-      "max_attempts": 5,
-      "model": "gemini-2.5-flash",
-      "openai_endpoint": null,
-      "prompt": "hi",
-      "schema": null,
-      "timeout": 180
-    }
-  },
-  "name": "gemini-agent",
-  "op": "plan"
+    "needs_claude_isolation": false
+  }
 }

@@ -1,11 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "status": "ok",
-    "text": "",
-    "usage": null,
-    "value": null
-  },
+  "name": "codex-empty",
+  "op": "resolve",
   "input": {
     "provider": "codex",
     "raw": "",
@@ -13,6 +8,11 @@
     "stderr": "",
     "wants_value": false
   },
-  "name": "codex-empty",
-  "op": "resolve"
+  "expected": {
+    "status": "ok",
+    "text": "",
+    "value": null,
+    "cost_usd": null,
+    "usage": null
+  }
 }

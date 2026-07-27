@@ -1,45 +1,45 @@
 {
-  "expected": {
-    "body": {
-      "messages": [
-        {
-          "content": "ping",
-          "role": "user"
-        }
-      ],
-      "model": "qwen3"
-    },
-    "headers": {
-      "Authorization": "Bearer sk-test"
-    },
-    "kind": "http",
-    "method": "POST",
-    "url": "http://local.test/v1/chat/completions"
-  },
+  "name": "openai-endpoint-plain",
+  "op": "plan",
   "input": {
-    "host": {
-      "platform": "darwin"
-    },
     "provider": "openai_endpoint",
     "spec": {
+      "prompt": "ping",
+      "model": "qwen3",
       "agent": false,
+      "isolated": true,
+      "timeout": 180,
+      "max_attempts": 5,
       "api_auth": false,
+      "schema": null,
       "claude": null,
       "codex": null,
       "gemini": null,
-      "isolated": true,
-      "max_attempts": 5,
-      "model": "qwen3",
       "openai_endpoint": {
         "api_key": "sk-test",
         "base_url": "http://local.test/v1",
         "model": "qwen3"
-      },
-      "prompt": "ping",
-      "schema": null,
-      "timeout": 180
+      }
+    },
+    "host": {
+      "platform": "darwin"
     }
   },
-  "name": "openai-endpoint-plain",
-  "op": "plan"
+  "expected": {
+    "kind": "http",
+    "method": "POST",
+    "url": "http://local.test/v1/chat/completions",
+    "headers": {
+      "Authorization": "Bearer sk-test"
+    },
+    "body": {
+      "model": "qwen3",
+      "messages": [
+        {
+          "role": "user",
+          "content": "ping"
+        }
+      ]
+    }
+  }
 }

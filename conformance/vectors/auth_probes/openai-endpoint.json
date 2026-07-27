@@ -1,16 +1,16 @@
 {
+  "name": "openai-endpoint",
+  "op": "auth_probes",
+  "input": {
+    "provider": "openai_endpoint",
+    "host": {
+      "platform": "darwin",
+      "home": "/Users/testuser"
+    }
+  },
   "expected": {
     "binary": "openai_endpoint",
     "install_hint": null,
     "probes": []
-  },
-  "input": {
-    "host": {
-      "home": "/Users/testuser",
-      "platform": "darwin"
-    },
-    "provider": "openai_endpoint"
-  },
-  "name": "openai-endpoint",
-  "op": "auth_probes"
+  }
 }

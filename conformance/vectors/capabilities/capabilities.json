@@ -1,5 +1,23 @@
 {
+  "name": "capabilities",
+  "op": "capabilities",
+  "input": {},
   "expected": {
+    "providers": [
+      "claude",
+      "codex",
+      "antigravity",
+      "gemini"
+    ],
+    "priority": [
+      "claude",
+      "codex",
+      "antigravity",
+      "gemini"
+    ],
+    "auto_select_excludes": [
+      "gemini"
+    ],
     "api_key_vars": {
       "antigravity": [
         "GEMINI_API_KEY",
@@ -18,20 +36,10 @@
         "GOOGLE_API_KEY"
       ]
     },
-    "auto_select_excludes": [
-      "gemini"
-    ],
-    "binaries": {
-      "antigravity": "agy",
-      "claude": "claude",
-      "codex": "codex",
-      "gemini": "gemini"
-    },
-    "install_hints": {
-      "antigravity": "curl -fsSL https://antigravity.google/cli/install.sh | bash",
-      "claude": "curl -fsSL https://claude.ai/install.sh | bash",
-      "codex": "npm install -g @openai/codex",
-      "gemini": "npm install -g @google/gemini-cli"
+    "specialties": {
+      "debugging": "codex",
+      "general": "claude",
+      "review": "codex"
     },
     "models": {
       "antigravity": {
@@ -55,25 +63,17 @@
         "small": "gemini-2.5-flash-lite"
       }
     },
-    "priority": [
-      "claude",
-      "codex",
-      "antigravity",
-      "gemini"
-    ],
-    "providers": [
-      "claude",
-      "codex",
-      "antigravity",
-      "gemini"
-    ],
-    "specialties": {
-      "debugging": "codex",
-      "general": "claude",
-      "review": "codex"
+    "binaries": {
+      "antigravity": "agy",
+      "claude": "claude",
+      "codex": "codex",
+      "gemini": "gemini"
+    },
+    "install_hints": {
+      "antigravity": "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+      "claude": "curl -fsSL https://claude.ai/install.sh | bash",
+      "codex": "npm install -g @openai/codex",
+      "gemini": "npm install -g @google/gemini-cli"
     }
-  },
-  "input": {},
-  "name": "capabilities",
-  "op": "capabilities"
+  }
 }

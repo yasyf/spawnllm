@@ -1,14 +1,6 @@
 {
-  "expected": {
-    "cost_usd": null,
-    "status": "ok",
-    "text": "{\"block\": true, \"reason\": \"policy\"}",
-    "usage": null,
-    "value": {
-      "block": true,
-      "reason": "policy"
-    }
-  },
+  "name": "codex-ok-value",
+  "op": "resolve",
   "input": {
     "provider": "codex",
     "raw": "{\"block\": true, \"reason\": \"policy\"}",
@@ -16,6 +8,14 @@
     "stderr": "",
     "wants_value": true
   },
-  "name": "codex-ok-value",
-  "op": "resolve"
+  "expected": {
+    "status": "ok",
+    "text": "{\"block\": true, \"reason\": \"policy\"}",
+    "value": {
+      "block": true,
+      "reason": "policy"
+    },
+    "cost_usd": null,
+    "usage": null
+  }
 }

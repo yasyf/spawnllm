@@ -1,25 +1,25 @@
 {
+  "name": "claude-darwin",
+  "op": "auth_probes",
+  "input": {
+    "provider": "claude",
+    "host": {
+      "platform": "darwin",
+      "home": "/Users/testuser"
+    }
+  },
   "expected": {
     "binary": "claude",
     "install_hint": "curl -fsSL https://claude.ai/install.sh | bash",
     "probes": [
       {
+        "kind": "exec_exit0",
         "argv": [
           "claude",
           "auth",
           "status"
-        ],
-        "kind": "exec_exit0"
+        ]
       }
     ]
-  },
-  "input": {
-    "host": {
-      "home": "/Users/testuser",
-      "platform": "darwin"
-    },
-    "provider": "claude"
-  },
-  "name": "claude-darwin",
-  "op": "auth_probes"
+  }
 }

@@ -1,4 +1,13 @@
 {
+  "name": "gemini-linux",
+  "op": "auth_probes",
+  "input": {
+    "provider": "gemini",
+    "host": {
+      "platform": "linux",
+      "home": "/home/testuser"
+    }
+  },
   "expected": {
     "binary": "gemini",
     "install_hint": "npm install -g @google/gemini-cli",
@@ -15,14 +24,5 @@
         ]
       }
     ]
-  },
-  "input": {
-    "host": {
-      "home": "/home/testuser",
-      "platform": "linux"
-    },
-    "provider": "gemini"
-  },
-  "name": "gemini-linux",
-  "op": "auth_probes"
+  }
 }
