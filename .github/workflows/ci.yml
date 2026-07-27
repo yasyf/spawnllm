@@ -79,6 +79,58 @@ jobs:
           uv pip install --python .wheel-smoke/bin/python dist/*.whl
           .wheel-smoke/bin/spawnllm --help
 
+  macos:
+    needs: blob
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download core blob (Python)
+        uses: actions/download-artifact@v8
+        with:
+          name: core-blob
+          path: spawnllm/_core
+
+      - name: Download core blob (Go)
+        uses: actions/download-artifact@v8
+        with:
+          name: core-blob
+          path: go/internal/core
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          python-version: "3.14"
+          cache-dependency-glob: uv.lock
+
+      - name: Sync (dev)
+        run: uv sync --extra dev
+
+      - name: Test (pytest)
+        run: uv run pytest
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go/go.mod
+          cache: true
+
+      - name: Test (Go)
+        working-directory: go
+        run: go test -count=1 ./...
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Test (Rust)
+        working-directory: rust
+        env:
+          SPAWNLLM_CONFORMANCE_STRICT: "1"
+        run: cargo test --workspace
+
   go:
     needs: blob
     runs-on: ubuntu-latest
