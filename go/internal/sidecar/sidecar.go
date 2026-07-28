@@ -60,7 +60,7 @@ func descriptorPath() (string, error) {
 	if current, err := os.ReadFile(path); err == nil && bytes.Equal(current, descriptor) {
 		return path, nil
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
 	return path, materialize(dir, path)
