@@ -258,8 +258,9 @@ async fn run_on_codex_reads_the_result_file_not_stdout() {
     assert_eq!(response.output, "codex-hello");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_on_times_out_and_kills_the_child() {
+    let _deadline = common::DEADLINE_LOCK.lock().await;
     common::fixtures();
     let term = tempfile::NamedTempFile::new().unwrap();
     let term_path = term.path().to_str().unwrap().to_owned();
@@ -287,8 +288,9 @@ async fn run_on_times_out_and_kills_the_child() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn run_on_times_out_while_stdin_write_is_blocked() {
+    let _deadline = common::DEADLINE_LOCK.lock().await;
     common::fixtures();
     let spec = RunSpec::new("x".repeat(1024 * 1024), "haiku")
         .isolated(false)
@@ -331,9 +333,12 @@ async fn early_stdin_write_error_reaps_the_child() {
     assert!(!process_exists(pid), "child {pid} was not reaped");
 }
 
+// ChildGuard::drop hands the child to a freshly spawned task, which a current-thread
+// runtime only polls when this test yields. A worker thread reaps it independently.
 #[cfg(unix)]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn cancelling_run_reaps_the_child_with_sigterm() {
+    let _deadline = common::DEADLINE_LOCK.lock().await;
     common::fixtures();
     let pid_file = tempfile::NamedTempFile::new().unwrap();
     let term_file = tempfile::NamedTempFile::new().unwrap();
@@ -503,8 +508,9 @@ async fn codex_extract_sends_strict_schema_in_every_definition() {
     assert_extract_schema_strict(Backend::Codex).await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn call_returns_text_via_auto_selected_backend() {
+    let _deadline = common::DEADLINE_LOCK.lock().await;
     common::fixtures();
     let text = spawnllm::call("hi", CallOpts::default())
         .await
@@ -596,7 +602,11 @@ async fn model_tier_maps_to_the_backend_concrete_model() {
 #[test]
 fn blocking_call_runs_on_its_own_runtime() {
     common::fixtures();
-    let text = spawnllm::blocking::call("hi", CallOpts::default()).expect("blocking call succeeds");
+    let opts = CallOpts {
+        backend: Some(Backend::Claude),
+        ..CallOpts::default()
+    };
+    let text = spawnllm::blocking::call("hi", opts).expect("blocking call succeeds");
     assert_eq!(text, "hello");
 }
 

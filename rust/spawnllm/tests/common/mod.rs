@@ -8,6 +8,11 @@ use std::sync::{Mutex, OnceLock};
 /// Serializes tests that mutate host configuration environment variables.
 pub static ENV_LOCK: Mutex<()> = Mutex::new(());
 
+/// Serializes tests that assert wall-clock deadlines against a real spawned child.
+/// Run concurrently with the rest of the suite, they lose the CPU to other tests'
+/// subprocesses and miss their deadline while the behavior under test is fine.
+pub static DEADLINE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 static FIXTURES: OnceLock<PathBuf> = OnceLock::new();
 
 const CLAUDE_FAKE: &str = r#"#!/bin/sh
@@ -16,7 +21,7 @@ if [ -n "$SPAWNLLM_FAKE_PID_OUT" ]; then printf '%s' "$$" > "$SPAWNLLM_FAKE_PID_
 if [ -n "$SPAWNLLM_FAKE_TERM_OUT" ]; then trap 'printf term > "$SPAWNLLM_FAKE_TERM_OUT"; exit 0' TERM; fi
 if [ -n "$SPAWNLLM_FAKE_ENV_OUT" ]; then printf 'ANTHROPIC_API_KEY=%s\nANTHROPIC_AUTH_TOKEN=%s\n' "${ANTHROPIC_API_KEY-<unset>}" "${ANTHROPIC_AUTH_TOKEN-<unset>}" > "$SPAWNLLM_FAKE_ENV_OUT"; fi
 if [ -n "$SPAWNLLM_FAKE_EXIT_BEFORE_STDIN" ]; then exit 0; fi
-if [ -n "$SPAWNLLM_FAKE_SPIN" ]; then while :; do :; done; fi
+if [ -n "$SPAWNLLM_FAKE_SPIN" ]; then while :; do sleep 0.05; done; fi
 if [ -n "$SPAWNLLM_FAKE_IGNORE_STDIN" ]; then sleep "$SPAWNLLM_FAKE_IGNORE_STDIN"; exit 0; fi
 has_schema=0
 schema=""
