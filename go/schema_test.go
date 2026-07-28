@@ -49,8 +49,6 @@ func assertObjectsStrict(t *testing.T, node any, path string) {
 	}
 }
 
-// assertDefsStrict is the lead's explicit ask: every $defs entry, after the
-// strict transform, must carry additionalProperties:false.
 func assertDefsStrict(t *testing.T, schema map[string]any, label string) {
 	t.Helper()
 	defs, ok := schema["$defs"].(map[string]any)
@@ -93,6 +91,22 @@ func TestExtractSchemaStrictifiesNested(t *testing.T) {
 			t.Errorf("%s: $id folded into a junk description: %q", provider, d)
 		}
 	}
+}
+
+func TestExtractSchemaAppliesTheAppleDialect(t *testing.T) {
+	raw, err := extractSchema[probePerson](ProviderApple)
+	if err != nil {
+		t.Fatalf("apple: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("apple: decode %s: %v", raw, err)
+	}
+	if _, ok := m["x-order"]; !ok {
+		t.Errorf("apple schema carries no x-order — the dialect never ran: %s", raw)
+	}
+	assertObjectsStrict(t, m, "apple")
+	assertDefsStrict(t, m, "apple")
 }
 
 func TestExtractSchemaHandlesRecursiveType(t *testing.T) {

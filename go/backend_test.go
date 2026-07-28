@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -53,6 +54,70 @@ func TestSelectBackendReturnsCanceledContext(t *testing.T) {
 	_, err := SelectBackend(ctx, SelectOpts{})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("SelectBackend error = %v, want context.Canceled", err)
+	}
+}
+
+func TestSelectionOrderGatesTierRestrictedBackends(t *testing.T) {
+	caps, err := capabilitiesOnce()
+	if err != nil {
+		t.Fatalf("capabilities: %v", err)
+	}
+	for _, tt := range []struct {
+		name      string
+		model     ModelTier
+		reachable bool
+	}{
+		{name: "small", model: Small, reachable: true},
+		{name: "unspecified", model: "", reachable: false},
+		{name: "medium", model: Medium, reachable: false},
+		{name: "large", model: Large, reachable: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			order, err := selectionOrder(caps, "", tt.model)
+			if err != nil {
+				t.Fatalf("selectionOrder: %v", err)
+			}
+			if got := slices.Contains(order, ProviderApple); got != tt.reachable {
+				t.Fatalf("apple in %v = %t, want %t", order, got, tt.reachable)
+			}
+			if !slices.Contains(order, ProviderClaude) {
+				t.Fatalf("the tier gate dropped an unrestricted backend: %v", order)
+			}
+		})
+	}
+}
+
+func TestExplicitBackendBypassesTheTierGate(t *testing.T) {
+	backend, err := resolveBackend(context.Background(), CallOpts{Backend: AppleBackend(), Model: Large})
+	if err != nil {
+		t.Fatalf("resolveBackend: %v", err)
+	}
+	if backend.Provider() != ProviderApple {
+		t.Fatalf("resolved %s, want apple", backend.Provider())
+	}
+}
+
+func TestRunOnRejectsAppleSamplingKnobsWithoutRandom(t *testing.T) {
+	_, err := RunOn(context.Background(), AppleBackend(), RunSpec{
+		Prompt:    "hi",
+		Providers: ProviderConfigs{Apple: &AppleConfig{SamplingSeed: 7}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "require sampling='random'") {
+		t.Fatalf("RunOn error = %v, want a random-only knob rejection", err)
+	}
+}
+
+func TestRunOnRejectsAppleTopWithProbabilityThreshold(t *testing.T) {
+	_, err := RunOn(context.Background(), AppleBackend(), RunSpec{
+		Prompt: "hi",
+		Providers: ProviderConfigs{Apple: &AppleConfig{
+			Sampling:                     AppleSamplingRandom,
+			SamplingTop:                  20,
+			SamplingProbabilityThreshold: 0.9,
+		}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "not both") {
+		t.Fatalf("RunOn error = %v, want a conflicting-knob rejection", err)
 	}
 }
 
@@ -251,5 +316,64 @@ func TestExtractSchemaOpenAIStrict(t *testing.T) {
 	required, ok := m["required"].([]any)
 	if !ok || len(required) != 1 || required[0] != "echo" {
 		t.Fatalf("openai strict schema required = %v, want [echo]", m["required"])
+	}
+}
+
+func TestAppleConfigDefaultsAndPlan(t *testing.T) {
+	cs := RunSpec{Prompt: "hi", Providers: ProviderConfigs{Apple: &AppleConfig{}}}.core()
+	if cs.Apple.UseCase != AppleUseCaseGeneral || cs.Apple.Guardrails != AppleGuardrailsDefault {
+		t.Fatalf("zero AppleConfig = %s/%s, want general/default", cs.Apple.UseCase, cs.Apple.Guardrails)
+	}
+	if cs.Apple.Sampling != nil {
+		t.Fatalf("zero Sampling = %v, want nil", *cs.Apple.Sampling)
+	}
+	_, plan, _, err := corePlan(ProviderApple, cs)
+	if err != nil {
+		t.Fatalf("corePlan: %v", err)
+	}
+	if len(plan.Argv) != 1 || plan.Argv[0] != "spawnllm-apple" {
+		t.Fatalf("argv = %v, want [spawnllm-apple]", plan.Argv)
+	}
+	want := `{"prompt":"hi","instructions":null,"use_case":"general","guardrails":"default","options":null,"schema":null}`
+	if plan.Stdin != want {
+		t.Fatalf("stdin = %s, want %s", plan.Stdin, want)
+	}
+}
+
+func TestAppleConfigKnobsReachThePlan(t *testing.T) {
+	cs := RunSpec{
+		Prompt: "hi",
+		Providers: ProviderConfigs{Apple: &AppleConfig{
+			Instructions: "Tag it.",
+			UseCase:      AppleUseCaseContentTagging,
+			Guardrails:   AppleGuardrailsPermissiveContentTransformations,
+			Temperature:  0.5,
+			Sampling:     AppleSamplingRandom,
+			SamplingTop:  20,
+			SamplingSeed: 7,
+		}},
+	}.core()
+	_, plan, _, err := corePlan(ProviderApple, cs)
+	if err != nil {
+		t.Fatalf("corePlan: %v", err)
+	}
+	want := `{"prompt":"hi","instructions":"Tag it.","use_case":"content_tagging","guardrails":"permissive_content_transformations",` +
+		`"options":{"temperature":0.5,"maximum_response_tokens":null,` +
+		`"sampling":{"mode":"random","top":20,"probability_threshold":null,"seed":7}},"schema":null}`
+	if plan.Stdin != want {
+		t.Fatalf("stdin = %s, want %s", plan.Stdin, want)
+	}
+}
+
+func TestAppleBackendResolvesFromCapabilities(t *testing.T) {
+	if backendForProvider(ProviderApple).Provider() != ProviderApple {
+		t.Fatal("backendForProvider(apple) should return the apple backend")
+	}
+	model, err := modelTier(AppleBackend(), Small)
+	if err != nil {
+		t.Fatalf("modelTier: %v", err)
+	}
+	if model != "" {
+		t.Fatalf("apple model = %q, want empty (the device hosts one model)", model)
 	}
 }

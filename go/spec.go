@@ -23,6 +23,67 @@ func (t ModelTier) orDefault() ModelTier {
 	return t
 }
 
+// AppleUseCase names the SystemLanguageModelUseCase the sidecar builds its
+// session with. The zero value is AppleUseCaseGeneral.
+type AppleUseCase string
+
+// The use cases the on-device model is specialized for.
+const (
+	AppleUseCaseGeneral        AppleUseCase = "general"
+	AppleUseCaseContentTagging AppleUseCase = "content_tagging"
+)
+
+func (u AppleUseCase) orDefault() AppleUseCase {
+	if u == "" {
+		return AppleUseCaseGeneral
+	}
+	return u
+}
+
+// AppleGuardrails names the SystemLanguageModelGuardrails the sidecar builds its
+// session with. The zero value is AppleGuardrailsDefault.
+type AppleGuardrails string
+
+// The guardrail settings the on-device model runs under.
+const (
+	AppleGuardrailsDefault                          AppleGuardrails = "default"
+	AppleGuardrailsPermissiveContentTransformations AppleGuardrails = "permissive_content_transformations"
+)
+
+func (g AppleGuardrails) orDefault() AppleGuardrails {
+	if g == "" {
+		return AppleGuardrailsDefault
+	}
+	return g
+}
+
+// AppleSampling picks the SamplingMode factory the sidecar calls. The empty
+// string leaves the framework default.
+type AppleSampling string
+
+// The sampling modes the on-device model decodes with.
+const (
+	AppleSamplingGreedy AppleSampling = "greedy"
+	AppleSamplingRandom AppleSampling = "random"
+)
+
+// AppleConfig passes on-device Foundation Models knobs through to the
+// spawnllm-apple sidecar. Empty string and zero fields are unset; SamplingTop,
+// SamplingProbabilityThreshold, and SamplingSeed apply only to
+// AppleSamplingRandom, and Top and ProbabilityThreshold are mutually exclusive —
+// Run and RunOn reject either combination rather than dropping the knob.
+type AppleConfig struct {
+	Instructions                 string
+	UseCase                      AppleUseCase
+	Guardrails                   AppleGuardrails
+	Temperature                  float64
+	MaximumResponseTokens        int
+	Sampling                     AppleSampling
+	SamplingTop                  int
+	SamplingProbabilityThreshold float64
+	SamplingSeed                 uint64
+}
+
 // ClaudeConfig passes flags through to the claude CLI. Empty string and zero
 // fields are unset; Tools distinguishes nil (CLI default) from an empty slice
 // (disable every built-in tool).
@@ -63,6 +124,7 @@ type GeminiConfig struct {
 // ProviderConfigs carries the per-provider flag passthrough a RunSpec applies;
 // only the matching backend's config is read.
 type ProviderConfigs struct {
+	Apple  *AppleConfig
 	Claude *ClaudeConfig
 	Codex  *CodexConfig
 	Gemini *GeminiConfig
@@ -113,10 +175,23 @@ type coreSpec struct {
 	Timeout        int64           `json:"timeout"`
 	MaxAttempts    int64           `json:"max_attempts"`
 	Schema         json.RawMessage `json:"schema"`
+	Apple          *coreApple      `json:"apple"`
 	Claude         *coreClaude     `json:"claude"`
 	Codex          *coreCodex      `json:"codex"`
 	Gemini         *coreGemini     `json:"gemini"`
 	OpenAIEndpoint *coreOpenAI     `json:"openai_endpoint"`
+}
+
+type coreApple struct {
+	Instructions                 *string         `json:"instructions"`
+	UseCase                      AppleUseCase    `json:"use_case"`
+	Guardrails                   AppleGuardrails `json:"guardrails"`
+	Temperature                  *float64        `json:"temperature"`
+	MaximumResponseTokens        *int            `json:"maximum_response_tokens"`
+	Sampling                     *AppleSampling  `json:"sampling"`
+	SamplingTop                  *int            `json:"sampling_top"`
+	SamplingProbabilityThreshold *float64        `json:"sampling_probability_threshold"`
+	SamplingSeed                 *uint64         `json:"sampling_seed"`
 }
 
 type coreClaude struct {
@@ -168,6 +243,13 @@ func optInt(n int) *int {
 	return &n
 }
 
+func optUint64(n uint64) *uint64 {
+	if n == 0 {
+		return nil
+	}
+	return &n
+}
+
 func optFloat(f float64) *float64 {
 	if f == 0 {
 		return nil
@@ -189,9 +271,31 @@ func (s RunSpec) core() coreSpec {
 		Timeout:     int64(s.timeout() / time.Second),
 		MaxAttempts: int64(s.maxAttempts()),
 		Schema:      schema,
+		Apple:       coreAppleOf(s.Providers.Apple),
 		Claude:      coreClaudeOf(s.Providers.Claude),
 		Codex:       coreCodexOf(s.Providers.Codex),
 		Gemini:      coreGeminiOf(s.Providers.Gemini),
+	}
+}
+
+func coreAppleOf(c *AppleConfig) *coreApple {
+	if c == nil {
+		return nil
+	}
+	var sampling *AppleSampling
+	if c.Sampling != "" {
+		sampling = &c.Sampling
+	}
+	return &coreApple{
+		Instructions:                 optString(c.Instructions),
+		UseCase:                      c.UseCase.orDefault(),
+		Guardrails:                   c.Guardrails.orDefault(),
+		Temperature:                  optFloat(c.Temperature),
+		MaximumResponseTokens:        optInt(c.MaximumResponseTokens),
+		Sampling:                     sampling,
+		SamplingTop:                  optInt(c.SamplingTop),
+		SamplingProbabilityThreshold: optFloat(c.SamplingProbabilityThreshold),
+		SamplingSeed:                 optUint64(c.SamplingSeed),
 	}
 }
 

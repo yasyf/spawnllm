@@ -1,0 +1,19 @@
+{
+  "name": "apple-malformed-envelope",
+  "op": "resolve",
+  "input": {
+    "provider": "apple",
+    "raw": "not json",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": false
+  },
+  "expected": {
+    "status": "error",
+    "kind": "envelope",
+    "msg": "apple returned an invalid response envelope: not json",
+    "transient": false,
+    "cost_usd": null,
+    "usage": null
+  }
+}

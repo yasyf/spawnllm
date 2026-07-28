@@ -29,8 +29,9 @@ type attempt struct {
 var retrySleep = sleepCtx
 
 // CallOpts configures Call and Extract. Backend overrides auto-selection;
-// Specialty scopes auto-selection; Model "" resolves to Small; APIAuth requests
-// API-credential authentication; Timeout is per-attempt (0 → 180s).
+// Specialty scopes auto-selection; Model "" resolves to Small and gates the
+// tier-restricted backends; APIAuth requests API-credential authentication;
+// Timeout is per-attempt (0 → 180s).
 type CallOpts struct {
 	Backend   Backend
 	Specialty Specialty
@@ -42,9 +43,10 @@ type CallOpts struct {
 }
 
 // Run executes a RunSpec on the first ready backend, retrying transient failures
-// with backoff. The returned error is only a caller-side failure (an invalid
-// spec, context cancellation, or backend selection); every provider outcome
-// lands in Response.Err.
+// with backoff. RunSpec.Model is a concrete provider model id rather than a tier,
+// so auto-selection skips every tier-restricted backend; reach one with RunOn.
+// The returned error is only a caller-side failure (an invalid spec, context
+// cancellation, or backend selection); every provider outcome lands in Response.Err.
 func Run(ctx context.Context, spec RunSpec) (*Response, error) {
 	if err := validateRunSpec(spec); err != nil {
 		return nil, err
@@ -123,24 +125,23 @@ func Extract[T any](ctx context.Context, prompt string, opts CallOpts) (T, error
 }
 
 func validateRunSpec(spec RunSpec) error {
-	if len(spec.Schema) == 0 {
-		return nil
+	if len(spec.Schema) > 0 {
+		var schema map[string]json.RawMessage
+		if err := json.Unmarshal(spec.Schema, &schema); err != nil {
+			return fmt.Errorf("spawnllm: schema must be a JSON object: %w", err)
+		}
+		if schema == nil {
+			return errors.New("spawnllm: schema must be a JSON object")
+		}
 	}
-	var schema map[string]json.RawMessage
-	if err := json.Unmarshal(spec.Schema, &schema); err != nil {
-		return fmt.Errorf("spawnllm: schema must be a JSON object: %w", err)
-	}
-	if schema == nil {
-		return errors.New("spawnllm: schema must be a JSON object")
-	}
-	return nil
+	return coreValidateSpec(spec.core())
 }
 
 func resolveBackend(ctx context.Context, opts CallOpts) (Backend, error) {
 	if opts.Backend != nil {
 		return opts.Backend, nil
 	}
-	return SelectBackend(ctx, SelectOpts{Specialty: opts.Specialty})
+	return SelectBackend(ctx, SelectOpts{Specialty: opts.Specialty, Model: opts.Model.orDefault()})
 }
 
 func extractSchema[T any](provider Provider) (json.RawMessage, error) {
@@ -160,6 +161,8 @@ func extractSchema[T any](provider Provider) (json.RawMessage, error) {
 		return coreStrictSchema("anthropic", raw)
 	case ProviderCodex, ProviderOpenAIEndpoint:
 		return coreStrictSchema("openai", raw)
+	case ProviderApple:
+		return coreStrictSchema("apple", raw)
 	default:
 		return raw, nil
 	}

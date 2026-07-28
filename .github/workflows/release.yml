@@ -1,0 +1,319 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  blob:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - uses: yasyf/homebrew-tap/.github/actions/verify-tag-on-main@2281a3ea884422db190de44fad65ce9bc08b19c4
+
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          targets: wasm32-wasip1
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: rust
+
+      - name: Build the core wasm blob
+        id: blob
+        env:
+          SPAWNLLM_BLOB_NO_FETCH: "1"
+        run: |
+          bash scripts/build_wasm.sh
+          echo "asset=spawnllm_core-$(bash scripts/build_wasm.sh --hash-only).wasm" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the blob to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          ASSET: ${{ steps.blob.outputs.asset }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --title "$TAG" --generate-notes --latest=false
+          if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -qxF "$ASSET"; then
+            echo "$ASSET is already published — every consumer fetches those bytes"
+            exit 0
+          fi
+          cp go/internal/core/spawnllm_core.wasm "$ASSET"
+          sha256sum "$ASSET" | cut -d' ' -f1 > "$ASSET.sha256"
+          gh release upload "$TAG" "$ASSET" "$ASSET.sha256"
+
+  build:
+    needs: [blob]
+    uses: yasyf/homebrew-tap/.github/workflows/release-pypi-build.yml@41f8de6765b3b833ef333b0b98f5683f0e46685b
+    secrets: inherit
+    with:
+      dist-name: spawnllm
+      python-version: "3.14"
+      pre-build: rustup target add wasm32-wasip1 && bash scripts/build_wasm.sh
+
+  macos-wheel:
+    needs: [blob]
+    runs-on: macos-26
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - uses: yasyf/homebrew-tap/.github/actions/verify-tag-on-main@2281a3ea884422db190de44fad65ce9bc08b19c4
+
+      - name: Pin Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.5.app
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: "3.14"
+          cache-dependency-glob: uv.lock
+
+      - name: Set version from tag
+        run: uv version --frozen "${GITHUB_REF_NAME#v}"
+
+      - name: Resolve the core wasm blob
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/build_wasm.sh
+
+      - name: Build the Apple sidecar
+        run: swift build -c release --package-path swift/spawnllm-apple
+
+      - name: Stage the sidecar into the package
+        run: |
+          mkdir -p spawnllm/_bin
+          cp swift/spawnllm-apple/.build/release/spawnllm-apple spawnllm/_bin/spawnllm-apple
+          chmod +x spawnllm/_bin/spawnllm-apple
+
+      - name: Build the wheel
+        run: uv build --wheel
+
+      - name: Retag the wheel for macOS
+        run: uv run --with wheel wheel tags --platform-tag macosx_26_0_arm64 --remove dist/*.whl
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dist-macos
+          path: dist/*.whl
+          if-no-files-found: error
+
+      - name: Publish the sidecar to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          ASSET="spawnllm-apple_${TAG#v}_darwin_arm64.tar.gz"
+          if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -qxF "$ASSET"; then
+            echo "$ASSET is already published; the descriptor pins its digest, so it is never rebuilt"
+            exit 0
+          fi
+          TZ=UTC touch -t 198001010000 swift/spawnllm-apple/.build/release/spawnllm-apple
+          tar --uid 0 --gid 0 --uname '' --gname '' \
+            -cf - -C swift/spawnllm-apple/.build/release spawnllm-apple | gzip -n > "$ASSET"
+          gh release upload "$TAG" "$ASSET"
+
+  publish:
+    needs: [build, macos-wheel]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: dist*
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247
+
+  go:
+    needs: [blob, descriptor]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - uses: yasyf/homebrew-tap/.github/actions/verify-tag-on-main@2281a3ea884422db190de44fad65ce9bc08b19c4
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go/go.mod
+          cache: true
+
+      - name: Resolve the core wasm blob
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/build_wasm.sh
+
+      - name: Sync the sidecar descriptor
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release download "$TAG" --pattern spawnllm-apple.binrun \
+            --output descriptor/spawnllm-apple.binrun --clobber
+          bash scripts/sync_descriptor.sh
+
+      - name: Test at the release commit
+        working-directory: go
+        run: go test -race -count=1 ./...
+
+      - name: Create and push the directory-prefixed alias tag
+        run: |
+          ALIAS="go/${GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --tags origin "$ALIAS" >/dev/null; then
+            echo "$ALIAS is already published — nothing to do"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f go/internal/core/spawnllm_core.wasm go/internal/sidecar/spawnllm-apple.binrun
+          git commit -m "release: embed core wasm blob and sidecar descriptor for ${GITHUB_REF_NAME}"
+          git tag "$ALIAS" HEAD
+          git push origin "$ALIAS"
+
+      - name: Warm the module proxy
+        run: GOPROXY=https://proxy.golang.org go mod download "github.com/yasyf/spawnllm/go@${GITHUB_REF_NAME}" || true
+
+  crates:
+    needs: [blob, descriptor]
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - uses: yasyf/homebrew-tap/.github/actions/verify-tag-on-main@2281a3ea884422db190de44fad65ce9bc08b19c4
+
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+
+      - name: Sync the sidecar descriptor
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release download "$TAG" --pattern spawnllm-apple.binrun \
+            --output descriptor/spawnllm-apple.binrun --clobber
+          bash scripts/sync_descriptor.sh
+
+      - name: Install cargo-edit
+        run: cargo install cargo-edit --locked
+
+      - name: Stamp workspace version from tag
+        working-directory: rust
+        run: cargo set-version --workspace "${GITHUB_REF_NAME#v}"
+
+      - uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1
+        id: auth
+
+      - name: Publish
+        working-directory: rust
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish --workspace --allow-dirty
+
+  descriptor:
+    needs: [macos-wheel]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go/go.mod
+          cache: true
+
+      - name: Install binrun
+        run: go install github.com/yasyf/binrun/cmd/binrun@v0.2.0
+
+      - name: Render the descriptor from the published asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ASSET="spawnllm-apple_${TAG#v}_darwin_arm64.tar.gz"
+          gh release download "$TAG" --pattern "$ASSET"
+          bash scripts/render-descriptor.sh "$ASSET" "${TAG#v}" > descriptor/spawnllm-apple.binrun
+          chmod +x descriptor/spawnllm-apple.binrun
+          binrun -- parse descriptor/spawnllm-apple.binrun
+
+      - name: Publish the descriptor to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: gh release upload "$TAG" descriptor/spawnllm-apple.binrun --clobber
+
+      - name: Commit the descriptor to main
+        run: |
+          bash scripts/sync_descriptor.sh
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add descriptor/spawnllm-apple.binrun \
+                  go/internal/sidecar/spawnllm-apple.binrun \
+                  rust/spawnllm/spawnllm-apple.binrun
+          if git diff --quiet --cached; then
+            echo "descriptor unchanged"
+            exit 0
+          fi
+          git commit -m "release: descriptor for ${GITHUB_REF_NAME} [skip ci]"
+          for attempt in 1 2 3; do
+            git push origin HEAD:main && exit 0
+            echo "push $attempt lost the race; rebasing onto main"
+            git pull --rebase origin main
+          done
+          git push origin HEAD:main
+
+  github-release:
+    needs: [build, macos-wheel, publish, descriptor, go, crates]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: dist*
+          path: dist
+          merge-multiple: true
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          gh release upload "$TAG" dist/* --clobber
+          gh release edit "$TAG" --draft=false --latest

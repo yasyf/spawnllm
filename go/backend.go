@@ -7,8 +7,11 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"slices"
 	"sync"
 	"time"
+
+	"github.com/yasyf/spawnllm/go/internal/sidecar"
 )
 
 // Provider identifies an LLM backend's provider.
@@ -20,6 +23,7 @@ const (
 	ProviderCodex          Provider = "codex"
 	ProviderGemini         Provider = "gemini"
 	ProviderAntigravity    Provider = "antigravity"
+	ProviderApple          Provider = "apple"
 	ProviderOpenAIEndpoint Provider = "openai_endpoint"
 )
 
@@ -55,7 +59,7 @@ func (s BackendStatus) Ready() bool { return s.State == BackendReady }
 
 // Backend executes a RunSpec against one provider. The set is sealed to this
 // package's constructors: ClaudeBackend, CodexBackend, GeminiBackend,
-// AntigravityBackend, and OpenAIEndpoint.
+// AntigravityBackend, AppleBackend, and OpenAIEndpoint.
 type Backend interface {
 	Provider() Provider
 	CheckStatus(ctx context.Context) BackendStatus
@@ -112,6 +116,12 @@ func GeminiBackend() Backend { return &cliBackend{provider: ProviderGemini} }
 // AntigravityBackend returns a backend for the Antigravity agy CLI.
 func AntigravityBackend() Backend { return &cliBackend{provider: ProviderAntigravity} }
 
+// AppleBackend returns a backend for the spawnllm-apple on-device Foundation
+// Models sidecar. It hosts one small model, so Model is inert, auto-selection
+// reaches it only for the Small tier, and every other tier reaches it only by
+// passing it explicitly.
+func AppleBackend() Backend { return &cliBackend{provider: ProviderApple} }
+
 // OpenAIOpts configures an OpenAIEndpoint backend. APIKey "" becomes "local";
 // Client nil uses http.DefaultClient.
 type OpenAIOpts struct {
@@ -143,21 +153,29 @@ func backendForProvider(p Provider) Backend {
 		return GeminiBackend()
 	case ProviderAntigravity:
 		return AntigravityBackend()
+	case ProviderApple:
+		return AppleBackend()
 	default:
 		return nil
 	}
 }
 
 // SelectOpts configures SelectBackend. Specialty promotes its backend to the
-// front of the chain; Timeout bounds each readiness probe (0 → 10s).
+// front of the chain; Model is the abstract tier the run wants, gating backends
+// core restricts to a subset of tiers, and its zero value names no tier — the
+// shape Run takes, whose spec carries a concrete provider model id — which
+// excludes every tier-restricted backend; Timeout bounds each readiness probe
+// (0 → 10s).
 type SelectOpts struct {
 	Specialty Specialty
+	Model     ModelTier
 	Timeout   time.Duration
 }
 
 // SelectBackend returns the first installed, authenticated backend in priority
 // order, promoting Specialty's backend to the front and skipping the auto-select
-// exclusions. It returns a *BackendUnavailableError when none is ready.
+// exclusions plus every backend whose tier restriction excludes Model. It returns
+// a *BackendUnavailableError when none is ready.
 func SelectBackend(ctx context.Context, opts SelectOpts) (Backend, error) {
 	timeout := opts.Timeout
 	if timeout <= 0 {
@@ -167,7 +185,7 @@ func SelectBackend(ctx context.Context, opts SelectOpts) (Backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	order, err := selectionOrder(caps, opts.Specialty)
+	order, err := selectionOrder(caps, opts.Specialty, opts.Model)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +206,7 @@ func SelectBackend(ctx context.Context, opts SelectOpts) (Backend, error) {
 	return nil, &BackendUnavailableError{Specialty: opts.Specialty, Statuses: statuses}
 }
 
-func selectionOrder(caps capabilities, specialty Specialty) ([]Provider, error) {
+func selectionOrder(caps capabilities, specialty Specialty, model ModelTier) ([]Provider, error) {
 	excluded := make(map[string]bool, len(caps.AutoSelectExcludes))
 	for _, e := range caps.AutoSelectExcludes {
 		excluded[e] = true
@@ -205,6 +223,9 @@ func selectionOrder(caps capabilities, specialty Specialty) ([]Provider, error) 
 	}
 	for _, p := range caps.Priority {
 		if seen[p] || excluded[p] {
+			continue
+		}
+		if tiers, restricted := caps.AutoSelectTiers[p]; restricted && !slices.Contains(tiers, string(model)) {
 			continue
 		}
 		order = append(order, Provider(p))
@@ -233,28 +254,47 @@ func checkStatusViaProbes(ctx context.Context, provider Provider) BackendStatus 
 	if err != nil {
 		return BackendStatus{State: BackendNotAuthenticated}
 	}
-	if _, err := exec.LookPath(probes.Binary); err != nil {
-		hint := ""
-		if probes.InstallHint != nil {
-			hint = *probes.InstallHint
-		}
-		return BackendStatus{State: BackendNotInstalled, Binary: probes.Binary, InstallHint: hint}
+	launch, err := resolveBinary(probes.Binary)
+	if err != nil {
+		return BackendStatus{State: BackendNotInstalled, Binary: probes.Binary, InstallHint: installHint(probes)}
 	}
 	for _, p := range probes.Probes {
-		if runProbe(ctx, p) {
+		if runProbe(ctx, launch, p) {
 			return BackendStatus{State: BackendReady, Binary: probes.Binary}
 		}
 	}
 	return BackendStatus{State: BackendNotAuthenticated, Binary: probes.Binary}
 }
 
-func runProbe(ctx context.Context, p authProbe) bool {
+// resolveBinary returns the argv prefix that runs binary, reporting an error
+// when it is not installed. Every CLI but the Apple sidecar must be on PATH; the
+// sidecar falls back to binrun against its pinned descriptor.
+func resolveBinary(binary string) ([]string, error) {
+	if binary == sidecar.Binary {
+		return sidecar.Launch()
+	}
+	path, err := exec.LookPath(binary)
+	if err != nil {
+		return nil, err
+	}
+	return []string{path}, nil
+}
+
+func installHint(probes authProbes) string {
+	if probes.Binary == sidecar.Binary {
+		return sidecar.InstallHint
+	}
+	if probes.InstallHint == nil {
+		return ""
+	}
+	return *probes.InstallHint
+}
+
+func runProbe(ctx context.Context, launch []string, p authProbe) bool {
 	switch p.Kind {
 	case "exec_exit0":
-		if len(p.Argv) == 0 {
-			return false
-		}
-		return exec.CommandContext(ctx, p.Argv[0], p.Argv[1:]...).Run() == nil
+		argv := append(append([]string{}, launch...), p.Argv[1:]...)
+		return exec.CommandContext(ctx, argv[0], argv[1:]...).Run() == nil
 	case "keychain_exists":
 		return exec.CommandContext(ctx, "security", "find-generic-password", "-s", p.Service, "-a", p.Account).Run() == nil
 	case "env_any":

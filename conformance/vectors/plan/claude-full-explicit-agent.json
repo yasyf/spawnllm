@@ -22,6 +22,7 @@
           "answer"
         ]
       },
+      "apple": null,
       "claude": {
         "append_system_prompt": "extra",
         "disable_slash_commands": true,

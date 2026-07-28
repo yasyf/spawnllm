@@ -50,6 +50,7 @@ class TestWireSpec:
             "api_auth": False,
             "timeout": 180,
             "max_attempts": 5,
+            "apple": None,
             "claude": None,
             "codex": None,
             "gemini": None,
@@ -77,6 +78,7 @@ class TestWireSpec:
             "api_auth": True,
             "timeout": 42,
             "max_attempts": 2,
+            "apple": None,
             "claude": dataclasses.asdict(ClaudeConfig(tools=("Bash", "Read"))),
             "codex": None,
             "gemini": None,
@@ -84,7 +86,6 @@ class TestWireSpec:
         }
 
     def test_tools_none_versus_empty_tuple_is_preserved(self) -> None:
-        # Assert the JSON the core actually consumes: None -> null, () -> [].
         def wire(cfg: ClaudeConfig) -> dict:
             spec = RunSpec(prompt="hi", model="haiku", provider_configs={"claude": cfg})
             return json.loads(json.dumps(ClaudeCliBackend().wire_spec(spec)))
@@ -299,7 +300,6 @@ class TestClaudeIsolation:
         env = backend.env(RunSpec(prompt="hi", model="haiku"))
         config_dir = Path(env["CLAUDE_CONFIG_DIR"])
         assert config_dir.is_dir()
-        # The dir is created once and cached on the instance, not regenerated per call.
         assert backend.env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"] == str(config_dir)
         # The token is substituted in place of the plan's ${isolated_config_dir} placeholder.
         assert "${isolated_config_dir}" not in env["CLAUDE_CONFIG_DIR"]
@@ -399,7 +399,7 @@ class TestRegistry:
         core_providers = set(caps["providers"])
         native_backends = {name: backend for name, backend in BACKENDS_BY_NAME.items() if name in core_providers}
         specialty_aliases = {"claude-sdk": "claude"}
-        assert set(BACKENDS_BY_NAME) - core_providers == {"claude-sdk", "apple"}
+        assert set(BACKENDS_BY_NAME) - core_providers == {"claude-sdk"}
         assert caps["providers"] == list(native_backends)
         assert caps["priority"] == [backend.provider for backend in PRIORITY if backend.provider in core_providers]
         assert caps["specialties"] == {
@@ -410,6 +410,11 @@ class TestRegistry:
         assert caps["binaries"] == {name: backend.binary for name, backend in native_backends.items()}
         assert caps["install_hints"] == {name: backend.install_hint for name, backend in native_backends.items()}
         assert caps["auto_select_excludes"] == ["gemini"]
+        assert caps["auto_select_tiers"] == {
+            name: sorted(backend.auto_select_tiers)
+            for name, backend in native_backends.items()
+            if backend.auto_select_tiers is not None
+        }
         assert caps["api_key_vars"]["claude"] == ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]
 
 

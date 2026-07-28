@@ -7,6 +7,7 @@ mod resolve;
 mod retry;
 mod route;
 mod schema;
+mod validate;
 pub mod wire;
 
 use serde::de::DeserializeOwned;
@@ -16,6 +17,7 @@ use serde_json::{Value, json};
 pub use extract::{ExtractInput, extract_json};
 pub use retry::{RetryDecision, RetryInput, backoff, retry_decision};
 pub use route::{Capabilities, ModelTiers, capabilities};
+pub use validate::{validate_apple, validate_spec};
 
 pub(crate) struct OpError {
     kind: &'static str,
@@ -36,6 +38,13 @@ impl OpError {
         Self {
             kind: "bad_input",
             msg: error.to_string(),
+        }
+    }
+
+    pub(crate) fn invalid_spec(msg: &'static str) -> Self {
+        Self {
+            kind: "invalid_spec",
+            msg: msg.to_owned(),
         }
     }
 
@@ -82,6 +91,7 @@ fn run(op: &str, input: Value) -> OpResult {
         "retry_decision" => retry::dispatch(input),
         "extract_json" => extract::dispatch(input),
         "plan" => plan::dispatch(input),
+        "validate_spec" => validate::dispatch(input),
         "resolve" => resolve::dispatch(input),
         "strict_schema" => schema::dispatch(input),
         "auth_probes" => probe::dispatch(input),

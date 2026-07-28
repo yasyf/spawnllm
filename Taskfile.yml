@@ -13,3 +13,8 @@ tasks:
     desc: Build the wasm core blob
     cmds:
       - bash scripts/build_wasm.sh
+
+  descriptor:
+    desc: Copy the sidecar binrun descriptor into the Go and Rust host trees
+    cmds:
+      - bash scripts/sync_descriptor.sh

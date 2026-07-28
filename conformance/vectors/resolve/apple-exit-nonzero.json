@@ -1,0 +1,19 @@
+{
+  "name": "apple-exit-nonzero",
+  "op": "resolve",
+  "input": {
+    "provider": "apple",
+    "raw": "",
+    "returncode": 1,
+    "stderr": "spawnllm-apple: bad request",
+    "wants_value": false
+  },
+  "expected": {
+    "status": "error",
+    "kind": "exit",
+    "msg": "apple exited 1: spawnllm-apple: bad request",
+    "transient": false,
+    "cost_usd": null,
+    "usage": null
+  }
+}

@@ -74,7 +74,7 @@ def test_status_reports_per_backend_and_selection(monkeypatch: pytest.MonkeyPatc
             CodexCliBackend: BackendNotInstalled(binary="codex", install_hint="npm install -g @openai/codex"),
             AntigravityCliBackend: BackendNotAuthenticated("agy"),
             GeminiCliBackend: BackendNotAuthenticated("gemini"),
-            AppleBackend: BackendReady("apple"),
+            AppleBackend: BackendReady("spawnllm-apple"),
         },
     )
     result = CliRunner().invoke(main, ["status"])
@@ -86,7 +86,7 @@ def test_status_reports_per_backend_and_selection(monkeypatch: pytest.MonkeyPatc
         "codex: not installed — install with: npm install -g @openai/codex",
         "agy: not authenticated",
         "gemini: not authenticated",
-        "apple: ready",
+        "spawnllm-apple: ready",
         "selected: claude-sdk",
     ]
     assert re.fullmatch(r"core: \d+\.\d+\.\d+@[0-9a-f]{12}", core_line)
@@ -101,7 +101,7 @@ def test_status_selects_apple_when_it_is_the_only_ready_backend(monkeypatch: pyt
             CodexCliBackend: BackendNotAuthenticated("codex"),
             AntigravityCliBackend: BackendNotAuthenticated("agy"),
             GeminiCliBackend: BackendNotAuthenticated("gemini"),
-            AppleBackend: BackendReady("apple"),
+            AppleBackend: BackendReady("spawnllm-apple"),
         },
     )
     result = CliRunner().invoke(main, ["status"])
@@ -113,8 +113,8 @@ def test_status_selects_apple_when_it_is_the_only_ready_backend(monkeypatch: pyt
         "codex: not authenticated",
         "agy: not authenticated",
         "gemini: not authenticated",
-        "apple: ready",
-        "selected: apple",
+        "spawnllm-apple: ready",
+        "selected: spawnllm-apple",
     ]
 
 
@@ -127,7 +127,7 @@ def test_status_reports_none_available(monkeypatch: pytest.MonkeyPatch) -> None:
             CodexCliBackend: BackendNotAuthenticated("codex"),
             AntigravityCliBackend: BackendNotAuthenticated("agy"),
             GeminiCliBackend: BackendNotAuthenticated("gemini"),
-            AppleBackend: BackendNotAuthenticated("apple"),
+            AppleBackend: BackendNotAuthenticated("spawnllm-apple"),
         },
     )
     result = CliRunner().invoke(main, ["status"])
@@ -139,7 +139,7 @@ def test_status_reports_none_available(monkeypatch: pytest.MonkeyPatch) -> None:
         "codex: not authenticated",
         "agy: not authenticated",
         "gemini: not authenticated",
-        "apple: not authenticated",
+        "spawnllm-apple: not authenticated",
         "selected: none available",
     ]
     assert re.fullmatch(r"core: \d+\.\d+\.\d+@[0-9a-f]{12}", core_line)

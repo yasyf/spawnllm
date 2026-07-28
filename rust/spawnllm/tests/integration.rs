@@ -9,7 +9,10 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::json;
 
-use spawnllm::{Backend, BackendStatus, CallOpts, Error, ModelTier, RunSpec, Specialty};
+use spawnllm::{
+    AppleConfig, AppleSampling, Backend, BackendStatus, CallOpts, Error, ModelTier, RunSpec,
+    Specialty,
+};
 
 #[derive(Debug, Deserialize, JsonSchema, PartialEq)]
 struct Sample {
@@ -526,14 +529,54 @@ async fn check_status_reports_ready_for_installed_authenticated_backends() {
 #[tokio::test]
 async fn select_backend_follows_priority_and_specialty() {
     common::fixtures();
-    let auto = spawnllm::select_backend(None, Duration::from_secs(30))
+    let auto = spawnllm::select_backend(None, None, Duration::from_secs(30))
         .await
         .expect("a backend is ready");
     assert!(matches!(auto, Backend::Claude));
-    let debugging = spawnllm::select_backend(Some(Specialty::Debugging), Duration::from_secs(30))
-        .await
-        .expect("codex serves debugging");
+    let debugging =
+        spawnllm::select_backend(Some(Specialty::Debugging), None, Duration::from_secs(30))
+            .await
+            .expect("codex serves debugging");
     assert!(matches!(debugging, Backend::Codex));
+}
+
+#[test]
+fn an_apple_sampling_knob_without_random_sampling_fails_validation() {
+    let spec = RunSpec::new("hi", "").apple(AppleConfig {
+        sampling_seed: Some(7),
+        ..AppleConfig::default()
+    });
+    let error = spawnllm::blocking::run(spec)
+        .outcome
+        .expect_err("a knob the framework would drop is rejected");
+    assert!(
+        matches!(error.source, Error::Validation(_)),
+        "unexpected source: {:?}",
+        error.source
+    );
+    assert!(
+        error.msg.contains("require sampling='random'"),
+        "unexpected message: {}",
+        error.msg
+    );
+}
+
+#[test]
+fn apple_top_and_probability_threshold_together_fail_validation() {
+    let spec = RunSpec::new("hi", "").apple(AppleConfig {
+        sampling: Some(AppleSampling::Random),
+        sampling_top: Some(20),
+        sampling_probability_threshold: Some(0.9),
+        ..AppleConfig::default()
+    });
+    let error = spawnllm::blocking::run(spec)
+        .outcome
+        .expect_err("the framework rejects both knobs at once");
+    assert!(
+        error.msg.contains("not both"),
+        "unexpected message: {}",
+        error.msg
+    );
 }
 
 #[tokio::test]

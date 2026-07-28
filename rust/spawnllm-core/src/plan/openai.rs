@@ -61,6 +61,7 @@ mod tests {
             max_attempts: 5,
             api_auth: false,
             schema,
+            apple: None,
             claude: None,
             codex: None,
             gemini: None,

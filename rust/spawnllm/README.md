@@ -32,7 +32,7 @@ call: pong
 extract: Paris
 ```
 
-The API is async-first — `call`, `extract`, `run`, and `run_on` are `async fn`s on tokio, and the `blocking` module mirrors them for sync contexts. No API keys: the CLI backends drive the logins you already have, auto-selecting the first ready backend (claude, then codex, then agy). `extract` derives a strict JSON schema from your type via `schemars` and deserializes the validated reply.
+The API is async-first — `call`, `extract`, `run`, and `run_on` are `async fn`s on tokio, and the `blocking` module mirrors them for sync contexts. No API keys: the CLI backends drive the logins you already have, auto-selecting the first ready backend (claude, then codex, then agy, then apple — small-tier requests only; chosen explicitly it works at any tier). On macOS 26+ Apple Silicon with Apple Intelligence enabled, the `apple` backend drives Apple's on-device Foundation Models through the `spawnllm-apple` sidecar — no login at all. When the sidecar is not on `PATH`, [binrun](https://github.com/yasyf/binrun) (`brew install yasyf/tap/binrun`) fetches the release build via the crate's embedded descriptor, verifying it against the pinned sha256; without binrun, or on any other platform, the backend reports not installed. `extract` derives a strict JSON schema from your type via `schemars` and deserializes the validated reply.
 
 ## The contract
 

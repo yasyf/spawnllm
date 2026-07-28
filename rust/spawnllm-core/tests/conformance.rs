@@ -1,6 +1,5 @@
-use std::collections::BTreeSet;
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::{env, fs};
 
 use serde_json::{Number, Value, json};
 use spawnllm_core::dispatch;
@@ -50,35 +49,14 @@ fn value_eq(left: &Value, right: &Value) -> bool {
     }
 }
 
-fn ops_filter() -> Option<BTreeSet<String>> {
-    env::var("SPAWNLLM_CONFORMANCE_OPS").ok().map(|raw| {
-        raw.split(',')
-            .map(str::trim)
-            .filter(|part| !part.is_empty())
-            .map(String::from)
-            .collect()
-    })
-}
-
-fn requires_replayed_vectors(filter: Option<&BTreeSet<String>>) -> bool {
-    filter.is_none_or(|ops| !ops.is_empty())
-}
-
 #[test]
 fn conformance_vectors() {
-    let strict = env::var("SPAWNLLM_CONFORMANCE_STRICT").is_ok_and(|value| value == "1");
-    let filter = ops_filter();
-
     let mut passed = 0usize;
     let mut replayed = 0usize;
-    let mut skipped: Vec<String> = Vec::new();
     let mut failures: Vec<String> = Vec::new();
 
     for op_dir in sorted_children(&vectors_dir(), |path| path.is_dir()) {
         let op = op_dir.file_name().unwrap().to_string_lossy().into_owned();
-        if filter.as_ref().is_some_and(|ops| !ops.contains(&op)) {
-            continue;
-        }
         for path in sorted_children(&op_dir, |path| {
             path.extension().is_some_and(|ext| ext == "json")
         }) {
@@ -94,47 +72,27 @@ fn conformance_vectors() {
                     "MISMATCH {label}\n  expected: {}\n  actual:   {}",
                     vector["expected"], ok
                 )),
-                (None, Some(err)) if err["kind"] == "unimplemented" && !strict => {
-                    skipped.push(label)
+                (None, Some(err)) if err["kind"] == "unimplemented" => {
+                    failures.push(format!("UNIMPLEMENTED {label}"))
                 }
-                (None, Some(err)) if err["kind"] == "unimplemented" => failures.push(format!(
-                    "UNIMPLEMENTED {label} (SPAWNLLM_CONFORMANCE_STRICT=1)"
-                )),
                 (None, Some(err)) => failures.push(format!("ERROR {label}: {err}")),
                 _ => failures.push(format!("MALFORMED {label}: {response}")),
             }
         }
     }
 
-    let skipped_ops: BTreeSet<&str> = skipped
-        .iter()
-        .filter_map(|label| label.split('/').next())
-        .collect();
     println!(
-        "conformance: {passed} passed, {} skipped {skipped_ops:?}, {} failed ({replayed} replayed)",
-        skipped.len(),
+        "conformance: {passed} passed, {} failed ({replayed} replayed)",
         failures.len()
     );
 
-    assert!(
-        replayed > 0 || !requires_replayed_vectors(filter.as_ref()),
-        "no conformance vectors replayed"
-    );
+    assert!(replayed > 0, "no conformance vectors replayed");
     assert!(
         failures.is_empty(),
         "conformance failures ({}):\n{}",
         failures.len(),
         failures.join("\n")
     );
-}
-
-#[test]
-fn nonempty_filter_requires_at_least_one_replayed_vector() {
-    assert!(requires_replayed_vectors(None));
-    assert!(requires_replayed_vectors(Some(&BTreeSet::from([
-        "missing-op".to_owned()
-    ]))));
-    assert!(!requires_replayed_vectors(Some(&BTreeSet::new())));
 }
 
 #[test]

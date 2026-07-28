@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from spawnllm import _core
 from spawnllm.proc import acapture_cli, capture_cli
 from spawnllm.response import Error, Output, Response, Result
-from spawnllm.spec import ClaudeConfig, CodexConfig, GeminiConfig
+from spawnllm.spec import AppleConfig, ClaudeConfig, CodexConfig, GeminiConfig
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -109,14 +109,21 @@ class Invocation:
     env_unset: tuple[str, ...] = ()
 
 
-def run_probe(probe: dict[str, Any], *, timeout: int) -> bool:
-    """Execute one auth probe the core laid out, mirroring the reference host's probe kinds."""
+def run_probe(probe: dict[str, Any], *, binary: str, timeout: int) -> bool:
+    """Execute one auth probe the core laid out, mirroring the reference host's probe kinds.
+
+    Args:
+        probe: One entry from the core's `auth_probes` layout.
+        binary: The path an `exec_exit0` probe runs, replacing the layout's
+            `argv[0]` so a wheel-bundled executable is reached without `PATH`.
+        timeout: Seconds to wait for a subprocess-backed probe.
+    """
     match probe:
-        case {"kind": "exec_exit0", "argv": [*argv]}:
+        case {"kind": "exec_exit0", "argv": [_, *args]}:
             try:
                 return (
                     subprocess.run(
-                        [*map(str, argv)], capture_output=True, text=True, timeout=timeout, check=False
+                        [binary, *map(str, args)], capture_output=True, text=True, timeout=timeout, check=False
                     ).returncode
                     == 0
                 )
@@ -282,6 +289,7 @@ class LlmBackend(ABC):
             "api_auth": spec.api_auth,
             "timeout": spec.timeout,
             "max_attempts": spec.max_attempts,
+            "apple": dataclasses.asdict(a) if (a := spec.config_for(AppleConfig)) is not None else None,
             "claude": dataclasses.asdict(c) if (c := spec.config_for(ClaudeConfig)) is not None else None,
             "codex": dataclasses.asdict(x) if (x := spec.config_for(CodexConfig)) is not None else None,
             "gemini": dataclasses.asdict(g) if (g := spec.config_for(GeminiConfig)) is not None else None,
@@ -365,6 +373,15 @@ class CliBackend(LlmBackend):
     binary: ClassVar[str]
     install_hint: ClassVar[str]
 
+    def binary_path(self) -> str:
+        """Return the command every exec of this backend runs as `argv[0]`.
+
+        The default is `binary` itself, left for the operating system to resolve
+        through `PATH`; a backend whose executable ships inside the wheel returns
+        that path instead.
+        """
+        return self.binary
+
     def claude_isolation(self) -> str:
         """Return the isolated config home a claude run substitutes into `${isolated_config_dir}`."""
         raise NotImplementedError
@@ -377,9 +394,10 @@ class CliBackend(LlmBackend):
         """Materialize the core's exec plan into a runnable `Invocation`.
 
         Mints a temp file per `files[]` entry (writing its content when non-null),
-        substitutes `${file:id}` placeholders in the argv and — for a claude run —
-        `${isolated_config_dir}`, and wires the plan's stdout/result source and the
-        minted paths into the returned `Invocation` for cleanup.
+        points `argv[0]` at `binary_path`, substitutes `${file:id}` placeholders in
+        the argv and — for a claude run — `${isolated_config_dir}`, and wires the
+        plan's stdout/result source and the minted paths into the returned
+        `Invocation` for cleanup.
 
         Args:
             spec: The configured run to translate into an invocation.
@@ -398,7 +416,9 @@ class CliBackend(LlmBackend):
                         os.write(fd, entry["content"].encode())
                 finally:
                     os.close(fd)
-            tokens = {f"${{file:{file_id}}}": path for file_id, path in paths.items()}
+            tokens = {self.binary: self.binary_path()} | {
+                f"${{file:{file_id}}}": path for file_id, path in paths.items()
+            }
             argv = [tokens.get(arg, arg) for arg in plan["argv"]]
             env = plan["env"]
             if plan["needs_claude_isolation"]:
@@ -454,7 +474,7 @@ class CliBackend(LlmBackend):
             "auth_probes",
             {"provider": self.provider, "host": {"platform": sys.platform, "home": str(Path.home())}},
         )
-        return any(run_probe(probe, timeout=timeout) for probe in probes["probes"])
+        return any(run_probe(probe, binary=self.binary_path(), timeout=timeout) for probe in probes["probes"])
 
     def timed_out(self, spec: RunSpec) -> Response:
         msg = f"{self.provider} timed out after {spec.timeout}s"
@@ -511,13 +531,13 @@ class CliBackend(LlmBackend):
             timeout: Seconds to wait for the authentication probe.
 
         Returns:
-            `BackendReady` when authenticated, `BackendNotInstalled` when the CLI
-            is not on PATH, else `BackendNotAuthenticated`.
+            `BackendReady` when authenticated, `BackendNotInstalled` when
+            `binary_path` names no executable file, else `BackendNotAuthenticated`.
 
         Raises:
             subprocess.TimeoutExpired: If `is_authenticated` exceeds `timeout`.
         """
-        if not shutil.which(self.binary):
+        if not shutil.which(self.binary_path()):
             return BackendNotInstalled(binary=self.binary, install_hint=self.install_hint)
         if self.is_authenticated(timeout=timeout):
             return BackendReady(binary=self.binary)

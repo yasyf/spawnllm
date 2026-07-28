@@ -17,6 +17,7 @@ enum Provider {
     Codex,
     Gemini,
     Antigravity,
+    Apple,
     OpenaiEndpoint,
 }
 
@@ -97,6 +98,13 @@ pub(crate) fn dispatch(input: Value) -> OpResult {
                 probes,
             }
         }
+        Provider::Apple => AuthProbes {
+            binary: "spawnllm-apple",
+            install_hint: Some("swift build -c release --package-path swift/spawnllm-apple"),
+            probes: vec![Probe::ExecExit0 {
+                argv: vec!["spawnllm-apple", "--probe"],
+            }],
+        },
         Provider::OpenaiEndpoint => AuthProbes {
             binary: "openai_endpoint",
             install_hint: None,

@@ -580,7 +580,7 @@ fn normalize_type(mut node: Map<String, Value>) -> Map<String, Value> {
 }
 
 fn walk(node: Value, taken: &mut BTreeSet<String>, hint: &str) -> Value {
-    let mut node = match node {
+    let node = match node {
         Value::Array(items) => {
             return Value::Array(
                 items
@@ -592,7 +592,6 @@ fn walk(node: Value, taken: &mut BTreeSet<String>, hint: &str) -> Value {
         Value::Object(node) => node,
         other => return other,
     };
-    node.remove("pattern");
     let mut out = normalize_type(node);
 
     for key in ["properties", "$defs"] {
@@ -896,18 +895,27 @@ mod tests {
     }
 
     #[test]
-    fn apple_removes_pattern() {
+    fn apple_preserves_generation_constraints() {
         let output = apple(json!({
             "type": "object",
             "title": "Coded",
-            "properties": {"code": {"type": "string", "pattern": "^[a-z]+$", "minLength": 3}},
+            "properties": {
+                "code": {"type": "string", "pattern": "^[a-z]+$", "minLength": 3},
+                "counts": {"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 9}, "minItems": 1, "maxItems": 4},
+                "grade": {"type": "string", "enum": ["a", "b"]},
+            },
             "required": ["code"],
         }));
 
         assert_eq!(
             output["properties"]["code"],
-            json!({"type": "string", "minLength": 3})
+            json!({"type": "string", "pattern": "^[a-z]+$", "minLength": 3})
         );
+        assert_eq!(
+            output["properties"]["counts"],
+            json!({"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 9}, "minItems": 1, "maxItems": 4})
+        );
+        assert_eq!(output["properties"]["grade"]["enum"], json!(["a", "b"]));
     }
 
     #[test]

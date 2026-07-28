@@ -1,0 +1,48 @@
+{
+  "name": "apple-sampling-greedy",
+  "op": "plan",
+  "input": {
+    "provider": "apple",
+    "spec": {
+      "prompt": "hi",
+      "model": "",
+      "agent": false,
+      "isolated": true,
+      "timeout": 180,
+      "max_attempts": 5,
+      "api_auth": false,
+      "schema": null,
+      "apple": {
+        "instructions": null,
+        "use_case": "general",
+        "guardrails": "default",
+        "temperature": null,
+        "maximum_response_tokens": null,
+        "sampling": "greedy",
+        "sampling_top": null,
+        "sampling_probability_threshold": null,
+        "sampling_seed": null
+      },
+      "claude": null,
+      "codex": null,
+      "gemini": null,
+      "openai_endpoint": null
+    },
+    "host": {
+      "platform": "darwin"
+    }
+  },
+  "expected": {
+    "kind": "exec",
+    "argv": [
+      "spawnllm-apple"
+    ],
+    "stdin": "{\"prompt\":\"hi\",\"instructions\":null,\"use_case\":\"general\",\"guardrails\":\"default\",\"options\":{\"temperature\":null,\"maximum_response_tokens\":null,\"sampling\":{\"mode\":\"greedy\"}},\"schema\":null}",
+    "files": [],
+    "stdout_to_file": false,
+    "read_result_from": "stdout",
+    "env": {},
+    "env_unset": [],
+    "needs_claude_isolation": false
+  }
+}

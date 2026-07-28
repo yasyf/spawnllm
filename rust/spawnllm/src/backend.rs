@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -8,7 +8,8 @@ use tokio::process::Command;
 
 use crate::core_io::core_op;
 use crate::error::Error;
-use crate::host::{home, platform};
+use crate::host::{home, platform, which};
+use crate::sidecar;
 use crate::spec::{ModelTier, Specialty};
 
 #[cfg(feature = "openai")]
@@ -23,13 +24,14 @@ pub struct OpenAiEndpoint {
     pub model: String,
 }
 
-/// A concrete LLM backend: one of the four CLIs, or an OpenAI-compatible endpoint.
+/// A concrete LLM backend: one of the five CLIs, or an OpenAI-compatible endpoint.
 #[derive(Debug, Clone)]
 pub enum Backend {
     Claude,
     Codex,
     Gemini,
     Antigravity,
+    Apple,
     #[cfg(feature = "openai")]
     OpenAiEndpoint(OpenAiEndpoint),
 }
@@ -72,6 +74,7 @@ impl Backend {
             Backend::Codex => "codex",
             Backend::Gemini => "gemini",
             Backend::Antigravity => "antigravity",
+            Backend::Apple => "apple",
             #[cfg(feature = "openai")]
             Backend::OpenAiEndpoint(_) => "openai_endpoint",
         }
@@ -81,6 +84,7 @@ impl Backend {
         match self {
             Backend::Claude => Some("anthropic"),
             Backend::Codex => Some("openai"),
+            Backend::Apple => Some("apple"),
             Backend::Gemini | Backend::Antigravity => None,
             #[cfg(feature = "openai")]
             Backend::OpenAiEndpoint(_) => Some("openai"),
@@ -104,6 +108,9 @@ impl Backend {
         if let Backend::OpenAiEndpoint(endpoint) = self {
             return endpoint.model.clone();
         }
+        if matches!(self, Backend::Apple) {
+            return String::new();
+        }
         let caps = spawnllm_core::capabilities();
         let tiers = caps
             .models
@@ -114,6 +121,7 @@ impl Backend {
             ModelTier::Medium => tiers.medium,
             ModelTier::Large => tiers.large,
         }
+        .expect("cli backend names a model for every tier")
         .to_owned()
     }
 
@@ -136,13 +144,14 @@ impl Backend {
                 };
             }
         };
-        if which(&probes.binary).is_none() {
+        let Ok(launch) = resolve_binary(&probes.binary) else {
+            let install_hint = install_hint(&probes);
             return BackendStatus::NotInstalled {
                 binary: probes.binary,
-                install_hint: probes.install_hint.unwrap_or_default(),
+                install_hint,
             };
-        }
-        if authenticated(&probes.probes, timeout).await {
+        };
+        if authenticated(&probes.probes, &launch, timeout).await {
             BackendStatus::Ready {
                 binary: probes.binary,
             }
@@ -162,21 +171,45 @@ impl Backend {
     }
 }
 
-async fn authenticated(probes: &[Probe], timeout: Duration) -> bool {
+/// The argv prefix that runs `binary`, or [`std::io::ErrorKind::NotFound`] when it
+/// is not installed. Every CLI but the Apple sidecar must be on `PATH`; the
+/// sidecar falls back to binrun against its pinned descriptor.
+pub(crate) fn resolve_binary(binary: &str) -> std::io::Result<Vec<String>> {
+    if binary == sidecar::BINARY {
+        return sidecar::launch();
+    }
+    which(binary)
+        .map(|path| vec![path.to_string_lossy().into_owned()])
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("{binary} is not on PATH"),
+            )
+        })
+}
+
+fn install_hint(probes: &AuthProbes) -> String {
+    if probes.binary == sidecar::BINARY {
+        return sidecar::INSTALL_HINT.to_owned();
+    }
+    probes.install_hint.clone().unwrap_or_default()
+}
+
+async fn authenticated(probes: &[Probe], launch: &[String], timeout: Duration) -> bool {
     if probes.is_empty() {
         return true;
     }
     for probe in probes {
-        if run_probe(probe, timeout).await {
+        if run_probe(probe, launch, timeout).await {
             return true;
         }
     }
     false
 }
 
-async fn run_probe(probe: &Probe, timeout: Duration) -> bool {
+async fn run_probe(probe: &Probe, launch: &[String], timeout: Duration) -> bool {
     match probe {
-        Probe::ExecExit0 { argv } => exec_exit0(argv, timeout).await,
+        Probe::ExecExit0 { argv } => exec_exit0(&[launch, &argv[1..]].concat(), timeout).await,
         Probe::KeychainExists { service, account } => {
             exec_exit0(
                 &[
@@ -223,27 +256,17 @@ async fn exec_exit0(argv: &[String], timeout: Duration) -> bool {
 ///
 /// A `specialty` promotes its registered backend to the front of the chain; the
 /// chain otherwise follows core's priority order minus the auto-select excludes
-/// (Gemini). Returns [`Error::BackendUnavailable`] when none is ready.
+/// (Gemini) and minus every backend core restricts to tiers `model` is not among
+/// (Apple, which hosts one small on-device model). `model` is `None` when the run
+/// names a concrete provider model id rather than a tier, which excludes every
+/// tier-restricted backend. Returns [`Error::BackendUnavailable`] when none is ready.
 pub async fn select_backend(
     specialty: Option<Specialty>,
+    model: Option<ModelTier>,
     timeout: Duration,
 ) -> Result<Backend, Error> {
-    let caps = spawnllm_core::capabilities();
-    let mut names: Vec<&str> = Vec::new();
-    if let Some(specialty) = specialty
-        && let Some(provider) = caps.specialties.get(specialty.key())
-    {
-        names.push(provider);
-    }
-    for &name in &caps.priority {
-        if caps.auto_select_excludes.contains(&name) || names.contains(&name) {
-            continue;
-        }
-        names.push(name);
-    }
-
     let mut statuses = Vec::new();
-    for name in names {
+    for name in selection_order(&spawnllm_core::capabilities(), specialty, model) {
         let backend = backend_from_name(name);
         match backend.check_status(timeout).await {
             BackendStatus::Ready { .. } => return Ok(backend),
@@ -256,33 +279,70 @@ pub async fn select_backend(
     })
 }
 
+fn selection_order(
+    caps: &spawnllm_core::Capabilities,
+    specialty: Option<Specialty>,
+    model: Option<ModelTier>,
+) -> Vec<&'static str> {
+    let mut names: Vec<&'static str> = Vec::new();
+    if let Some(specialty) = specialty
+        && let Some(provider) = caps.specialties.get(specialty.key())
+    {
+        names.push(*provider);
+    }
+    for &name in &caps.priority {
+        if caps.auto_select_excludes.contains(&name) || names.contains(&name) {
+            continue;
+        }
+        if let Some(tiers) = caps.auto_select_tiers.get(name)
+            && !model.is_some_and(|tier| tiers.contains(&tier.key()))
+        {
+            continue;
+        }
+        names.push(name);
+    }
+    names
+}
+
 fn backend_from_name(name: &str) -> Backend {
     match name {
         "claude" => Backend::Claude,
         "codex" => Backend::Codex,
         "gemini" => Backend::Gemini,
         "antigravity" => Backend::Antigravity,
+        "apple" => Backend::Apple,
         other => panic!("core capabilities named an unknown backend: {other}"),
     }
 }
 
-fn which(binary: &str) -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path).find_map(|dir| {
-        let candidate = dir.join(binary);
-        is_executable(&candidate).then_some(candidate)
-    })
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[cfg(unix)]
-fn is_executable(path: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
+    fn order(specialty: Option<Specialty>, model: Option<ModelTier>) -> Vec<&'static str> {
+        selection_order(&spawnllm_core::capabilities(), specialty, model)
+    }
 
-    std::fs::metadata(path)
-        .is_ok_and(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
-}
+    #[test]
+    fn apple_is_auto_selectable_only_for_the_small_tier() {
+        assert!(order(None, Some(ModelTier::Small)).contains(&"apple"));
+        for model in [None, Some(ModelTier::Medium), Some(ModelTier::Large)] {
+            assert!(
+                !order(None, model).contains(&"apple"),
+                "apple reachable for {model:?}"
+            );
+        }
+    }
 
-#[cfg(not(unix))]
-fn is_executable(path: &Path) -> bool {
-    path.is_file()
+    #[test]
+    fn the_tier_gate_leaves_the_unrestricted_backends_alone() {
+        assert_eq!(
+            order(None, Some(ModelTier::Large)),
+            vec!["claude", "codex", "antigravity"]
+        );
+        assert_eq!(
+            order(Some(Specialty::Debugging), Some(ModelTier::Large)),
+            vec!["codex", "claude", "antigravity"]
+        );
+    }
 }

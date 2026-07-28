@@ -9,6 +9,7 @@ use tokio::process::{Child, Command};
 
 use spawnllm_core::wire::{ExecPlan, FileId, ReadResultFrom};
 
+use crate::backend::resolve_binary;
 use crate::run::{Attempt, AttemptKind, resolve_kind};
 use crate::spec::RunSpec;
 
@@ -38,7 +39,7 @@ pub(crate) async fn exec_attempt(
         temp_files.push(handle);
     }
 
-    let argv: Vec<String> = plan
+    let planned: Vec<String> = plan
         .argv
         .iter()
         .map(|arg| match arg.as_str() {
@@ -55,6 +56,7 @@ pub(crate) async fn exec_attempt(
             other => other.to_owned(),
         })
         .collect();
+    let argv = [resolve_binary(&planned[0])?, planned[1..].to_vec()].concat();
 
     let mut cmd = Command::new(&argv[0]);
     cmd.args(&argv[1..]);
@@ -190,7 +192,6 @@ async fn reap(child: &mut Child) {
     }
     #[cfg(unix)]
     if let Some(pid) = child.id() {
-        // SIGTERM first, then SIGKILL after a grace period.
         unsafe {
             libc::kill(pid as libc::pid_t, libc::SIGTERM);
         }

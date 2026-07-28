@@ -16,6 +16,8 @@ pub struct RunSpec {
     #[serde(default)]
     pub schema: Option<Value>,
     #[serde(default)]
+    pub apple: Option<AppleConfig>,
+    #[serde(default)]
     pub claude: Option<ClaudeConfig>,
     #[serde(default)]
     pub codex: Option<CodexConfig>,
@@ -23,6 +25,42 @@ pub struct RunSpec {
     pub gemini: Option<GeminiConfig>,
     #[serde(default)]
     pub openai_endpoint: Option<OpenAiEndpoint>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AppleUseCase {
+    #[default]
+    General,
+    ContentTagging,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AppleGuardrails {
+    #[default]
+    Default,
+    PermissiveContentTransformations,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AppleSampling {
+    Greedy,
+    Random,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct AppleConfig {
+    pub instructions: Option<String>,
+    pub use_case: AppleUseCase,
+    pub guardrails: AppleGuardrails,
+    pub temperature: Option<f64>,
+    pub maximum_response_tokens: Option<i64>,
+    pub sampling: Option<AppleSampling>,
+    pub sampling_top: Option<i64>,
+    pub sampling_probability_threshold: Option<f64>,
+    pub sampling_seed: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

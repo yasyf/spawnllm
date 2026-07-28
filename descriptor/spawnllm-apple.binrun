@@ -1,0 +1,19 @@
+#!/usr/bin/env binrun
+{
+  "schema": 1,
+  "name": "spawnllm-apple",
+  "kind": "release-binary",
+  "version": {"static": "0.0.0"},
+  "platforms": {
+    "macos-aarch64": {
+      "size": 88725,
+      "hash": "sha256",
+      "digest": "d3e827ad78f629b3d8ed2e0fe12b5c3d5fca406daf9ee72307fdfc165251054f",
+      "format": "tar.gz",
+      "path": "spawnllm-apple",
+      "providers": [
+        {"type": "github-release", "repo": "yasyf/spawnllm", "tag": "v0.0.0", "name": "spawnllm-apple_0.0.0_darwin_arm64.tar.gz"}
+      ]
+    }
+  }
+}

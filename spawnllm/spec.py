@@ -15,20 +15,23 @@ if TYPE_CHECKING:
 class AppleConfig:
     """Apple Foundation Models knobs applied only by the Apple backend.
 
-    `use_case` and `guardrails` name the `SystemLanguageModelUseCase` and
-    `SystemLanguageModelGuardrails` members the session is built with, upcased
-    from these literals. The sampling knobs are flat rather than a nested mode
-    because Apple exposes `SamplingMode` as a factory (`greedy()` / `random()`)
-    that no serializable value can carry: `sampling` picks the factory and
-    `sampling_top`, `sampling_probability_threshold`, and `sampling_seed` are the
-    arguments `random` takes. `None` everywhere leaves the framework default.
+    `use_case` and `guardrails` select the `SystemLanguageModelUseCase` and
+    `SystemLanguageModelGuardrails` the `spawnllm-apple` sidecar builds its
+    session with. The sampling knobs are flat rather than a nested mode because
+    Apple exposes `SamplingMode` as a factory (`greedy()` / `random()`) that no
+    serializable value can carry: `sampling` picks the factory and `sampling_top`,
+    `sampling_probability_threshold`, and `sampling_seed` are the arguments
+    `random` takes. `None` everywhere leaves the framework default.
 
     Example:
         >>> AppleConfig(use_case="content_tagging", sampling="random", sampling_top=20)
 
     Raises:
         ValueError: When a `random`-only argument is set without `sampling="random"`,
-            a combination the framework would silently discard.
+            a combination the framework would silently discard; when `sampling_top`
+            and `sampling_probability_threshold` are set together, a pair the
+            framework rejects; or when `sampling_seed` is negative, which the
+            framework's `UInt64` cannot carry.
     """
 
     use_case: Literal["general", "content_tagging"] = "general"
@@ -48,6 +51,10 @@ class AppleConfig:
             raise ValueError(
                 "AppleConfig sampling_top, sampling_probability_threshold, and sampling_seed require sampling='random'"
             )
+        if self.sampling_top is not None and self.sampling_probability_threshold is not None:
+            raise ValueError("AppleConfig accepts either sampling_top or sampling_probability_threshold, not both")
+        if self.sampling_seed is not None and self.sampling_seed < 0:
+            raise ValueError("AppleConfig sampling_seed is unsigned; the framework takes a UInt64")
 
 
 @dataclass(frozen=True, slots=True)

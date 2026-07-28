@@ -8,6 +8,12 @@
     "api_auth": {
       "type": "boolean"
     },
+    "apple": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
     "claude": {
       "type": [
         "object",

@@ -1,0 +1,19 @@
+{
+  "name": "apple-rate-limited",
+  "op": "resolve",
+  "input": {
+    "provider": "apple",
+    "raw": "{\"status\": \"error\", \"kind\": \"RateLimitedError\", \"message\": \"too many requests\"}",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": false
+  },
+  "expected": {
+    "status": "error",
+    "kind": "envelope",
+    "msg": "apple hit a rate limit (RateLimitedError): too many requests",
+    "transient": true,
+    "cost_usd": null,
+    "usage": null
+  }
+}

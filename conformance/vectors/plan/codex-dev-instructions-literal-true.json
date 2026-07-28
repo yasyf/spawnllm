@@ -12,6 +12,7 @@
       "max_attempts": 5,
       "api_auth": false,
       "schema": null,
+      "apple": null,
       "claude": null,
       "codex": {
         "developer_instructions": "true",

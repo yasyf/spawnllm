@@ -14,20 +14,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
           targets: wasm32-wasip1
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: rust
 
-      - name: Build core wasm blob
+      - name: Resolve the core wasm blob
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: bash scripts/build_wasm.sh
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: core-blob
           path: go/internal/core/spawnllm_core.wasm
@@ -41,22 +43,22 @@ jobs:
       matrix:
         python-version: ["3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Download core blob (Go)
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: core-blob
           path: go/internal/core
 
       - name: Download core blob (Python)
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: core-blob
           path: spawnllm/_core
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           python-version: ${{ matrix.python-version }}
           cache-dependency-glob: uv.lock
@@ -84,22 +86,22 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Download core blob (Python)
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: core-blob
           path: spawnllm/_core
 
       - name: Download core blob (Go)
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: core-blob
           path: go/internal/core
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           python-version: "3.14"
           cache-dependency-glob: uv.lock
@@ -110,7 +112,7 @@ jobs:
       - name: Test (pytest)
         run: uv run pytest
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go/go.mod
           cache: true
@@ -119,32 +121,102 @@ jobs:
         working-directory: go
         run: go test -count=1 ./...
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: rust
 
       - name: Test (Rust)
         working-directory: rust
-        env:
-          SPAWNLLM_CONFORMANCE_STRICT: "1"
         run: cargo test --workspace
+
+  swift:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Pin Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.5.app
+
+      - name: Test the Apple sidecar
+        run: swift test --package-path swift/spawnllm-apple
+
+      - name: Build the Apple sidecar
+        run: swift build -c release --package-path swift/spawnllm-apple
+
+      - name: Every request the core plans decodes in the sidecar
+        run: |
+          python3 - <<'PY'
+          import glob, json, subprocess
+
+          binary = "swift/spawnllm-apple/.build/release/spawnllm-apple"
+          malformed = "the request on stdin could not be decoded into a sidecar request"
+          vectors = sorted(glob.glob("conformance/vectors/plan/apple-*.json"))
+          assert vectors, "no apple plan vectors to replay"
+
+          for path in vectors:
+              stdin = json.load(open(path))["expected"]["stdin"]
+              done = subprocess.run([binary], input=stdin, capture_output=True, text=True)
+              print(f"{path}: exit={done.returncode} {done.stdout.strip()}")
+              assert done.returncode == 0, (path, done.returncode, done.stderr)
+              reply = json.loads(done.stdout)
+              assert reply["status"] in {"ok", "error"}, (path, reply)
+              assert reply.get("message") != malformed, (path, reply)
+          PY
+
+      - name: Probe reports a specific verdict
+        run: |
+          OUT="$(swift/spawnllm-apple/.build/release/spawnllm-apple --probe)" && CODE=0 || CODE=$?
+          printf 'probe exit=%s stdout=%s\n' "$CODE" "$OUT"
+          python3 - "$CODE" "$OUT" <<'PY'
+          import sys, json
+          code, probe = int(sys.argv[1]), json.loads(sys.argv[2])
+          assert probe.keys() <= {"available", "reason"}, probe
+          assert isinstance(probe["available"], bool), probe
+          assert (code == 0) == probe["available"], (code, probe)
+          if not probe["available"]:
+              assert isinstance(probe["reason"], str) and probe["reason"].strip(), probe
+          PY
+
+  descriptor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go/go.mod
+          cache: true
+
+      - name: Install binrun
+        run: go install github.com/yasyf/binrun/cmd/binrun@v0.2.0
+
+      - name: Descriptor parses and is runnable
+        run: |
+          test -x descriptor/spawnllm-apple.binrun
+          head -1 descriptor/spawnllm-apple.binrun | grep -qx '#!/usr/bin/env binrun'
+          binrun -- parse descriptor/spawnllm-apple.binrun
+
+      - name: Host copies match the descriptor
+        run: bash scripts/sync_descriptor.sh --check
 
   go:
     needs: blob
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Download core blob
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: core-blob
           path: go/internal/core
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go/go.mod
           cache: true
@@ -168,21 +240,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Download core blob
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: core-blob
           path: go/internal/core
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go/go.mod
           cache: true
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: latest
           working-directory: go
@@ -191,13 +263,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
           components: rustfmt,clippy
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: rust
 
@@ -209,10 +281,8 @@ jobs:
         working-directory: rust
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-      - name: Test (strict conformance, all features)
+      - name: Test (all features)
         working-directory: rust
-        env:
-          SPAWNLLM_CONFORMANCE_STRICT: "1"
         run: cargo test --workspace --all-features
 
       - name: Test (spawnllm, no default features)
@@ -224,15 +294,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Download core blob
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: core-blob
           path: go/internal/core
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go/go.mod
           cache: true

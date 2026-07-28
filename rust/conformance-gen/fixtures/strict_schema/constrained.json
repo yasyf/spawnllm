@@ -1,5 +1,10 @@
 {
   "properties": {
+    "code": {
+      "pattern": "^[A-Z]{3}$",
+      "title": "Code",
+      "type": "string"
+    },
     "label": {
       "minLength": 2,
       "title": "Label",
@@ -10,11 +15,22 @@
       "minimum": 1,
       "title": "N",
       "type": "integer"
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 3,
+      "minItems": 1,
+      "title": "Tags",
+      "type": "array"
     }
   },
   "required": [
     "n",
-    "label"
+    "label",
+    "code",
+    "tags"
   ],
   "title": "Constrained",
   "type": "object"

@@ -7,9 +7,7 @@ tasks:
       - cargo build --workspace --all-features
 
   test:
-    desc: Run the workspace suite (strict conformance, all features)
-    env:
-      SPAWNLLM_CONFORMANCE_STRICT: "1"
+    desc: Run the workspace suite (all features)
     cmds:
       - cargo test --workspace --all-features
 

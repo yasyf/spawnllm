@@ -12,6 +12,7 @@
       "max_attempts": 5,
       "api_auth": false,
       "schema": null,
+      "apple": null,
       "claude": {
         "append_system_prompt": "extra instructions",
         "disable_slash_commands": false,

@@ -50,7 +50,7 @@ call: pong
 extract: Paris
 ```
 
-No API keys: the CLI backends drive the logins you already have, auto-selecting the first ready backend (claude, then codex, then agy). `Extract` turns your struct into a strict JSON-schema constraint on the call itself and unmarshals the validated reply.
+No API keys: the CLI backends drive the logins you already have, auto-selecting the first ready backend (claude, then codex, then agy, then apple — small-tier requests only; an explicit `AppleBackend()` works at any tier). `Extract` turns your struct into a strict JSON-schema constraint on the call itself and unmarshals the validated reply.
 
 ## The contract
 
@@ -66,7 +66,10 @@ No API keys: the CLI backends drive the logins you already have, auto-selecting 
 | `CodexBackend()` | `codex` | `codex login` |
 | `AntigravityBackend()` | `agy` | keychain, or `GEMINI_API_KEY`/`ANTIGRAVITY_API_KEY` |
 | `GeminiBackend()` | `gemini` | OAuth or `GEMINI_API_KEY`; never auto-selected |
+| `AppleBackend()` | `spawnllm-apple` | none — the Apple Intelligence model resident on-device (macOS 26+, Apple Silicon) |
 | `OpenAIEndpoint(url, model, opts)` | — | any OpenAI-compatible `/chat/completions` server |
+
+The `spawnllm-apple` sidecar itself needs no install: when it is not on `PATH`, the module hands its embedded descriptor to [binrun](https://github.com/yasyf/binrun), which fetches the release build, verifies it against the pinned sha256, and caches it. binrun is the one prerequisite (`brew install yasyf/tap/binrun`, or `go install github.com/yasyf/binrun/cmd/binrun@latest`); without it, `CheckStatus` reports the backend not installed.
 
 Local MLX inference stays Python-only — use the [Python package](https://github.com/yasyf/spawnllm) for that.
 

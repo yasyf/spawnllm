@@ -60,6 +60,11 @@ func runExecPlan(ctx context.Context, plan execPlan, spec RunSpec) (output strin
 	}
 
 	argv := substituteFiles(plan.Argv, paths)
+	launch, e := resolveBinary(argv[0])
+	if e != nil {
+		return "", 0, "", false, e
+	}
+	argv = append(launch, argv[1:]...)
 	attemptCtx, cancel := context.WithTimeout(ctx, spec.timeout())
 	defer cancel()
 

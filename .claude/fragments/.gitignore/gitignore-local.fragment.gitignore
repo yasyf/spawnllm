@@ -1,3 +1,7 @@
 # wasm core blob: built from source, never committed (scripts/build_wasm.sh)
 go/internal/core/spawnllm_core.wasm
 spawnllm/_core/spawnllm_core.wasm
+
+# Apple sidecar: built per-release into the macOS wheel, never committed
+spawnllm/_bin/
+swift/spawnllm-apple/.build/

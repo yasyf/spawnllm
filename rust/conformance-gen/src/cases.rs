@@ -1,5 +1,8 @@
 use serde_json::{Value, json};
-use spawnllm_core::wire::{ClaudeConfig, CodexConfig, GeminiConfig, OpenAiEndpoint, RunSpec};
+use spawnllm_core::wire::{
+    AppleConfig, AppleGuardrails, AppleSampling, AppleUseCase, ClaudeConfig, CodexConfig,
+    GeminiConfig, OpenAiEndpoint, RunSpec,
+};
 
 pub struct Case {
     pub op: &'static str,
@@ -28,6 +31,7 @@ fn spec(prompt: &str, model: &str) -> RunSpec {
         max_attempts: 5,
         api_auth: false,
         schema: None,
+        apple: None,
         claude: None,
         codex: None,
         gemini: None,
@@ -80,6 +84,17 @@ fn plan_case(name: &str, provider: &'static str, spec: RunSpec) -> Case {
             "host": {"platform": "darwin"},
         }),
     }
+}
+
+fn apple_cfg_case(name: &str, cfg: AppleConfig) -> Case {
+    plan_case(
+        name,
+        "apple",
+        RunSpec {
+            apple: Some(cfg),
+            ..spec("hi", "")
+        },
+    )
 }
 
 fn claude_cfg_case(name: &str, cfg: ClaudeConfig) -> Case {
@@ -463,6 +478,57 @@ fn plan_cases() -> Vec<Case> {
                 ..spec("hi", "gemini-3.5")
             },
         ),
+        plan_case("apple-default", "apple", spec("hi", "")),
+        plan_case(
+            "apple-schema",
+            "apple",
+            RunSpec {
+                schema: Some(schema_value()),
+                ..spec("hi", "")
+            },
+        ),
+        apple_cfg_case(
+            "apple-session",
+            AppleConfig {
+                instructions: Some("You are terse.".to_owned()),
+                use_case: AppleUseCase::ContentTagging,
+                guardrails: AppleGuardrails::PermissiveContentTransformations,
+                ..AppleConfig::default()
+            },
+        ),
+        apple_cfg_case(
+            "apple-decoding",
+            AppleConfig {
+                temperature: Some(0.2),
+                maximum_response_tokens: Some(256),
+                ..AppleConfig::default()
+            },
+        ),
+        apple_cfg_case(
+            "apple-sampling-greedy",
+            AppleConfig {
+                sampling: Some(AppleSampling::Greedy),
+                ..AppleConfig::default()
+            },
+        ),
+        apple_cfg_case(
+            "apple-sampling-random",
+            AppleConfig {
+                sampling: Some(AppleSampling::Random),
+                sampling_top: Some(20),
+                sampling_seed: Some(7),
+                ..AppleConfig::default()
+            },
+        ),
+        apple_cfg_case(
+            "apple-sampling-threshold",
+            AppleConfig {
+                sampling: Some(AppleSampling::Random),
+                sampling_probability_threshold: Some(0.9),
+                sampling_seed: Some(7),
+                ..AppleConfig::default()
+            },
+        ),
         endpoint_case("openai-endpoint-plain", None),
         endpoint_case("openai-endpoint-schema", Some(schema_value())),
     ]
@@ -669,6 +735,62 @@ fn resolve_cases() -> Vec<Case> {
             "agy print failed",
             false,
         ),
+        resolve_case(
+            "apple-ok-text",
+            "apple",
+            r#"{"status": "ok", "text": "hello world"}"#,
+            0,
+            "",
+            false,
+        ),
+        resolve_case(
+            "apple-ok-value",
+            "apple",
+            r#"{"status": "ok", "text": "{\"answer\": \"42\"}"}"#,
+            0,
+            "",
+            true,
+        ),
+        resolve_case(
+            "apple-rate-limited",
+            "apple",
+            r#"{"status": "error", "kind": "RateLimitedError", "message": "too many requests"}"#,
+            0,
+            "",
+            false,
+        ),
+        resolve_case(
+            "apple-concurrent-requests",
+            "apple",
+            r#"{"status": "error", "kind": "ConcurrentRequestsError", "message": "a session is already responding"}"#,
+            0,
+            "",
+            false,
+        ),
+        resolve_case(
+            "apple-guardrail-violation",
+            "apple",
+            r#"{"status": "error", "kind": "GuardrailViolationError", "message": "the prompt was blocked"}"#,
+            0,
+            "",
+            false,
+        ),
+        resolve_case(
+            "apple-malformed-envelope",
+            "apple",
+            "not json",
+            0,
+            "",
+            false,
+        ),
+        resolve_case(
+            "apple-exit-nonzero",
+            "apple",
+            "",
+            1,
+            "spawnllm-apple: bad request",
+            false,
+        ),
     ]
 }
 
@@ -819,6 +941,7 @@ fn auth_probe_cases() -> Vec<Case> {
         auth_probe_case("gemini-linux", "gemini", "linux", HOME_LINUX),
         auth_probe_case("antigravity-darwin", "antigravity", "darwin", HOME_DARWIN),
         auth_probe_case("antigravity-linux", "antigravity", "linux", HOME_LINUX),
+        auth_probe_case("apple-darwin", "apple", "darwin", HOME_DARWIN),
         auth_probe_case("openai-endpoint", "openai_endpoint", "darwin", HOME_DARWIN),
     ]
 }

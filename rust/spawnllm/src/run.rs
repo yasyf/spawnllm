@@ -114,6 +114,7 @@ fn portable(spec: &RunSpec, endpoint: Option<&Value>) -> Value {
         "isolated": spec.isolated,
         "timeout": spec.timeout.as_secs() as i64,
         "max_attempts": spec.max_attempts as i64,
+        "apple": spec.apple,
         "claude": spec.claude,
         "codex": spec.codex,
         "gemini": spec.gemini,

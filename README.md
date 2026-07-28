@@ -95,11 +95,7 @@ uv add "spawnllm[mlx]"
 
 ### Call Apple's on-device model with zero downloads
 
-Even local MLX starts with a multi-gigabyte model fetch. On a Mac with Apple Intelligence, the `apple` extra skips that too: `AppleBackend` generates in-process through Apple's Foundation Models framework, against the model already resident on the device. No credentials, no network, nothing to download:
-
-```bash
-uv pip install 'spawnllm[apple]'
-```
+Even local MLX starts with a multi-gigabyte model fetch. On a Mac with Apple Intelligence, `AppleBackend` skips that too: a prebuilt Swift sidecar inside the macOS wheel drives Apple's Foundation Models framework against the model already resident on the device. No extra, no compiler, no credentials, no network — installing spawnllm is the whole setup, `uvx spawnllm` included:
 
 ```python
 from spawnllm import AppleBackend, call_sync
@@ -107,7 +103,7 @@ from spawnllm import AppleBackend, call_sync
 print(call_sync("Reply with just the word: pong", backend=AppleBackend()))
 ```
 
-Auto-selection tries this backend last, after every CLI backend, and only for `model="small"`; an explicit `backend=AppleBackend()` always reaches it. Session and decoding knobs (`use_case`, `guardrails`, `instructions`, `temperature`, sampling) ride in via `RunSpec(provider_configs={"apple": AppleConfig(...)})`. Structured `extract_sync` works too, nested models included, with two Apple-imposed limits: the schema dialect strips JSON Schema `pattern` because Apple's importer rejects it, so a `Field(pattern=...)` constraint goes unenforced during generation and only fails `model_validate` afterward; and recursive models are unsupported. Requires macOS 26+ on Apple Silicon with Apple Intelligence enabled. Installing needs full Xcode 26+: `apple-fm-sdk` ships as an sdist that compiles a Swift dylib, and its build backend rejects the Command Line Tools.
+Auto-selection tries this backend last and only for `model="small"`; an explicit `backend=AppleBackend()` always reaches it. Session and decoding knobs (`use_case`, `guardrails`, `instructions`, `temperature`, sampling) ride in via `RunSpec(provider_configs={"apple": AppleConfig(...)})`. Structured `extract_sync` works too, nested models included, and schema constraints now bind during decoding: `minimum`/`maximum`, `minItems`/`maxItems`, and string-valued `enum`s are enforced exactly (a non-string `enum` such as `Literal[1, 2]` fails before generation, `extract_sync` raising `BackendCallError`), and a `Field(pattern=...)` constrains the value's shape — length, separators, and character families. Apple's decoder rejects bracket character classes, so the sidecar widens each to the narrowest escape it accepts (`^[A-Z]{3}-\d{4}$` decodes as `\w{3}-\d{4}`), and pydantic stays the exact validator: a value that fits the widened shape but violates your regex raises a plain `ValidationError`. Self-referential models extract cleanly; a mutually recursive pair (A referencing B referencing A) fails cleanly instead, `extract_sync` raising `BackendCallError` and `run` returning an error `Response`. Requires macOS 26+ on Apple Silicon with Apple Intelligence enabled — every other platform gets the pure-Python wheel and reports the backend as not installed.
 
 ### Call the same backends from Go or Rust
 
@@ -118,7 +114,7 @@ go get github.com/yasyf/spawnllm/go   # pure Go, no cgo — the core embeds as W
 cargo add spawnllm                    # async-first, with a blocking mirror
 ```
 
-Both expose `Call`/`call` and typed `Extract`/`extract` against your existing CLI logins — see the [Go README](https://github.com/yasyf/spawnllm/tree/main/go) and the [Rust README](https://github.com/yasyf/spawnllm/tree/main/rust/spawnllm). MLX and the Apple backend stay Python-only.
+Both expose `Call`/`call` and typed `Extract`/`extract` against your existing CLI logins, and both reach Apple's on-device model on a capable Mac with [binrun](https://github.com/yasyf/binrun) installed to fetch the digest-pinned sidecar — see the [Go README](https://github.com/yasyf/spawnllm/tree/main/go) and the [Rust README](https://github.com/yasyf/spawnllm/tree/main/rust/spawnllm). MLX stays Python-only.
 
 ## More in the docs
 

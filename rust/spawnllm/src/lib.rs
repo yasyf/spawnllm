@@ -1,5 +1,5 @@
-//! Run LLM calls through provider CLIs (`claude`, `codex`, `gemini`, `agy`) or an
-//! OpenAI-compatible endpoint.
+//! Run LLM calls through provider CLIs (`claude`, `codex`, `gemini`, `agy`,
+//! `spawnllm-apple`) or an OpenAI-compatible endpoint.
 //!
 //! This crate is the I/O host over the sans-io [`spawnllm_core`] crate: core owns
 //! all drift-prone logic (argv/env/result planning, output resolution, strict-schema
@@ -16,6 +16,7 @@ mod exec;
 mod host;
 mod isolate;
 mod run;
+mod sidecar;
 mod spec;
 
 pub mod blocking;
@@ -28,8 +29,8 @@ pub use backend::OpenAiEndpoint;
 pub use backend::{Backend, BackendStatus, select_backend};
 pub use error::{Error, RunError};
 pub use spec::{
-    CallOpts, ClaudeConfig, CodexConfig, DiscardedAttempt, GeminiConfig, ModelTier, Response,
-    RunResult, RunSpec, Specialty,
+    AppleConfig, AppleGuardrails, AppleSampling, AppleUseCase, CallOpts, ClaudeConfig, CodexConfig,
+    DiscardedAttempt, GeminiConfig, ModelTier, Response, RunResult, RunSpec, Specialty,
 };
 
 use schemars::JsonSchema;
@@ -41,12 +42,13 @@ use spec::DEFAULT_SELECT_TIMEOUT;
 ///
 /// The boundary is infallible: backend unavailability and every provider failure
 /// land in [`Response::outcome`] as an `Err`, never as a panic. The prompt's model
-/// is taken from the spec verbatim (no tier mapping).
+/// is taken from the spec verbatim (no tier mapping), so auto-selection skips every
+/// tier-restricted backend; reach one with [`run_on`].
 pub async fn run(spec: RunSpec) -> Response {
     if let Err(error) = spec.validate() {
         return spec::unavailable_response(spec, error);
     }
-    match select_backend(None, DEFAULT_SELECT_TIMEOUT).await {
+    match select_backend(None, None, DEFAULT_SELECT_TIMEOUT).await {
         Ok(backend) => run_on(&backend, spec).await,
         Err(error) => spec::unavailable_response(spec, error),
     }
@@ -75,7 +77,8 @@ pub async fn call(prompt: impl Into<String>, opts: CallOpts) -> Result<String, E
 ///
 /// Builds `T`'s JSON schema, runs it through core's strict-schema transform for the
 /// selected backend's dialect (Anthropic for Claude, OpenAI for Codex and the
-/// endpoint; Gemini-family backends carry the plain schema), constrains the call to
+/// endpoint, Apple for the on-device sidecar; Gemini-family backends carry the
+/// plain schema), constrains the call to
 /// it, then deserializes the parsed value. A non-conforming value returns
 /// [`Error::Validation`].
 pub async fn extract<T: DeserializeOwned + JsonSchema>(
@@ -97,7 +100,7 @@ pub async fn extract<T: DeserializeOwned + JsonSchema>(
 async fn resolve_backend(opts: &CallOpts) -> Result<Backend, Error> {
     match &opts.backend {
         Some(backend) => Ok(backend.clone()),
-        None => select_backend(opts.specialty, DEFAULT_SELECT_TIMEOUT).await,
+        None => select_backend(opts.specialty, Some(opts.model), DEFAULT_SELECT_TIMEOUT).await,
     }
 }
 

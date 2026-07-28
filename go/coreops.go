@@ -65,6 +65,7 @@ type capabilities struct {
 	Providers          []string              `json:"providers"`
 	Priority           []string              `json:"priority"`
 	AutoSelectExcludes []string              `json:"auto_select_excludes"`
+	AutoSelectTiers    map[string][]string   `json:"auto_select_tiers"`
 	Specialties        map[string]string     `json:"specialties"`
 	Models             map[string]modelTiers `json:"models"`
 	Binaries           map[string]string     `json:"binaries"`
@@ -128,6 +129,13 @@ func coreInto[T any](op string, input any) (T, error) {
 
 func coreCapabilities() (capabilities, error) {
 	return coreInto[capabilities]("capabilities", struct{}{})
+}
+
+func coreValidateSpec(spec coreSpec) error {
+	_, err := coreCall("validate_spec", struct {
+		Spec coreSpec `json:"spec"`
+	}{Spec: spec})
+	return err
 }
 
 func corePlan(provider Provider, spec coreSpec) (string, execPlan, httpPlan, error) {

@@ -1,0 +1,19 @@
+{
+  "name": "apple-guardrail-violation",
+  "op": "resolve",
+  "input": {
+    "provider": "apple",
+    "raw": "{\"status\": \"error\", \"kind\": \"GuardrailViolationError\", \"message\": \"the prompt was blocked\"}",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": false
+  },
+  "expected": {
+    "status": "error",
+    "kind": "envelope",
+    "msg": "apple generation failed (GuardrailViolationError): the prompt was blocked",
+    "transient": false,
+    "cost_usd": null,
+    "usage": null
+  }
+}

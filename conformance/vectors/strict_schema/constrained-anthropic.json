@@ -5,6 +5,11 @@
     "dialect": "anthropic",
     "schema": {
       "properties": {
+        "code": {
+          "pattern": "^[A-Z]{3}$",
+          "title": "Code",
+          "type": "string"
+        },
         "label": {
           "minLength": 2,
           "title": "Label",
@@ -15,11 +20,22 @@
           "minimum": 1,
           "title": "N",
           "type": "integer"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Tags",
+          "type": "array"
         }
       },
       "required": [
         "n",
-        "label"
+        "label",
+        "code",
+        "tags"
       ],
       "title": "Constrained",
       "type": "object"
@@ -30,6 +46,11 @@
       "type": "object",
       "title": "Constrained",
       "properties": {
+        "code": {
+          "type": "string",
+          "title": "Code",
+          "description": "{pattern: ^[A-Z]{3}$}"
+        },
         "label": {
           "type": "string",
           "title": "Label",
@@ -39,12 +60,23 @@
           "type": "integer",
           "title": "N",
           "description": "{maximum: 10, minimum: 1}"
+        },
+        "tags": {
+          "type": "array",
+          "title": "Tags",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "{maxItems: 3}"
         }
       },
       "additionalProperties": false,
       "required": [
         "n",
-        "label"
+        "label",
+        "code",
+        "tags"
       ]
     }
   }

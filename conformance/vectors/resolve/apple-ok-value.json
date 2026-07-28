@@ -1,0 +1,20 @@
+{
+  "name": "apple-ok-value",
+  "op": "resolve",
+  "input": {
+    "provider": "apple",
+    "raw": "{\"status\": \"ok\", \"text\": \"{\\\"answer\\\": \\\"42\\\"}\"}",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": true
+  },
+  "expected": {
+    "status": "ok",
+    "text": "{\"answer\": \"42\"}",
+    "value": {
+      "answer": "42"
+    },
+    "cost_usd": null,
+    "usage": null
+  }
+}

@@ -7,22 +7,30 @@
       "claude",
       "codex",
       "antigravity",
-      "gemini"
+      "gemini",
+      "apple"
     ],
     "priority": [
       "claude",
       "codex",
       "antigravity",
-      "gemini"
+      "gemini",
+      "apple"
     ],
     "auto_select_excludes": [
       "gemini"
     ],
+    "auto_select_tiers": {
+      "apple": [
+        "small"
+      ]
+    },
     "api_key_vars": {
       "antigravity": [
         "GEMINI_API_KEY",
         "ANTIGRAVITY_API_KEY"
       ],
+      "apple": [],
       "claude": [
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_AUTH_TOKEN"
@@ -47,6 +55,7 @@
         "medium": "gemini-3.5",
         "small": "gemini-3.5-flash"
       },
+      "apple": {},
       "claude": {
         "large": "opus",
         "medium": "sonnet",
@@ -65,12 +74,14 @@
     },
     "binaries": {
       "antigravity": "agy",
+      "apple": "spawnllm-apple",
       "claude": "claude",
       "codex": "codex",
       "gemini": "gemini"
     },
     "install_hints": {
       "antigravity": "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+      "apple": "swift build -c release --package-path swift/spawnllm-apple",
       "claude": "curl -fsSL https://claude.ai/install.sh | bash",
       "codex": "npm install -g @openai/codex",
       "gemini": "npm install -g @google/gemini-cli"

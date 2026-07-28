@@ -1,4 +1,5 @@
 mod antigravity;
+mod apple;
 mod claude;
 mod codex;
 mod gemini;
@@ -17,6 +18,7 @@ enum Provider {
     Codex,
     Gemini,
     Antigravity,
+    Apple,
     OpenaiEndpoint,
 }
 
@@ -32,6 +34,7 @@ fn plan(input: PlanInput) -> InvocationPlan {
         Provider::Codex => codex::plan(&input.spec),
         Provider::Gemini => gemini::plan(&input.spec),
         Provider::Antigravity => antigravity::plan(&input.spec),
+        Provider::Apple => apple::plan(&input.spec),
         Provider::OpenaiEndpoint => openai::plan(&input.spec),
     }
 }

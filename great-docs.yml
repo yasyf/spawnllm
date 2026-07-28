@@ -77,7 +77,7 @@ reference:
       - CodexConfig
       - GeminiConfig
   - title: Backends
-    desc: CLI backends (Claude, Codex, and the Gemini family), the in-process Claude Agent SDK and Apple Foundation Models backends, the MLX and OpenAI-endpoint backends, the specialty registry, backend selection, and install/auth status checks.
+    desc: CLI backends (Claude, Codex, and the Gemini family), the in-process Claude Agent SDK backend, the Apple Foundation Models backend over its bundled Swift sidecar, the MLX and OpenAI-endpoint backends, the specialty registry, backend selection, and install/auth status checks.
     contents:
       - LlmBackend
       - CliBackend

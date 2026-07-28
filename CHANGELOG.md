@@ -4,6 +4,65 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **The Apple backend no longer needs the `apple` extra, `apple-fm-sdk`, or
+  Xcode.** A prebuilt Swift sidecar ships inside the macOS platform wheel
+  (`macosx_26_0_arm64`), so installing spawnllm on an Apple-Intelligence-capable
+  Mac carries the backend with no extra, no compiler, and no network fetch at
+  runtime — `uvx spawnllm` now reaches it too, where the sdist previously
+  compiled a Swift package into every ephemeral environment. Linux and
+  pre-macOS-26 machines get the pure-Python `py3-none-any` wheel and report the
+  backend as not installed, exactly as before.
+
+### Added
+- Structured output on the Apple backend now enforces schema constraints
+  during generation: the sidecar compiles `minimum`/`maximum`,
+  `minItems`/`maxItems`, and string-valued `enum` into the framework's native
+  constraints exactly (a non-string `enum` such as `Literal[1, 2]` fails the
+  call before generation rather than dropping the constraint), and compiles
+  `pattern` — stripped entirely in 0.11.0 — into a shape
+  constraint covering length, separators, and character families, widening the
+  bracket character classes Apple's decoder rejects to the narrowest escape it
+  accepts (`^[A-Z]{3}-\d{4}$` decodes as `\w{3}-\d{4}`, measured at full
+  extraction accuracy). pydantic remains the exact validator: a value that
+  fits the widened shape but violates the regex raises `ValidationError`.
+- The Go module and Rust crate gain the Apple backend. Previously the one
+  in-process, Python-only backend, it is now an ordinary CLI-style provider
+  planned by the shared core, so all three hosts drive Apple's on-device
+  Foundation Models through the same sidecar. With no wheel to carry the
+  binary, both hosts embed a binrun descriptor pinning the sidecar release
+  build's version, size, and sha256: when `spawnllm-apple` is not on `PATH`,
+  the host hands the descriptor to `binrun`, which fetches the archive from
+  the GitHub release, verifies it against the pinned digest, caches it, and
+  runs it. binrun is the one prerequisite — `brew install yasyf/tap/binrun`,
+  or `go install github.com/yasyf/binrun/cmd/binrun@latest` — and without it
+  the backend reports not installed. The platform requirement is Python's,
+  unchanged: macOS 26+ on Apple Silicon with Apple Intelligence enabled.
+- The backend behaves the same in all three hosts. Auto-selection skips it
+  unless the request asks for the `small` tier, since the device hosts one
+  small model; off macOS every host reports it not installed rather than
+  fetching a binary the platform cannot run; and the `AppleConfig` sampling
+  combinations Python has always rejected — `sampling_top`,
+  `sampling_probability_threshold`, or `sampling_seed` set without
+  `sampling="random"`, and `sampling_top` set together with
+  `sampling_probability_threshold` — are now rejected by the shared core, so Go
+  and Rust refuse them with the message Python raises.
+
+### Fixed
+- `AppleConfig.sampling_seed` is honored: a fixed seed now reproduces the same
+  generation run over run. The old backend dropped the seed in `apple-fm-sdk`'s
+  C bridge, so seeded runs still sampled freely; the sidecar calls Swift's
+  `SamplingMode` directly. A negative seed now raises `ValueError` — the
+  framework takes a `UInt64`.
+- Concurrent Apple runs no longer contend: each request is its own sidecar
+  subprocess with no shared session lock, so parallel `asyncio.gather` calls
+  all succeed where the in-process SDK raised `ConcurrentRequestsError`.
+
+### Removed
+- The `apple` extra and the `apple-fm-sdk` dependency.
+
 ## [0.11.0] - 2026-07-27
 
 ### Added
@@ -29,8 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `apple` strict-schema dialect, nested response models included. Apple's
   schema importer rejects JSON Schema `pattern`, so the dialect strips it: a
   `Field(pattern=...)` constraint is not enforced during generation and can
-  still fail `model_validate` afterward. Recursive/self-referential models
-  are unsupported by Apple.
+  still fail `model_validate` afterward. Self-referential models extract
+  cleanly; only a mutually recursive pair (A referencing B referencing A)
+  degrades, coming back as an error `Response` rather than a crash.
 
 ## [0.10.0] - 2026-07-19
 

@@ -8,6 +8,8 @@ use serde_json::{Map, Value};
 use crate::backend::Backend;
 use crate::error::{Error, RunError};
 
+pub use spawnllm_core::wire::{AppleConfig, AppleGuardrails, AppleSampling, AppleUseCase};
+
 pub(crate) const DEFAULT_TIMEOUT: Duration = Duration::from_secs(180);
 pub(crate) const DEFAULT_MAX_ATTEMPTS: u32 = 5;
 pub(crate) const DEFAULT_SELECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -76,6 +78,16 @@ pub enum ModelTier {
     Large,
 }
 
+impl ModelTier {
+    pub(crate) fn key(self) -> &'static str {
+        match self {
+            ModelTier::Small => "small",
+            ModelTier::Medium => "medium",
+            ModelTier::Large => "large",
+        }
+    }
+}
+
 /// Task specialty that scopes backend auto-selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Specialty {
@@ -114,6 +126,7 @@ pub struct RunSpec {
     pub env: Option<HashMap<String, String>>,
     pub timeout: Duration,
     pub max_attempts: u32,
+    pub apple: Option<AppleConfig>,
     pub claude: Option<ClaudeConfig>,
     pub codex: Option<CodexConfig>,
     pub gemini: Option<GeminiConfig>,
@@ -132,6 +145,7 @@ impl RunSpec {
             env: None,
             timeout: DEFAULT_TIMEOUT,
             max_attempts: DEFAULT_MAX_ATTEMPTS,
+            apple: None,
             claude: None,
             codex: None,
             gemini: None,
@@ -181,6 +195,16 @@ impl RunSpec {
         self
     }
 
+    /// Apply Apple Foundation Models knobs, read only by the Apple backend.
+    ///
+    /// A sampling knob set without [`AppleSampling::Random`], or `sampling_top`
+    /// together with `sampling_probability_threshold`, produces
+    /// [`Error::Validation`] in the run outcome.
+    pub fn apple(mut self, config: AppleConfig) -> Self {
+        self.apple = Some(config);
+        self
+    }
+
     pub fn claude(mut self, config: ClaudeConfig) -> Self {
         self.claude = Some(config);
         self
@@ -206,6 +230,13 @@ impl RunSpec {
                 <serde_json::Error as serde::de::Error>::custom(
                     "RunSpec schema must be a JSON object",
                 ),
+            ));
+        }
+        if let Some(config) = &self.apple
+            && let Err(msg) = spawnllm_core::validate_apple(config)
+        {
+            return Err(Error::Validation(
+                <serde_json::Error as serde::de::Error>::custom(msg),
             ));
         }
         Ok(())

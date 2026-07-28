@@ -6,6 +6,7 @@ license.workspace = true
 repository.workspace = true
 description = "Run LLM calls through provider CLIs (claude, codex, gemini) or an OpenAI-compatible endpoint."
 readme = "README.md"
+include = ["src/**/*.rs", "tests/**/*.rs", "examples/**/*.rs", "spawnllm-apple.binrun", "README.md"]
 
 [features]
 default = ["openai"]

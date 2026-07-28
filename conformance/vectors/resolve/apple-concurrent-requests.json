@@ -1,0 +1,19 @@
+{
+  "name": "apple-concurrent-requests",
+  "op": "resolve",
+  "input": {
+    "provider": "apple",
+    "raw": "{\"status\": \"error\", \"kind\": \"ConcurrentRequestsError\", \"message\": \"a session is already responding\"}",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": false
+  },
+  "expected": {
+    "status": "error",
+    "kind": "envelope",
+    "msg": "apple hit a rate limit (ConcurrentRequestsError): a session is already responding",
+    "transient": true,
+    "cost_usd": null,
+    "usage": null
+  }
+}

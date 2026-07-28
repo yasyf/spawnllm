@@ -1,0 +1,18 @@
+{
+  "name": "apple-ok-text",
+  "op": "resolve",
+  "input": {
+    "provider": "apple",
+    "raw": "{\"status\": \"ok\", \"text\": \"hello world\"}",
+    "returncode": 0,
+    "stderr": "",
+    "wants_value": false
+  },
+  "expected": {
+    "status": "ok",
+    "text": "hello world",
+    "value": null,
+    "cost_usd": null,
+    "usage": null
+  }
+}

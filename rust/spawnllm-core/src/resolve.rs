@@ -6,6 +6,8 @@ use crate::retry::is_transient;
 use crate::wire::{ResolveErrorKind, Resolved, ResolvedError, ResolvedOk};
 use crate::{OpError, OpResult, from_input};
 
+const APPLE_TRANSIENT_KINDS: &[&str] = &["RateLimitedError", "ConcurrentRequestsError"];
+
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum Provider {
@@ -13,6 +15,7 @@ enum Provider {
     Codex,
     Gemini,
     Antigravity,
+    Apple,
     OpenaiEndpoint,
 }
 
@@ -23,9 +26,17 @@ impl Provider {
             Self::Codex => "codex",
             Self::Gemini => "gemini",
             Self::Antigravity => "antigravity",
+            Self::Apple => "apple",
             Self::OpenaiEndpoint => "openai_endpoint",
         }
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+enum AppleEnvelope {
+    Ok { text: String },
+    Error { kind: String, message: String },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -211,6 +222,36 @@ fn resolve_gemini(raw: &str, wants_value: bool) -> Resolved {
     )
 }
 
+fn resolve_apple(raw: &str, wants_value: bool) -> Resolved {
+    match serde_json::from_str::<AppleEnvelope>(raw) {
+        Ok(AppleEnvelope::Ok { text }) => {
+            finish(Provider::Apple, text, wants_value, None, None, None)
+        }
+        Ok(AppleEnvelope::Error { kind, message }) => {
+            let transient = APPLE_TRANSIENT_KINDS.contains(&kind.as_str());
+            Resolved::Error(ResolvedError {
+                transient,
+                kind: ResolveErrorKind::Envelope,
+                msg: match transient {
+                    true => format!("apple hit a rate limit ({kind}): {}", tail_2000(&message)),
+                    false => format!("apple generation failed ({kind}): {}", tail_2000(&message)),
+                },
+                cost_usd: None,
+                usage: None,
+            })
+        }
+        Err(_) => error(
+            ResolveErrorKind::Envelope,
+            format!(
+                "apple returned an invalid response envelope: {}",
+                tail_2000(raw)
+            ),
+            None,
+            None,
+        ),
+    }
+}
+
 fn resolve_openai(raw: &str, wants_value: bool) -> Resolved {
     let data: Value = match serde_json::from_str(raw) {
         Ok(data) => data,
@@ -298,6 +339,7 @@ fn resolve(input: ResolveInput) -> Resolved {
             None,
             None,
         ),
+        Provider::Apple => resolve_apple(&input.raw, input.wants_value),
         Provider::OpenaiEndpoint => resolve_openai(&input.raw, input.wants_value),
     }
 }
