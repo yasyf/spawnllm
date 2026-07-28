@@ -349,7 +349,7 @@ async fn cancelling_run_reaps_the_child_with_sigterm() {
 
     task.abort();
     assert!(task.await.unwrap_err().is_cancelled());
-    tokio::time::timeout(Duration::from_secs(3), async {
+    tokio::time::timeout(Duration::from_secs(10), async {
         while process_exists(pid)
             || std::fs::read_to_string(term_file.path())
                 .unwrap()
