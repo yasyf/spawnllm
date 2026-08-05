@@ -4,7 +4,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.12.0] - 2026-07-28
+## [Unreleased]
+
+### Fixed
+- **A newline-free stderr blob past 64 KiB no longer crashes a CLI-backed run.**
+  `_tee_stderr` drained stderr with `async for`, which uses
+  `StreamReader.readline` and caps a line at 64 KiB — a longer newline-free
+  write from the child (e.g. `claude` emitting a large single-line diagnostic)
+  raised `LimitOverrunError` mid-drain and took down the whole call. It now
+  reads in fixed 64 KiB chunks, so stderr of any size and line length is
+  captured whole. This mirrors the file-backed stdout fix that already dodges
+  the same 64 KiB pipe boundary.
 
 ### Changed
 - **The Apple backend no longer needs the `apple` extra, `apple-fm-sdk`, or

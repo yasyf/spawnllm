@@ -13,6 +13,10 @@ from pathlib import Path
 
 __all__ = ["RunResult", "acapture_cli", "arun_cli", "capture_cli", "collect_process", "map_concurrent", "run_cli"]
 
+# Drain stderr in fixed chunks: `StreamReader.readline` (what `async for` uses) caps a
+# line at 64 KiB and raises `LimitOverrunError` on a longer newline-free blob.
+_STDERR_CHUNK = 1 << 16
+
 
 @dataclass(frozen=True, slots=True)
 class RunResult:
@@ -130,7 +134,7 @@ async def collect_process(
         proc: A process created with stderr piped and stdout either piped or
             redirected to a file. A file-backed stdout (a `None` pipe) is not
             drained here and comes back empty for the caller to read from the file.
-        stderr_tee: Callback invoked with each stderr line as it arrives.
+        stderr_tee: Callback invoked with each stderr chunk as it arrives.
 
     Returns:
         A `(stdout, stderr, returncode)` tuple.
@@ -150,10 +154,10 @@ async def _tee_stderr(
     buf: bytearray,
     stderr_tee: Callable[[bytes], None] | None,
 ) -> None:
-    async for raw in stream:
-        buf.extend(raw)
+    while chunk := await stream.read(_STDERR_CHUNK):
+        buf.extend(chunk)
         if stderr_tee is not None:
-            stderr_tee(raw)
+            stderr_tee(chunk)
 
 
 async def _reap(proc: asyncio.subprocess.Process, *, grace: float = 2.0) -> None:
@@ -210,7 +214,7 @@ async def arun_cli(
         input: Text delivered to the process over stdin.
         env: Environment for the process; `None` inherits the current environment.
         cwd: Working directory for the process.
-        stderr_tee: Callback invoked with each stderr line as it arrives.
+        stderr_tee: Callback invoked with each stderr chunk as it arrives.
 
     Returns:
         The raw stdout bytes.

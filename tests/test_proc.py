@@ -122,6 +122,18 @@ class TestArunCli:
         await arun_cli(["sh", "-c", "echo a >&2; echo b >&2"], stderr_tee=seen.append)
         assert b"".join(seen) == b"a\nb\n"
 
+    async def test_stderr_newline_free_blob_past_64k(self) -> None:
+        # A newline-free stderr blob past the 64 KiB readline limit is captured whole,
+        # not dropped to a LimitOverrunError mid-drain.
+        blob = "e" * 200_000
+        seen: list[bytes] = []
+        argv = [sys.executable, "-c", f"import sys; sys.stderr.write({blob!r}); sys.exit(4)"]
+        with pytest.raises(subprocess.CalledProcessError) as exc:
+            await arun_cli(argv, stderr_tee=seen.append)
+        assert exc.value.returncode == 4
+        assert exc.value.stderr == blob.encode()
+        assert b"".join(seen) == blob.encode()
+
 
 class TestMapConcurrent:
     async def test_preserves_order_and_counts_completions(self) -> None:
