@@ -127,7 +127,7 @@ class TestArunCli:
         # not dropped to a LimitOverrunError mid-drain.
         blob = "e" * 200_000
         seen: list[bytes] = []
-        argv = [sys.executable, "-c", f"import sys; sys.stderr.write({blob!r}); sys.exit(4)"]
+        argv = [sys.executable, "-c", "import sys; sys.stderr.write('e' * 200_000); sys.exit(4)"]
         with pytest.raises(subprocess.CalledProcessError) as exc:
             await arun_cli(argv, stderr_tee=seen.append)
         assert exc.value.returncode == 4
