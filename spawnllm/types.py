@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-__all__ = ["ProviderName", "TModel", "TSpecialty"]
+__all__ = ["ProviderName", "TModel", "TSettingSource", "TSpecialty"]
 
 TSpecialty = Literal["debugging", "review", "general"]
 """Task specialty; `LlmBackends.for_specialty` maps each to its registered backend."""
+
+TSettingSource = Literal["user", "project", "local"]
+"""A settings layer the Claude CLI loads; `ClaudeConfig.setting_sources` selects them."""
 
 TModel = Literal["small", "medium", "large"]
 """Abstract model tier; each backend maps it to a provider-specific model name."""

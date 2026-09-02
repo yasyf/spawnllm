@@ -22,6 +22,7 @@
         "mcp_config": null,
         "output_format": null,
         "permission_mode": null,
+        "setting_sources": null,
         "settings": "{\"model\":\"opus\"}",
         "strict_mcp": false,
         "system_prompt": null,

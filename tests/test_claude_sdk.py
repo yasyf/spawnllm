@@ -59,11 +59,33 @@ class TestBuildOptions:
         assert options.extra_args == {"no-session-persistence": None}
         assert options.output_format is None
 
-    def test_isolated_false_loads_every_setting_source(self) -> None:
+    def test_isolated_false_loads_project_settings_only(self) -> None:
         options = ClaudeSdkBackend().build_options(spec(isolated=False))
 
-        assert options.setting_sources == ["user", "project", "local"]
+        assert options.setting_sources == ["project"]
         assert options.strict_mcp_config is False
+
+    @pytest.mark.parametrize(
+        ("configured", "isolated", "expected"),
+        [
+            pytest.param(None, True, [], id="isolated-default"),
+            pytest.param(None, False, ["project"], id="host-default"),
+            pytest.param((), False, [], id="none"),
+            pytest.param(("user", "project", "local"), False, ["user", "project", "local"], id="host-restore"),
+            pytest.param(("project",), True, ["project"], id="explicit-over-isolation"),
+        ],
+    )
+    def test_setting_sources_selection(
+        self,
+        configured: tuple[str, ...] | None,
+        isolated: bool,
+        expected: list[str],
+    ) -> None:
+        options = ClaudeSdkBackend().build_options(
+            spec(config=ClaudeConfig(setting_sources=configured), isolated=isolated)
+        )
+
+        assert options.setting_sources == expected
 
     def test_agent_branch_uses_auto_permissions_and_claude_code_prompt(self) -> None:
         options = ClaudeSdkBackend().build_options(spec(agent=True))

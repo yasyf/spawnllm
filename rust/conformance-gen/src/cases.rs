@@ -49,6 +49,7 @@ fn claude() -> ClaudeConfig {
         mcp_config: None,
         output_format: None,
         permission_mode: None,
+        setting_sources: None,
         settings: None,
         strict_mcp: false,
         system_prompt: None,
@@ -225,6 +226,37 @@ fn plan_cases() -> Vec<Case> {
                     ..claude()
                 }),
                 ..spec("hi", "haiku")
+            },
+        ),
+        plan_case(
+            "claude-setting-sources-host",
+            "claude",
+            RunSpec {
+                isolated: false,
+                claude: Some(ClaudeConfig {
+                    setting_sources: Some(strs(&["user", "project", "local"])),
+                    ..claude()
+                }),
+                ..spec("hi", "haiku")
+            },
+        ),
+        plan_case(
+            "claude-setting-sources-empty",
+            "claude",
+            RunSpec {
+                isolated: false,
+                claude: Some(ClaudeConfig {
+                    setting_sources: Some(vec![]),
+                    ..claude()
+                }),
+                ..spec("hi", "haiku")
+            },
+        ),
+        claude_cfg_case(
+            "claude-setting-sources-isolated",
+            ClaudeConfig {
+                setting_sources: Some(strs(&["project"])),
+                ..claude()
             },
         ),
         claude_cfg_case(

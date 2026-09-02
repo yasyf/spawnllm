@@ -30,6 +30,8 @@
       "--no-session-persistence",
       "--model",
       "haiku",
+      "--setting-sources",
+      "project",
       "--system-prompt",
       ""
     ],

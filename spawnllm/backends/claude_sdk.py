@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
     from spawnllm.backends.base import BackendStatus
     from spawnllm.spec import RunSpec
-    from spawnllm.types import ProviderName, TModel
+    from spawnllm.types import ProviderName, TModel, TSettingSource
 
 
 def sdk_cli_path() -> str | None:
@@ -53,7 +53,9 @@ class ClaudeSdkBackend(LlmBackend):
     Here `isolated=True` makes settings and MCP configuration hermetic through
     `setting_sources=[]` and `strict_mcp_config`, but unlike `ClaudeCliBackend`
     it does not seed a fresh `CLAUDE_CONFIG_DIR`, so credentials come from the
-    ambient config home or `CLAUDE_CODE_OAUTH_TOKEN`.
+    ambient config home or `CLAUDE_CODE_OAUTH_TOKEN`. `isolated=False` loads
+    `["project"]`, matching the CLI plan, until `ClaudeConfig.setting_sources`
+    names its own.
 
     `api_auth=False` blanks Claude's API-key environment variables because the
     SDK can only overlay its subprocess environment, not truly unset inherited
@@ -90,11 +92,12 @@ class ClaudeSdkBackend(LlmBackend):
         cfg = spec.config_for(ClaudeConfig) or ClaudeConfig()
         api_key_vars = _core.dispatch("capabilities")["api_key_vars"]["claude"]
         schema = self.wire_schema(spec)
+        host_free: list[TSettingSource] = [] if spec.isolated else ["project"]
         options = ClaudeAgentOptions(
             model=spec.model,
             cwd=spec.cwd,
             env=({} if spec.api_auth else {key: "" for key in api_key_vars}) | (spec.env or {}),
-            setting_sources=[] if spec.isolated else ["user", "project", "local"],
+            setting_sources=host_free if cfg.setting_sources is None else list(cfg.setting_sources),
             strict_mcp_config=spec.isolated or cfg.strict_mcp,
             max_turns=cfg.max_turns,
             tools=list(cfg.tools) if cfg.tools is not None else None,

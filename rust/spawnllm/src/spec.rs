@@ -28,6 +28,9 @@ pub struct ClaudeConfig {
     pub mcp_config: Option<String>,
     pub output_format: Option<String>,
     pub permission_mode: Option<String>,
+    /// `--setting-sources`; unset drops the host's user settings (`project`, or nothing
+    /// when isolated), and `["user", "project", "local"]` restores the CLI default.
+    pub setting_sources: Option<Vec<String>>,
     pub settings: Option<String>,
     pub strict_mcp: bool,
     pub system_prompt: Option<String>,

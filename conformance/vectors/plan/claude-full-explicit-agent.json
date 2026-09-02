@@ -34,6 +34,7 @@
         "mcp_config": "{\"mcpServers\":{}}",
         "output_format": null,
         "permission_mode": "bypassPermissions",
+        "setting_sources": null,
         "settings": "{\"model\":\"opus\"}",
         "strict_mcp": true,
         "system_prompt": "terse",
