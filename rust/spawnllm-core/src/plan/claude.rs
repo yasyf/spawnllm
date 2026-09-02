@@ -17,12 +17,11 @@ pub(super) fn plan(spec: &RunSpec) -> InvocationPlan {
     ];
     let mut env = BTreeMap::new();
 
+    let config = spec.claude.as_ref();
+    argv.extend(["--setting-sources".into(), setting_sources(spec, config)]);
     if spec.isolated {
-        argv.extend(["--setting-sources".into(), String::new()]);
         env.insert("CLAUDE_CONFIG_DIR".into(), "${isolated_config_dir}".into());
     }
-
-    let config = spec.claude.as_ref();
     if spec.isolated || config.is_some_and(|config| config.strict_mcp) {
         argv.push("--strict-mcp-config".into());
     }
@@ -78,6 +77,14 @@ pub(super) fn plan(spec: &RunSpec) -> InvocationPlan {
         },
         needs_claude_isolation: spec.isolated,
     })
+}
+
+fn setting_sources(spec: &RunSpec, config: Option<&ClaudeConfig>) -> String {
+    match config.and_then(|config| config.setting_sources.as_deref()) {
+        Some(sources) => sources.join(","),
+        None if spec.isolated => String::new(),
+        None => "project".into(),
+    }
 }
 
 fn append_config(argv: &mut Vec<String>, spec: &RunSpec, config: &ClaudeConfig) {

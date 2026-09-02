@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-    from spawnllm.types import ProviderName
+    from spawnllm.types import ProviderName, TSettingSource
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,16 +67,20 @@ class ClaudeConfig:
     (`max_turns`, `max_budget_usd`, `tools`, `disable_slash_commands`,
     `output_format`, `verbose`). `tools` selects the built-in toolset: `None`
     keeps the CLI default, `()` disables every built-in tool, and names
-    restrict the session to those tools.
+    restrict the session to those tools. `setting_sources` selects
+    `--setting-sources`: `None` drops the host's user settings (`("project",)`,
+    or nothing when `isolated`), so a run never inherits the caller's hooks.
 
     Example:
         >>> ClaudeConfig(permission_mode="bypassPermissions", strict_mcp=True)
         >>> ClaudeConfig(tools=())  # bare session: no built-in tools
+        >>> ClaudeConfig(setting_sources=("user", "project", "local"))  # CLI default
     """
 
     permission_mode: str | None = None
     mcp_config: str | None = None
     strict_mcp: bool = False
+    setting_sources: tuple[TSettingSource, ...] | None = None
     append_system_prompt: str | None = None
     system_prompt: str | None = None
     settings: str | None = None

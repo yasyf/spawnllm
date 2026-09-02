@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same 64 KiB pipe boundary.
 
 ### Changed
+- **Claude runs no longer inherit the host's user settings, and that is a default
+  change.** `claude -p` loads `user`, `project`, and `local` settings unless told
+  otherwise, which handed every spawned session the caller's hooks. On a machine
+  with a real hook stack those hooks dominate the call. A one-word prompt to
+  `claude-haiku-4-5` measured 63s with the host's hooks against 6s without, and
+  the session exited printing `SessionEnd hook … failed`. Non-isolated runs now
+  plan `--setting-sources project`; isolated runs keep the `--setting-sources ""`
+  they already passed. The new `ClaudeConfig.setting_sources` (Go
+  `SettingSources`) names the sources instead, on isolated runs too. Pass
+  `("user", "project", "local")` to restore what non-isolated runs did before, or
+  `()` to load none. `--settings` is no substitute, because settings merge: a
+  `{"hooks":{}}` payload leaves the inherited hooks in place.
 - **The Apple backend no longer needs the `apple` extra, `apple-fm-sdk`, or
   Xcode.** A prebuilt Swift sidecar ships inside the macOS platform wheel
   (`macosx_26_0_arm64`), so installing spawnllm on an Apple-Intelligence-capable

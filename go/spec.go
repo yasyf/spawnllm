@@ -88,9 +88,13 @@ type AppleConfig struct {
 // fields are unset; Tools distinguishes nil (CLI default) from an empty slice
 // (disable every built-in tool).
 type ClaudeConfig struct {
-	PermissionMode       string
-	MCPConfig            string
-	StrictMCP            bool
+	PermissionMode string
+	MCPConfig      string
+	StrictMCP      bool
+	// SettingSources is --setting-sources. Nil drops the host's user settings
+	// ("project", or nothing when UseHostConfig is false), so a run never inherits
+	// the caller's hooks; {"user", "project", "local"} restores the CLI default.
+	SettingSources       []string
 	AppendSystemPrompt   string
 	SystemPrompt         string
 	Settings             string
@@ -203,6 +207,7 @@ type coreClaude struct {
 	MCPConfig            *string  `json:"mcp_config"`
 	OutputFormat         *string  `json:"output_format"`
 	PermissionMode       *string  `json:"permission_mode"`
+	SettingSources       []string `json:"setting_sources"`
 	Settings             *string  `json:"settings"`
 	StrictMCP            bool     `json:"strict_mcp"`
 	SystemPrompt         *string  `json:"system_prompt"`
@@ -312,6 +317,7 @@ func coreClaudeOf(c *ClaudeConfig) *coreClaude {
 		MCPConfig:            optString(c.MCPConfig),
 		OutputFormat:         optString(c.OutputFormat),
 		PermissionMode:       optString(c.PermissionMode),
+		SettingSources:       c.SettingSources,
 		Settings:             optString(c.Settings),
 		StrictMCP:            c.StrictMCP,
 		SystemPrompt:         optString(c.SystemPrompt),

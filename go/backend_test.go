@@ -269,6 +269,25 @@ func TestClaudeToolsNilVsEmpty(t *testing.T) {
 	}
 }
 
+func TestClaudeSettingSourcesNilVsList(t *testing.T) {
+	unset := RunSpec{Providers: ProviderConfigs{Claude: &ClaudeConfig{}}}.core()
+	raw, err := json.Marshal(unset.Claude)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(raw, []byte(`"setting_sources":null`)) {
+		t.Fatalf("nil SettingSources should serialize to null: %s", raw)
+	}
+	host := ClaudeConfig{SettingSources: []string{"user", "project", "local"}}
+	raw, err = json.Marshal(RunSpec{Providers: ProviderConfigs{Claude: &host}}.core().Claude)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(raw, []byte(`"setting_sources":["user","project","local"]`)) {
+		t.Fatalf("SettingSources should serialize verbatim: %s", raw)
+	}
+}
+
 func TestClaudeConfigOptionalsSerializeNull(t *testing.T) {
 	raw, err := json.Marshal(RunSpec{Providers: ProviderConfigs{Claude: &ClaudeConfig{}}}.core().Claude)
 	if err != nil {

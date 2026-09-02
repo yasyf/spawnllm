@@ -1,5 +1,5 @@
 {
-  "name": "claude-verbose",
+  "name": "claude-setting-sources-empty",
   "op": "plan",
   "input": {
     "provider": "claude",
@@ -7,7 +7,7 @@
       "prompt": "hi",
       "model": "haiku",
       "agent": false,
-      "isolated": true,
+      "isolated": false,
       "timeout": 180,
       "max_attempts": 5,
       "api_auth": false,
@@ -22,12 +22,12 @@
         "mcp_config": null,
         "output_format": null,
         "permission_mode": null,
-        "setting_sources": null,
+        "setting_sources": [],
         "settings": null,
         "strict_mcp": false,
         "system_prompt": null,
         "tools": null,
-        "verbose": true
+        "verbose": false
       },
       "codex": null,
       "gemini": null,
@@ -47,10 +47,8 @@
       "haiku",
       "--setting-sources",
       "",
-      "--strict-mcp-config",
       "--system-prompt",
-      "",
-      "--verbose"
+      ""
     ],
     "stdin": "hi",
     "files": [
@@ -62,13 +60,11 @@
     ],
     "stdout_to_file": true,
     "read_result_from": "stdout",
-    "env": {
-      "CLAUDE_CONFIG_DIR": "${isolated_config_dir}"
-    },
+    "env": {},
     "env_unset": [
       "ANTHROPIC_API_KEY",
       "ANTHROPIC_AUTH_TOKEN"
     ],
-    "needs_claude_isolation": true
+    "needs_claude_isolation": false
   }
 }

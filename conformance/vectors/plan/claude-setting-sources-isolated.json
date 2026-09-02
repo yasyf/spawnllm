@@ -1,5 +1,5 @@
 {
-  "name": "claude-verbose",
+  "name": "claude-setting-sources-isolated",
   "op": "plan",
   "input": {
     "provider": "claude",
@@ -22,12 +22,14 @@
         "mcp_config": null,
         "output_format": null,
         "permission_mode": null,
-        "setting_sources": null,
+        "setting_sources": [
+          "project"
+        ],
         "settings": null,
         "strict_mcp": false,
         "system_prompt": null,
         "tools": null,
-        "verbose": true
+        "verbose": false
       },
       "codex": null,
       "gemini": null,
@@ -46,11 +48,10 @@
       "--model",
       "haiku",
       "--setting-sources",
-      "",
+      "project",
       "--strict-mcp-config",
       "--system-prompt",
-      "",
-      "--verbose"
+      ""
     ],
     "stdin": "hi",
     "files": [

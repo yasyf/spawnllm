@@ -22,6 +22,7 @@
         "mcp_config": null,
         "output_format": null,
         "permission_mode": null,
+        "setting_sources": null,
         "settings": null,
         "strict_mcp": true,
         "system_prompt": null,
@@ -44,6 +45,8 @@
       "--no-session-persistence",
       "--model",
       "haiku",
+      "--setting-sources",
+      "project",
       "--strict-mcp-config"
     ],
     "stdin": "hi",
