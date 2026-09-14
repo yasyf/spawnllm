@@ -65,8 +65,8 @@ pub fn capabilities() -> Capabilities {
                 "codex",
                 ModelTiers {
                     large: Some("gpt-5.5:medium"),
-                    medium: Some("gpt-5.4-mini:medium"),
-                    small: Some("gpt-5.4-mini:low"),
+                    medium: Some("gpt-5.6-luna:medium"),
+                    small: Some("gpt-5.6-luna:low"),
                 },
             ),
             (

@@ -363,13 +363,13 @@ fn plan_cases() -> Vec<Case> {
             "codex",
             RunSpec {
                 agent: true,
-                ..spec("hi", "gpt-5.4-mini")
+                ..spec("hi", "gpt-5.6-luna")
             },
         ),
         plan_case(
             "codex-effort-suffix",
             "codex",
-            spec("hi", "gpt-5.4-mini:medium"),
+            spec("hi", "gpt-5.6-luna:medium"),
         ),
         codex_cfg_case(
             "codex-service-tier-none",

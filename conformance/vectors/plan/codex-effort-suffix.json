@@ -5,7 +5,7 @@
     "provider": "codex",
     "spec": {
       "prompt": "hi",
-      "model": "gpt-5.4-mini:medium",
+      "model": "gpt-5.6-luna:medium",
       "agent": false,
       "isolated": true,
       "timeout": 180,
@@ -34,7 +34,7 @@
       "--color",
       "never",
       "--model",
-      "gpt-5.4-mini",
+      "gpt-5.6-luna",
       "-c",
       "model_reasoning_effort=medium",
       "-c",
