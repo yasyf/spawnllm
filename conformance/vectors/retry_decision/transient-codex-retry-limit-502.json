@@ -1,0 +1,13 @@
+{
+  "name": "transient-codex-retry-limit-502",
+  "op": "retry_decision",
+  "input": {
+    "attempt": 0,
+    "max_attempts": 5,
+    "error_msg": "codex exited 1: user\nCap the sandbox at 512 MiB.\nERROR: exceeded retry limit, last status: 502 Bad Gateway"
+  },
+  "expected": {
+    "retry": true,
+    "sleep_s": 5.0
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "codex-exit-400-echoed-prompt",
+  "op": "resolve",
+  "input": {
+    "provider": "codex",
+    "raw": "",
+    "returncode": 1,
+    "stderr": "user\nCap the sandbox at 512 MiB and retry on a 503.\nERROR: {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'gpt-5.4-mini' model is not supported when using Codex with a ChatGPT account.\"}}",
+    "wants_value": false
+  },
+  "expected": {
+    "status": "error",
+    "kind": "exit",
+    "msg": "codex exited 1: user\nCap the sandbox at 512 MiB and retry on a 503.\nERROR: {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'gpt-5.4-mini' model is not supported when using Codex with a ChatGPT account.\"}}",
+    "transient": false,
+    "cost_usd": null,
+    "usage": null
+  }
+}

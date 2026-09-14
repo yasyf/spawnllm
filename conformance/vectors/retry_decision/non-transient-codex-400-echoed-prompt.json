@@ -1,0 +1,13 @@
+{
+  "name": "non-transient-codex-400-echoed-prompt",
+  "op": "retry_decision",
+  "input": {
+    "attempt": 0,
+    "max_attempts": 5,
+    "error_msg": "codex exited 1: user\nCap the sandbox at 512 MiB and retry on a 503.\nERROR: {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'gpt-5.4-mini' model is not supported when using Codex with a ChatGPT account.\"}}"
+  },
+  "expected": {
+    "retry": false,
+    "sleep_s": 0.0
+  }
+}

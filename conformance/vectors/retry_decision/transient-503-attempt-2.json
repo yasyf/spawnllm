@@ -4,7 +4,7 @@
   "input": {
     "attempt": 2,
     "max_attempts": 5,
-    "error_msg": "upstream returned 503"
+    "error_msg": "API Error: 503 {\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"Service Unavailable\"}}"
   },
   "expected": {
     "retry": true,
