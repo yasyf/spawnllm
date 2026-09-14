@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-09-14
+
+### Fixed
+- **The codex `small` and `medium` tiers run under a ChatGPT sign-in.** Both
+  resolved to `gpt-5.4-mini`, which codex rejects on every call when signed in
+  with a ChatGPT account: `The 'gpt-5.4-mini' model is not supported when using
+  Codex with a ChatGPT account.` They now resolve to `gpt-5.6-luna:low` and
+  `gpt-5.6-luna:medium`. `gpt-5.6-luna` is in the model list codex fetches for a
+  ChatGPT account and in the catalog bundled with the CLI for API-key auth, and
+  both mark it `supported_in_api`. `large` stays `gpt-5.5:medium`.
+
 ## [0.13.1] - 2026-09-14
 
 ### Fixed

@@ -29,8 +29,8 @@ class CodexCliBackend(CliBackend):
     """
 
     models: ClassVar[dict[TModel, str]] = {
-        "small": "gpt-5.4-mini:low",
-        "medium": "gpt-5.4-mini:medium",
+        "small": "gpt-5.6-luna:low",
+        "medium": "gpt-5.6-luna:medium",
         "large": "gpt-5.5:medium",
     }
     provider: ClassVar[ProviderName] = "codex"
