@@ -1,0 +1,13 @@
+{
+  "name": "non-transient-rate-limit-in-echoed-prompt",
+  "op": "retry_decision",
+  "input": {
+    "attempt": 0,
+    "max_attempts": 5,
+    "error_msg": "codex exited 1: user\nBack off when you hit a rate limit.\nERROR: stream closed unexpectedly"
+  },
+  "expected": {
+    "retry": false,
+    "sleep_s": 0.0
+  }
+}

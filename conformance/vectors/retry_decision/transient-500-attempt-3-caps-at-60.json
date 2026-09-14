@@ -4,7 +4,7 @@
   "input": {
     "attempt": 3,
     "max_attempts": 5,
-    "error_msg": "internal 500 error"
+    "error_msg": "ERROR: {\"type\":\"error\",\"status\":500,\"error\":{\"type\":\"server_error\",\"message\":\"internal error\"}}"
   },
   "expected": {
     "retry": true,

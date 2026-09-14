@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **A permanent CLI error no longer retries because the echoed prompt contains a
+  three-digit number.** The retry policy matched any bare `5xx`, `overloaded`,
+  or `rate limit` anywhere in the error message, and `codex` echoes the prompt
+  into stderr ahead of its error line. A prompt mentioning "512 MiB" made
+  codex's `status: 400` "model is not supported" error look transient, so every
+  call burned about 137s of backoff before failing. The policy now reads only
+  the error message's last non-empty line, the line where `codex` prints
+  `ERROR: ...` and `claude` prints `API Error: ...`, and counts a 5xx only in
+  a status position, such as `"status":503`, `last status: 502`, `API Error: 500`, or
+  an HTTP backend's `exited 503:` header. A 4xx is never transient.
 - **A newline-free stderr blob past 64 KiB no longer crashes a CLI-backed run.**
   `_tee_stderr` drained stderr with `async for`, which uses
   `StreamReader.readline` and caps a line at 64 KiB — a longer newline-free

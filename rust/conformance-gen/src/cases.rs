@@ -587,6 +587,10 @@ fn resolve_case(
     }
 }
 
+const CODEX_400_ECHOED_PROMPT: &str = r#"codex exited 1: user
+Cap the sandbox at 512 MiB and retry on a 503.
+ERROR: {"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The 'gpt-5.4-mini' model is not supported when using Codex with a ChatGPT account."}}"#;
+
 fn resolve_cases() -> Vec<Case> {
     vec![
         resolve_case(
@@ -677,6 +681,14 @@ fn resolve_cases() -> Vec<Case> {
             "",
             42,
             "codex exec failed",
+            false,
+        ),
+        resolve_case(
+            "codex-exit-400-echoed-prompt",
+            "codex",
+            "",
+            1,
+            CODEX_400_ECHOED_PROMPT.trim_start_matches("codex exited 1: "),
             false,
         ),
         resolve_case(
@@ -926,13 +938,17 @@ fn retry_cases() -> Vec<Case> {
             "transient-503-attempt-2",
             2,
             5,
-            Some("upstream returned 503"),
+            Some(
+                r#"API Error: 503 {"type":"error","error":{"type":"api_error","message":"Service Unavailable"}}"#,
+            ),
         ),
         retry_case(
             "transient-500-attempt-3-caps-at-60",
             3,
             5,
-            Some("internal 500 error"),
+            Some(
+                r#"ERROR: {"type":"error","status":500,"error":{"type":"server_error","message":"internal error"}}"#,
+            ),
         ),
         retry_case(
             "transient-overloaded-attempt-0",
@@ -947,6 +963,28 @@ fn retry_cases() -> Vec<Case> {
             Some("529 overloaded"),
         ),
         retry_case("transient-max-attempts-one", 0, 1, Some("529 overloaded")),
+        retry_case(
+            "transient-codex-retry-limit-502",
+            0,
+            5,
+            Some(
+                "codex exited 1: user\nCap the sandbox at 512 MiB.\nERROR: exceeded retry limit, last status: 502 Bad Gateway",
+            ),
+        ),
+        retry_case(
+            "non-transient-codex-400-echoed-prompt",
+            0,
+            5,
+            Some(CODEX_400_ECHOED_PROMPT),
+        ),
+        retry_case(
+            "non-transient-rate-limit-in-echoed-prompt",
+            0,
+            5,
+            Some(
+                "codex exited 1: user\nBack off when you hit a rate limit.\nERROR: stream closed unexpectedly",
+            ),
+        ),
         retry_case(
             "non-transient-attempt-0",
             0,

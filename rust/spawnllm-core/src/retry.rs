@@ -6,8 +6,12 @@ use serde_json::Value;
 
 use crate::{OpError, OpResult, from_input};
 
-static TRANSIENT: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\b529\b|overloaded|rate.?limit|\b5\d\d\b").unwrap());
+static TRANSIENT_ERROR_LINE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)overloaded|rate.?limit|(?:\bstatus|\bAPI Error)[\s":=]*5\d\d\b"#).unwrap()
+});
+
+static TRANSIENT_HTTP_EXIT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\w+ exited 5\d\d:").unwrap());
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RetryInput {
@@ -23,7 +27,12 @@ pub struct RetryDecision {
 }
 
 pub(crate) fn is_transient(msg: &str) -> bool {
-    TRANSIENT.is_match(msg)
+    TRANSIENT_HTTP_EXIT.is_match(msg)
+        || msg
+            .lines()
+            .rev()
+            .find(|line| !line.trim().is_empty())
+            .is_some_and(|line| TRANSIENT_ERROR_LINE.is_match(line))
 }
 
 pub fn backoff(attempt: u32) -> f64 {
