@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-09-14
+
 ### Fixed
 - **A permanent CLI error no longer retries because the echoed prompt contains a
   three-digit number.** The retry policy matched any bare `5xx`, `overloaded`,
@@ -17,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ERROR: ...` and `claude` prints `API Error: ...`, and counts a 5xx only in
   a status position, such as `"status":503`, `last status: 502`, `API Error: 500`, or
   an HTTP backend's `exited 503:` header. A 4xx is never transient.
+
+## [0.13.0] - 2026-09-02
+
+### Fixed
 - **A newline-free stderr blob past 64 KiB no longer crashes a CLI-backed run.**
   `_tee_stderr` drained stderr with `async for`, which uses
   `StreamReader.readline` and caps a line at 64 KiB — a longer newline-free
@@ -39,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `("user", "project", "local")` to restore what non-isolated runs did before, or
   `()` to load none. `--settings` is no substitute, because settings merge: a
   `{"hooks":{}}` payload leaves the inherited hooks in place.
+
+## [0.12.0] - 2026-07-28
+
+### Changed
 - **The Apple backend no longer needs the `apple` extra, `apple-fm-sdk`, or
   Xcode.** A prebuilt Swift sidecar ships inside the macOS platform wheel
   (`macosx_26_0_arm64`), so installing spawnllm on an Apple-Intelligence-capable
@@ -395,7 +405,9 @@ First release, published to PyPI as `spawnllm`.
   generation.
 - Click CLI: `spawnllm backends` and `spawnllm call`.
 
-[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/yasyf/spawnllm/compare/v0.13.0...v0.13.1
+[0.13.0]: https://github.com/yasyf/spawnllm/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/yasyf/spawnllm/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/yasyf/spawnllm/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/yasyf/spawnllm/compare/v0.9.1...v0.10.0

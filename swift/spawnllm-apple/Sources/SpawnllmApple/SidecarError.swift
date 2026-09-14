@@ -16,8 +16,9 @@ public enum ErrorKind: String, Sendable {
 }
 
 /// Messages are constants and never interpolate framework text, model output, or token
-/// counts: a host marks a response transient by pattern-matching the composed message, and
-/// a bare three-digit number leaking through would read as a retryable 5xx.
+/// counts: a host marks a response transient by pattern-matching the composed message
+/// for `overloaded`, `rate limit`, or a `status`/`API Error` 5xx, and arbitrary
+/// interpolated text could trip one of those keywords by accident.
 public struct SidecarError: Error, Equatable, Sendable {
     public let kind: ErrorKind
     public let message: String
