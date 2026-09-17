@@ -1,5 +1,5 @@
 {
-  "name": "default-home-darwin",
+  "name": "custom-oauth-url-darwin",
   "op": "claude_isolation_sources",
   "input": {
     "host": {
@@ -7,12 +7,12 @@
       "home": "/Users/testuser",
       "claude_config_dir_env": null,
       "claude_securestorage_config_dir_env": null,
-      "claude_code_custom_oauth_url_env": null
+      "claude_code_custom_oauth_url_env": "https://oauth.example.test"
     }
   },
   "expected": {
     "account_path": "/Users/testuser/.claude.json",
     "credentials_path": "/Users/testuser/.claude/.credentials.json",
-    "keychain_service": "Claude Code-credentials"
+    "keychain_service": "Claude Code-custom-oauth-credentials"
   }
 }

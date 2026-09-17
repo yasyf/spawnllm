@@ -288,6 +288,10 @@ class TestCliEnvironment:
         assert plan_calls == 2
 
 
+def suffixed_keychain_service(config_dir_env: str) -> str:
+    return f"Claude Code-credentials-{hashlib.sha256(config_dir_env.encode()).hexdigest()[:8]}"
+
+
 class TestClaudeIsolation:
     def test_env_isolates_and_seeds_config_dir_from_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
@@ -385,11 +389,82 @@ class TestClaudeIsolation:
 
         monkeypatch.setattr("spawnllm.backends.claude.subprocess.run", fake_run)
         config_dir = Path(ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"])
-        digest = hashlib.sha256(str(account_home).encode()).hexdigest()[:8]
-        assert calls == [["security", "find-generic-password", "-s", f"Claude Code-credentials-{digest}", "-w"]]
+        service = suffixed_keychain_service(str(account_home))
+        assert calls == [["security", "find-generic-password", "-s", service, "-w"]]
         credentials = config_dir / ".credentials.json"
         assert json.loads(credentials.read_text()) == {"claudeAiOauth": {"accessToken": "kc-tok"}}
         assert credentials.stat().st_mode & 0o777 == 0o600
+
+    @pytest.mark.parametrize(
+        "config_dir_env, expected_service",
+        [
+            (lambda home, acct: {"CLAUDE_CONFIG_DIR": ""}, lambda home, acct: "Claude Code-credentials"),
+            (
+                lambda home, acct: {"CLAUDE_CONFIG_DIR": f"{acct}/"},
+                lambda home, acct: suffixed_keychain_service(f"{acct}/"),
+            ),
+            (
+                lambda home, acct: {"CLAUDE_CONFIG_DIR": f"{home}/.claude"},
+                lambda home, acct: suffixed_keychain_service(f"{home}/.claude"),
+            ),
+            (
+                lambda home, acct: {"CLAUDE_CONFIG_DIR": acct, "CLAUDE_SECURESTORAGE_CONFIG_DIR": ""},
+                lambda home, acct: "Claude Code-credentials",
+            ),
+            (
+                lambda home, acct: {"CLAUDE_CONFIG_DIR": acct, "CLAUDE_SECURESTORAGE_CONFIG_DIR": f"{home}/secure"},
+                lambda home, acct: suffixed_keychain_service(f"{home}/secure"),
+            ),
+            (
+                lambda home, acct: {
+                    "CLAUDE_CONFIG_DIR": acct,
+                    "CLAUDE_CODE_CUSTOM_OAUTH_URL": "https://oauth.example.test",
+                },
+                lambda home, acct: suffixed_keychain_service(acct).replace(
+                    "Claude Code-credentials", "Claude Code-custom-oauth-credentials"
+                ),
+            ),
+        ],
+        ids=[
+            "empty-env-reads-the-bare-item",
+            "trailing-slash-hashed-as-set",
+            "default-path-env-still-suffixed",
+            "empty-securestorage-env-reads-the-bare-item",
+            "securestorage-env-hashed-over-config-dir",
+            "custom-oauth-url-names-the-custom-oauth-item",
+        ],
+    )
+    def test_env_keychain_service_follows_the_env_value_as_set(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        config_dir_env: Callable[[str, str], dict[str, str]],
+        expected_service: Callable[[str, str], str],
+    ) -> None:
+        (home := tmp_path / "home").mkdir()
+        (home / ".claude").mkdir()
+        (acct := tmp_path / "acct").mkdir()
+        for account_home in (home, acct):
+            (account_home / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": "e"}}))
+        monkeypatch.setenv("HOME", str(home))
+        for name in ("CLAUDE_CONFIG_DIR", "CLAUDE_SECURESTORAGE_CONFIG_DIR", "CLAUDE_CODE_CUSTOM_OAUTH_URL"):
+            monkeypatch.delenv(name, raising=False)
+        for name, value in config_dir_env(str(home), str(acct)).items():
+            monkeypatch.setenv(name, value)
+        monkeypatch.setattr("spawnllm.backends.claude.sys.platform", "darwin")
+        calls: list[list[str]] = []
+
+        def fake_run(argv: list[str], **kwargs: object) -> object:
+            calls.append(argv)
+            return type("P", (), {"returncode": 0, "stdout": '{"claudeAiOauth": {"accessToken": "kc-tok"}}\n'})()
+
+        monkeypatch.setattr("spawnllm.backends.claude.subprocess.run", fake_run)
+        config_dir = Path(ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"])
+        service = expected_service(str(home), str(acct))
+        assert calls == [["security", "find-generic-password", "-s", service, "-w"]]
+        assert json.loads((config_dir / ".credentials.json").read_text()) == {
+            "claudeAiOauth": {"accessToken": "kc-tok"}
+        }
 
     def test_env_keychain_miss_seeds_no_credentials(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         (account_home := tmp_path / "acct").mkdir()

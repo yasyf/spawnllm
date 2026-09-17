@@ -5,7 +5,9 @@
     "host": {
       "platform": "linux",
       "home": "/home/testuser",
-      "claude_config_dir_env": null
+      "claude_config_dir_env": null,
+      "claude_securestorage_config_dir_env": null,
+      "claude_code_custom_oauth_url_env": null
     }
   },
   "expected": {

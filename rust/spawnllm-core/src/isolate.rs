@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::ser::Formatter;
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
+use unicode_normalization::UnicodeNormalization;
 
 use crate::{OpError, OpResult, from_input, unimplemented};
 
@@ -17,6 +18,10 @@ struct IsolationHost {
     platform: String,
     home: String,
     claude_config_dir_env: Option<String>,
+    #[serde(default)]
+    claude_securestorage_config_dir_env: Option<String>,
+    #[serde(default)]
+    claude_code_custom_oauth_url_env: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -77,31 +82,55 @@ impl Formatter for PythonFormatter {
     }
 }
 
+fn is_set(value: &Option<String>) -> bool {
+    value.as_deref().is_some_and(|value| !value.is_empty())
+}
+
+fn config_dir_digest(config_dir_env: &str) -> String {
+    let digest = format!(
+        "{:x}",
+        Sha256::digest(config_dir_env.nfc().collect::<String>().as_bytes())
+    );
+    format!("-{}", &digest[..8])
+}
+
+// Mirrors Claude Code 2.1.274's lb()/mI(): a defined CLAUDE_SECURESTORAGE_CONFIG_DIR
+// overrides CLAUDE_CONFIG_DIR for the storage dir and the digest of the NFC value as set.
 fn isolation_sources(input: IsolationSourcesInput) -> IsolationSources {
     let host = input.host;
-    // Claude Code suffixes the item only when CLAUDE_CONFIG_DIR is set, even to the
-    // default path; the unset default home reads the bare item.
-    let (account_path, config_home, keychain_suffix) = match host.claude_config_dir_env {
-        Some(config_home) => {
-            let config_home = config_home.trim_end_matches('/').to_owned();
-            let digest = format!("{:x}", Sha256::digest(config_home.as_bytes()));
+    let default_home = format!("{}/.claude", host.home);
+    let (account_path, config_home) = match &host.claude_config_dir_env {
+        Some(config_dir_env) if !config_dir_env.is_empty() => {
+            let config_home = config_dir_env.trim_end_matches('/');
             (
                 format!("{config_home}/.claude.json"),
-                config_home,
-                format!("-{}", &digest[..8]),
+                config_home.to_owned(),
             )
         }
+        _ => (format!("{}/.claude.json", host.home), default_home.clone()),
+    };
+    let (credentials_home, hashed_dir) = match &host.claude_securestorage_config_dir_env {
+        Some(dir) if dir.is_empty() => (default_home, None),
+        Some(dir) => (dir.trim_end_matches('/').to_owned(), Some(dir.as_str())),
         None => (
-            format!("{}/.claude.json", host.home),
-            format!("{}/.claude", host.home),
-            String::new(),
+            config_home,
+            host.claude_config_dir_env
+                .as_deref()
+                .filter(|dir| !dir.is_empty()),
         ),
     };
-    let keychain_service =
-        (host.platform == "darwin").then(|| format!("Claude Code-credentials{keychain_suffix}"));
+    let oauth_file_suffix = if is_set(&host.claude_code_custom_oauth_url_env) {
+        "-custom-oauth"
+    } else {
+        ""
+    };
+    let keychain_service = (host.platform == "darwin").then(|| {
+        let digest = hashed_dir.map(config_dir_digest).unwrap_or_default();
+        format!("Claude Code{oauth_file_suffix}-credentials{digest}")
+    });
     IsolationSources {
         account_path,
-        credentials_path: format!("{config_home}/.credentials.json"),
+        credentials_path: format!("{credentials_home}/.credentials.json"),
         keychain_service,
     }
 }

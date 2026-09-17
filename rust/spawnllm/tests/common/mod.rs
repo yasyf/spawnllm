@@ -82,10 +82,11 @@ fi
 "#;
 
 const SECURITY_FAKE: &str = r#"#!/bin/sh
-for a in "$@"; do
-  if [ "$a" = "-w" ]; then printf 'keychain-token-xyz'; exit 0; fi
-done
-exit 1
+if [ -n "$SPAWNLLM_FAKE_SECURITY_ARGV_OUT" ]; then printf '%s\n' "$@" > "$SPAWNLLM_FAKE_SECURITY_ARGV_OUT"; fi
+if [ "$1" = "find-generic-password" ] && [ "$2" = "-s" ] && [ "$3" = "$SPAWNLLM_FAKE_KEYCHAIN_SERVICE" ] && [ "$4" = "-w" ] && [ $# -eq 4 ]; then
+  printf 'keychain-token-xyz'; exit 0
+fi
+exit 44
 "#;
 
 /// Materialize the fake CLIs once and prepend their dir to `PATH`; returns the dir.

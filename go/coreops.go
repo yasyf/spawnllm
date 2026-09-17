@@ -3,6 +3,7 @@ package spawnllm
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/yasyf/spawnllm/go/internal/core"
 )
@@ -197,9 +198,21 @@ func coreAuthProbes(provider Provider) (authProbes, error) {
 }
 
 func coreIsolationSources() (isolationSources, error) {
-	host := map[string]any{"platform": platform(), "home": home(), "claude_config_dir_env": nil}
+	host := map[string]any{
+		"platform":                            platform(),
+		"home":                                home(),
+		"claude_config_dir_env":               nil,
+		"claude_securestorage_config_dir_env": nil,
+		"claude_code_custom_oauth_url_env":    nil,
+	}
 	if dir := configDirEnv(); dir != "" {
 		host["claude_config_dir_env"] = dir
+	}
+	if dir, defined := os.LookupEnv("CLAUDE_SECURESTORAGE_CONFIG_DIR"); defined {
+		host["claude_securestorage_config_dir_env"] = dir
+	}
+	if url, defined := os.LookupEnv("CLAUDE_CODE_CUSTOM_OAUTH_URL"); defined {
+		host["claude_code_custom_oauth_url_env"] = url
 	}
 	return coreInto[isolationSources]("claude_isolation_sources", struct {
 		Host map[string]any `json:"host"`

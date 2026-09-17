@@ -40,6 +40,8 @@ pub(crate) async fn seed_isolation() -> Result<TempDir, Error> {
             "platform": platform(),
             "home": home(),
             "claude_config_dir_env": std::env::var("CLAUDE_CONFIG_DIR").ok().filter(|value| !value.is_empty()),
+            "claude_securestorage_config_dir_env": std::env::var("CLAUDE_SECURESTORAGE_CONFIG_DIR").ok(),
+            "claude_code_custom_oauth_url_env": std::env::var("CLAUDE_CODE_CUSTOM_OAUTH_URL").ok(),
         } }),
     )?;
 
