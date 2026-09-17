@@ -17,8 +17,11 @@ static FIXTURES: OnceLock<PathBuf> = OnceLock::new();
 
 const CLAUDE_FAKE: &str = r#"#!/bin/sh
 if [ "$1" = "auth" ]; then exit 0; fi
-if [ -n "$SPAWNLLM_FAKE_PID_OUT" ]; then printf '%s' "$$" > "$SPAWNLLM_FAKE_PID_OUT"; fi
+# The pid is what a test waits on before signalling, so the trap is armed first:
+# a TERM arriving between the two takes the shell's default action and the run
+# dies without recording it.
 if [ -n "$SPAWNLLM_FAKE_TERM_OUT" ]; then trap 'printf term > "$SPAWNLLM_FAKE_TERM_OUT"; exit 0' TERM; fi
+if [ -n "$SPAWNLLM_FAKE_PID_OUT" ]; then printf '%s' "$$" > "$SPAWNLLM_FAKE_PID_OUT"; fi
 if [ -n "$SPAWNLLM_FAKE_ENV_OUT" ]; then printf 'ANTHROPIC_API_KEY=%s\nANTHROPIC_AUTH_TOKEN=%s\n' "${ANTHROPIC_API_KEY-<unset>}" "${ANTHROPIC_AUTH_TOKEN-<unset>}" > "$SPAWNLLM_FAKE_ENV_OUT"; fi
 if [ -n "$SPAWNLLM_FAKE_EXIT_BEFORE_STDIN" ]; then exit 0; fi
 if [ -n "$SPAWNLLM_FAKE_SPIN" ]; then sleep 3600 & wait "$!"; fi
