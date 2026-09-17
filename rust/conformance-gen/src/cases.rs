@@ -1024,20 +1024,39 @@ fn capabilities_cases() -> Vec<Case> {
     }]
 }
 
-fn iso_sources_case(
-    name: &str,
-    platform: &str,
-    home: &str,
-    claude_config_dir_env: Option<&str>,
-) -> Case {
+struct IsoHost {
+    platform: &'static str,
+    home: &'static str,
+    config_dir_env: Option<&'static str>,
+    securestorage_config_dir_env: Option<&'static str>,
+    custom_oauth_url_env: Option<&'static str>,
+}
+
+const ISO_DARWIN: IsoHost = IsoHost {
+    platform: "darwin",
+    home: HOME_DARWIN,
+    config_dir_env: None,
+    securestorage_config_dir_env: None,
+    custom_oauth_url_env: None,
+};
+
+const ISO_LINUX: IsoHost = IsoHost {
+    platform: "linux",
+    home: HOME_LINUX,
+    ..ISO_DARWIN
+};
+
+fn iso_sources_case(name: &str, host: IsoHost) -> Case {
     Case {
         op: "claude_isolation_sources",
         name: name.to_owned(),
         input: json!({
             "host": {
-                "platform": platform,
-                "home": home,
-                "claude_config_dir_env": claude_config_dir_env,
+                "platform": host.platform,
+                "home": host.home,
+                "claude_config_dir_env": host.config_dir_env,
+                "claude_securestorage_config_dir_env": host.securestorage_config_dir_env,
+                "claude_code_custom_oauth_url_env": host.custom_oauth_url_env,
             }
         }),
     }
@@ -1045,25 +1064,87 @@ fn iso_sources_case(
 
 fn iso_sources_cases() -> Vec<Case> {
     vec![
-        iso_sources_case("default-home-darwin", "darwin", HOME_DARWIN, None),
-        iso_sources_case("default-home-linux", "linux", HOME_LINUX, None),
+        iso_sources_case("default-home-darwin", ISO_DARWIN),
+        iso_sources_case("default-home-linux", ISO_LINUX),
         iso_sources_case(
             "config-dir-env-darwin",
-            "darwin",
-            HOME_DARWIN,
-            Some("/Users/testuser/.acct"),
+            IsoHost {
+                config_dir_env: Some("/Users/testuser/.acct"),
+                ..ISO_DARWIN
+            },
         ),
         iso_sources_case(
             "config-dir-env-trailing-slash-darwin",
-            "darwin",
-            HOME_DARWIN,
-            Some("/Users/testuser/.acct/"),
+            IsoHost {
+                config_dir_env: Some("/Users/testuser/.acct/"),
+                ..ISO_DARWIN
+            },
         ),
         iso_sources_case(
             "config-dir-env-linux",
-            "linux",
-            HOME_LINUX,
-            Some("/home/testuser/.acct"),
+            IsoHost {
+                config_dir_env: Some("/home/testuser/.acct"),
+                ..ISO_LINUX
+            },
+        ),
+        iso_sources_case(
+            "config-dir-env-empty-darwin",
+            IsoHost {
+                config_dir_env: Some(""),
+                ..ISO_DARWIN
+            },
+        ),
+        iso_sources_case(
+            "config-dir-env-default-path-darwin",
+            IsoHost {
+                config_dir_env: Some("/Users/testuser/.claude"),
+                ..ISO_DARWIN
+            },
+        ),
+        iso_sources_case(
+            "config-dir-env-decomposed-darwin",
+            IsoHost {
+                config_dir_env: Some("/Users/testuser/re\u{0301}sume\u{0301}"),
+                ..ISO_DARWIN
+            },
+        ),
+        iso_sources_case(
+            "securestorage-env-darwin",
+            IsoHost {
+                securestorage_config_dir_env: Some("/Users/testuser/.secure"),
+                ..ISO_DARWIN
+            },
+        ),
+        iso_sources_case(
+            "securestorage-env-empty-over-config-dir-darwin",
+            IsoHost {
+                config_dir_env: Some("/Users/testuser/.acct"),
+                securestorage_config_dir_env: Some(""),
+                ..ISO_DARWIN
+            },
+        ),
+        iso_sources_case(
+            "securestorage-env-over-config-dir-darwin",
+            IsoHost {
+                config_dir_env: Some("/Users/testuser/.acct"),
+                securestorage_config_dir_env: Some("/Users/testuser/.secure/"),
+                ..ISO_DARWIN
+            },
+        ),
+        iso_sources_case(
+            "custom-oauth-url-darwin",
+            IsoHost {
+                custom_oauth_url_env: Some("https://oauth.example.test"),
+                ..ISO_DARWIN
+            },
+        ),
+        iso_sources_case(
+            "custom-oauth-url-empty-darwin",
+            IsoHost {
+                config_dir_env: Some("/Users/testuser/.acct"),
+                custom_oauth_url_env: Some(""),
+                ..ISO_DARWIN
+            },
         ),
     ]
 }

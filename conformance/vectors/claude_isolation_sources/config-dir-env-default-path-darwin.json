@@ -1,18 +1,18 @@
 {
-  "name": "default-home-darwin",
+  "name": "config-dir-env-default-path-darwin",
   "op": "claude_isolation_sources",
   "input": {
     "host": {
       "platform": "darwin",
       "home": "/Users/testuser",
-      "claude_config_dir_env": null,
+      "claude_config_dir_env": "/Users/testuser/.claude",
       "claude_securestorage_config_dir_env": null,
       "claude_code_custom_oauth_url_env": null
     }
   },
   "expected": {
-    "account_path": "/Users/testuser/.claude.json",
+    "account_path": "/Users/testuser/.claude/.claude.json",
     "credentials_path": "/Users/testuser/.claude/.credentials.json",
-    "keychain_service": "Claude Code-credentials"
+    "keychain_service": "Claude Code-credentials-1cc69f60"
   }
 }

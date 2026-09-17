@@ -6,6 +6,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Isolated `claude` runs from the default config home find the Keychain
+  token again.** With `CLAUDE_CONFIG_DIR` unset, Claude Code stores the
+  claude.ai token under the bare `Claude Code-credentials` Keychain item and
+  suffixes the name with `-<sha256(CLAUDE_CONFIG_DIR)[:8]>` only when the
+  variable is set, even when it names the default path. The isolation seed
+  looked up the suffixed name for the default home too, so on a machine with
+  no `~/.claude/.credentials.json` file every isolated run started without a
+  token and failed with `Not logged in · Please run /login`. The core now
+  hands the bare name to the host for the default home and the suffixed one
+  for a set `CLAUDE_CONFIG_DIR`.
+- **The isolated config dir and its credentials file are owner-only from the
+  moment they exist.** The Rust host created the temp dir with the process
+  umask (0755 under the usual 022) and every seeded file at 0644, wrote the
+  token, and only then chmodded it to 0600, so another local user on a shared
+  tmp could read the token in that window, and a run killed inside it left
+  the file readable. The Python host wrote the file before its chmod too. Both
+  now create the dir 0700 and each file with its final mode, `O_EXCL`, before
+  writing a byte; the Go host already did.
+- **The Keychain service name follows Claude Code 2.1.274's rule exactly.**
+  The core trimmed trailing slashes before hashing `CLAUDE_CONFIG_DIR`, but
+  Claude Code hashes the NFC form of the variable exactly as set, so `/x/`
+  named a different item than Claude Code wrote and the run started without
+  a token. The digest now covers the value as set, NFC-normalized; only the
+  filesystem paths joined under it are trimmed. A defined
+  `CLAUDE_SECURESTORAGE_CONFIG_DIR` takes over both the credentials file
+  location and the digest (empty means the default home and the bare item),
+  and a set `CLAUDE_CODE_CUSTOM_OAUTH_URL` selects the
+  `Claude Code-custom-oauth-credentials` items, as they do in Claude Code.
+  An empty `CLAUDE_CONFIG_DIR` reads the bare item, as an unset one does.
+
 ## [0.13.2] - 2026-09-14
 
 ### Fixed

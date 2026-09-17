@@ -2,10 +2,13 @@ package spawnllm
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +29,8 @@ type claudeOutput struct {
 	Seeded        bool   `json:"seeded"`
 	AccountHasMCP bool   `json:"account_has_mcp"`
 	CredsPresent  bool   `json:"creds_present"`
+	ConfigDirMode string `json:"config_dir_mode"`
+	CredsMode     string `json:"creds_mode"`
 }
 
 func TestClaudeStdinAndStdoutFile(t *testing.T) {
@@ -312,8 +317,152 @@ func TestClaudeIsolationSeeding(t *testing.T) {
 	if !out.CredsPresent {
 		t.Fatal("isolated config dir was not seeded with .credentials.json")
 	}
+	if out.ConfigDirMode != "drwx------" || out.CredsMode != "-rw-------" {
+		t.Fatalf("isolated config dir mode %q, credentials mode %q; want drwx------ and -rw-------", out.ConfigDirMode, out.CredsMode)
+	}
 	if _, err := os.Stat(out.ConfigDir); !os.IsNotExist(err) {
 		t.Fatalf("isolated config dir was not cleaned up: stat err = %v", err)
+	}
+}
+
+func suffixedKeychainService(configDirEnv string) string {
+	digest := sha256.Sum256([]byte(configDirEnv))
+	return "Claude Code-credentials-" + hex.EncodeToString(digest[:])[:8]
+}
+
+func keychainSeededRun(t *testing.T, service string) (claudeOutput, string) {
+	t.Helper()
+	if runtime.GOOS != "darwin" {
+		t.Skip("the Keychain fallback runs only on darwin")
+	}
+	withFakeBin(t)
+	argvOut := filepath.Join(t.TempDir(), "argv")
+	t.Setenv("FAKE_SECURITY_ARGV_OUT", argvOut)
+	t.Setenv("FAKE_KEYCHAIN_SERVICE", service)
+	t.Setenv("FAKE_KEYCHAIN_CREDENTIAL", `{"claudeAiOauth":{"accessToken":"kc-tok"}}`)
+
+	resp, err := RunOn(context.Background(), ClaudeBackend(), RunSpec{Prompt: "iso", Model: "haiku"})
+	if err != nil {
+		t.Fatalf("RunOn: %v", err)
+	}
+	if resp.Err != nil {
+		t.Fatalf("unexpected provider error: %v", resp.Err)
+	}
+	var out claudeOutput
+	if err := json.Unmarshal([]byte(resp.Output), &out); err != nil {
+		t.Fatalf("decode output %q: %v", resp.Output, err)
+	}
+	argv, err := os.ReadFile(argvOut)
+	if err != nil {
+		t.Fatalf("fake security recorded no argv: %v", err)
+	}
+	return out, string(argv)
+}
+
+func writeAccountPointer(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, ".claude.json"), []byte(`{"oauthAccount":{"accountUuid":"a"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClaudeIsolationKeychain(t *testing.T) {
+	cases := []struct {
+		name    string
+		env     func(home, acct string) map[string]string
+		service func(home, acct string) string
+	}{
+		{
+			name:    "unset env reads the bare item",
+			env:     func(string, string) map[string]string { return nil },
+			service: func(string, string) string { return "Claude Code-credentials" },
+		},
+		{
+			name:    "set env reads the suffixed item",
+			env:     func(_, acct string) map[string]string { return map[string]string{"CLAUDE_CONFIG_DIR": acct} },
+			service: func(_, acct string) string { return suffixedKeychainService(acct) },
+		},
+		{
+			name:    "trailing slash is hashed as set",
+			env:     func(_, acct string) map[string]string { return map[string]string{"CLAUDE_CONFIG_DIR": acct + "/"} },
+			service: func(_, acct string) string { return suffixedKeychainService(acct + "/") },
+		},
+		{
+			name: "env naming the default path is still suffixed",
+			env: func(home, _ string) map[string]string {
+				return map[string]string{"CLAUDE_CONFIG_DIR": filepath.Join(home, ".claude")}
+			},
+			service: func(home, _ string) string { return suffixedKeychainService(filepath.Join(home, ".claude")) },
+		},
+		{
+			name: "empty securestorage env reads the bare item over config dir env",
+			env: func(_, acct string) map[string]string {
+				return map[string]string{"CLAUDE_CONFIG_DIR": acct, "CLAUDE_SECURESTORAGE_CONFIG_DIR": ""}
+			},
+			service: func(string, string) string { return "Claude Code-credentials" },
+		},
+		{
+			name: "securestorage env is hashed over config dir env",
+			env: func(home, acct string) map[string]string {
+				return map[string]string{"CLAUDE_CONFIG_DIR": acct, "CLAUDE_SECURESTORAGE_CONFIG_DIR": home + "/secure"}
+			},
+			service: func(home, _ string) string { return suffixedKeychainService(home + "/secure") },
+		},
+		{
+			name: "custom oauth url names the custom-oauth item",
+			env: func(_, acct string) map[string]string {
+				return map[string]string{"CLAUDE_CONFIG_DIR": acct, "CLAUDE_CODE_CUSTOM_OAUTH_URL": "https://oauth.example.test"}
+			},
+			service: func(_, acct string) string {
+				return strings.Replace(suffixedKeychainService(acct), "Claude Code-credentials", "Claude Code-custom-oauth-credentials", 1)
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			home := t.TempDir()
+			acct := t.TempDir()
+			t.Setenv("HOME", home)
+			if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			writeAccountPointer(t, home)
+			writeAccountPointer(t, acct)
+			for _, name := range []string{"CLAUDE_CONFIG_DIR", "CLAUDE_SECURESTORAGE_CONFIG_DIR", "CLAUDE_CODE_CUSTOM_OAUTH_URL"} {
+				t.Setenv(name, "")
+				if err := os.Unsetenv(name); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for name, value := range tc.env(home, acct) {
+				t.Setenv(name, value)
+			}
+			service := tc.service(home, acct)
+
+			out, argv := keychainSeededRun(t, service)
+
+			if want := "find-generic-password\n-s\n" + service + "\n-w\n"; argv != want {
+				t.Fatalf("security argv = %q, want %q", argv, want)
+			}
+			if !out.CredsPresent || out.CredsMode != "-rw-------" {
+				t.Fatalf("keychain credentials seeded = %v with mode %q; want seeded at -rw-------", out.CredsPresent, out.CredsMode)
+			}
+		})
+	}
+}
+
+func TestClaudeIsolationKeychainMissSeedsNoCredentials(t *testing.T) {
+	acct := t.TempDir()
+	writeAccountPointer(t, acct)
+	t.Setenv("CLAUDE_CONFIG_DIR", acct)
+
+	out, argv := keychainSeededRun(t, "Claude Code-credentials-someone-else")
+
+	if want := "find-generic-password\n-s\n" + suffixedKeychainService(acct) + "\n-w\n"; argv != want {
+		t.Fatalf("security argv = %q, want %q", argv, want)
+	}
+	if out.CredsPresent {
+		t.Fatal("a Keychain miss must seed no credentials file")
 	}
 }
 

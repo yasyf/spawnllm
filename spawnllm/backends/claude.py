@@ -82,6 +82,8 @@ class ClaudeCliBackend(CliBackend):
                     "platform": sys.platform,
                     "home": str(Path.home()),
                     "claude_config_dir_env": os.environ.get("CLAUDE_CONFIG_DIR") or None,
+                    "claude_securestorage_config_dir_env": os.environ.get("CLAUDE_SECURESTORAGE_CONFIG_DIR"),
+                    "claude_code_custom_oauth_url_env": os.environ.get("CLAUDE_CODE_CUSTOM_OAUTH_URL"),
                 }
             },
         )
@@ -94,9 +96,9 @@ class ClaudeCliBackend(CliBackend):
         )
         config_dir = Path(tempfile.mkdtemp(prefix="spawnllm-claude-config-"))
         for file in seed["files"]:
-            path = config_dir / file["name"]
-            path.write_text(file["content"])
-            path.chmod(int(file["mode"], 8))
+            fd = os.open(config_dir / file["name"], os.O_WRONLY | os.O_CREAT | os.O_EXCL, int(file["mode"], 8))
+            with os.fdopen(fd, "w") as handle:
+                handle.write(file["content"])
         atexit.register(shutil.rmtree, config_dir, ignore_errors=True)
         self._isolated_config_dir = str(config_dir)
         return self._isolated_config_dir
