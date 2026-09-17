@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.4] - 2026-09-17
+
 ### Security
 - **Isolated `claude` runs no longer write the claude.ai token to disk.** The
   isolation seed copied the whole Keychain credential into a
@@ -471,7 +473,8 @@ First release, published to PyPI as `spawnllm`.
   generation.
 - Click CLI: `spawnllm backends` and `spawnllm call`.
 
-[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.13.3...HEAD
+[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.13.4...HEAD
+[0.13.4]: https://github.com/yasyf/spawnllm/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/yasyf/spawnllm/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/yasyf/spawnllm/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/yasyf/spawnllm/compare/v0.13.0...v0.13.1
