@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Isolated `claude` runs from the default config home find the Keychain
+  token again.** With `CLAUDE_CONFIG_DIR` unset, Claude Code stores the
+  claude.ai token under the bare `Claude Code-credentials` Keychain item and
+  suffixes the name with `-<sha256(CLAUDE_CONFIG_DIR)[:8]>` only when the
+  variable is set, even when it names the default path. The isolation seed
+  looked up the suffixed name for the default home too, so on a machine with
+  no `~/.claude/.credentials.json` file every isolated run started without a
+  token and failed with `Not logged in · Please run /login`. The core now
+  hands the bare name to the host for the default home and the suffixed one
+  for a set `CLAUDE_CONFIG_DIR`.
+
 ## [0.13.2] - 2026-09-14
 
 ### Fixed

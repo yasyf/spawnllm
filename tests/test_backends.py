@@ -319,7 +319,30 @@ class TestClaudeIsolation:
             "claudeAiOauth": {"accessToken": "acct-tok"}
         }
 
-    def test_env_falls_back_to_keychain_for_credentials(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_env_default_home_falls_back_to_the_bare_keychain_item(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        (tmp_path / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": "c"}}))
+        (tmp_path / ".claude").mkdir()
+        monkeypatch.setattr("spawnllm.backends.claude.sys.platform", "darwin")
+        calls: list[list[str]] = []
+
+        def fake_run(argv: list[str], **kwargs: object) -> object:
+            calls.append(argv)
+            return type("P", (), {"returncode": 0, "stdout": '{"claudeAiOauth": {"accessToken": "kc-tok"}}\n'})()
+
+        monkeypatch.setattr("spawnllm.backends.claude.subprocess.run", fake_run)
+        config_dir = Path(ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"])
+        assert calls == [["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"]]
+        credentials = config_dir / ".credentials.json"
+        assert json.loads(credentials.read_text()) == {"claudeAiOauth": {"accessToken": "kc-tok"}}
+        assert credentials.stat().st_mode & 0o777 == 0o600
+
+    def test_env_config_dir_falls_back_to_the_suffixed_keychain_item(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         (account_home := tmp_path / "acct").mkdir()
         monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(account_home))
         (account_home / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": "c"}}))
@@ -332,7 +355,6 @@ class TestClaudeIsolation:
 
         monkeypatch.setattr("spawnllm.backends.claude.subprocess.run", fake_run)
         config_dir = Path(ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"])
-        # The service name hashes the effective home path, matching the CLI's Keychain item.
         digest = hashlib.sha256(str(account_home).encode()).hexdigest()[:8]
         assert calls == [["security", "find-generic-password", "-s", f"Claude Code-credentials-{digest}", "-w"]]
         credentials = config_dir / ".credentials.json"

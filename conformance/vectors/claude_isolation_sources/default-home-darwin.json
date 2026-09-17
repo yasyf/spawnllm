@@ -11,6 +11,6 @@
   "expected": {
     "account_path": "/Users/testuser/.claude.json",
     "credentials_path": "/Users/testuser/.claude/.credentials.json",
-    "keychain_service": "Claude Code-credentials-1cc69f60"
+    "keychain_service": "Claude Code-credentials"
   }
 }

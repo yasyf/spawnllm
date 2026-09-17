@@ -79,20 +79,26 @@ impl Formatter for PythonFormatter {
 
 fn isolation_sources(input: IsolationSourcesInput) -> IsolationSources {
     let host = input.host;
-    let (account_path, config_home) = match host.claude_config_dir_env {
+    // Claude Code suffixes the item only when CLAUDE_CONFIG_DIR is set, even to the
+    // default path; the unset default home reads the bare item.
+    let (account_path, config_home, keychain_suffix) = match host.claude_config_dir_env {
         Some(config_home) => {
             let config_home = config_home.trim_end_matches('/').to_owned();
-            (format!("{config_home}/.claude.json"), config_home)
+            let digest = format!("{:x}", Sha256::digest(config_home.as_bytes()));
+            (
+                format!("{config_home}/.claude.json"),
+                config_home,
+                format!("-{}", &digest[..8]),
+            )
         }
         None => (
             format!("{}/.claude.json", host.home),
             format!("{}/.claude", host.home),
+            String::new(),
         ),
     };
-    let keychain_service = (host.platform == "darwin").then(|| {
-        let digest = format!("{:x}", Sha256::digest(config_home.as_bytes()));
-        format!("Claude Code-credentials-{}", &digest[..8])
-    });
+    let keychain_service =
+        (host.platform == "darwin").then(|| format!("Claude Code-credentials{keychain_suffix}"));
     IsolationSources {
         account_path,
         credentials_path: format!("{config_home}/.credentials.json"),
