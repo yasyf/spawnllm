@@ -42,7 +42,7 @@ if [ -n "$SPAWNLLM_FAKE_MARKER" ]; then
 fi
 if [ -n "$SPAWNLLM_FAKE_CRED_OUT" ]; then cat "$CLAUDE_CONFIG_DIR/.credentials.json" > "$SPAWNLLM_FAKE_CRED_OUT" 2>/dev/null || true; fi
 if [ -n "$SPAWNLLM_FAKE_ACCOUNT_OUT" ]; then cat "$CLAUDE_CONFIG_DIR/.claude.json" > "$SPAWNLLM_FAKE_ACCOUNT_OUT" 2>/dev/null || true; fi
-if [ -n "$SPAWNLLM_FAKE_MODES_OUT" ]; then { stat -f '%Lp' "$CLAUDE_CONFIG_DIR" "$CLAUDE_CONFIG_DIR/.credentials.json" 2>/dev/null || stat -c '%a' "$CLAUDE_CONFIG_DIR" "$CLAUDE_CONFIG_DIR/.credentials.json"; } > "$SPAWNLLM_FAKE_MODES_OUT"; fi
+if [ -n "$SPAWNLLM_FAKE_MODES_OUT" ]; then { ls -ld "$CLAUDE_CONFIG_DIR" "$CLAUDE_CONFIG_DIR/.credentials.json" | cut -c1-10; } > "$SPAWNLLM_FAKE_MODES_OUT"; fi
 if [ -n "$SPAWNLLM_FAKE_EXIT" ]; then printf 'boom' >&2; exit "$SPAWNLLM_FAKE_EXIT"; fi
 if [ -n "$SPAWNLLM_FAKE_SLEEP" ]; then sleep "$SPAWNLLM_FAKE_SLEEP"; fi
 if [ -n "$SPAWNLLM_FAKE_COUNTER" ]; then

@@ -21,7 +21,7 @@ creds_present=false
 config_dir_mode=""
 creds_mode=""
 mode_of() {
-	stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1"
+	ls -ld "$1" | cut -c1-10
 }
 if [ -n "$config_dir" ]; then
 	config_dir_mode="$(mode_of "$config_dir")"

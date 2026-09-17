@@ -317,8 +317,8 @@ func TestClaudeIsolationSeeding(t *testing.T) {
 	if !out.CredsPresent {
 		t.Fatal("isolated config dir was not seeded with .credentials.json")
 	}
-	if out.ConfigDirMode != "700" || out.CredsMode != "600" {
-		t.Fatalf("isolated config dir mode %q, credentials mode %q; want 700 and 600", out.ConfigDirMode, out.CredsMode)
+	if out.ConfigDirMode != "drwx------" || out.CredsMode != "-rw-------" {
+		t.Fatalf("isolated config dir mode %q, credentials mode %q; want drwx------ and -rw-------", out.ConfigDirMode, out.CredsMode)
 	}
 	if _, err := os.Stat(out.ConfigDir); !os.IsNotExist(err) {
 		t.Fatalf("isolated config dir was not cleaned up: stat err = %v", err)
@@ -430,7 +430,9 @@ func TestClaudeIsolationKeychain(t *testing.T) {
 			writeAccountPointer(t, acct)
 			for _, name := range []string{"CLAUDE_CONFIG_DIR", "CLAUDE_SECURESTORAGE_CONFIG_DIR", "CLAUDE_CODE_CUSTOM_OAUTH_URL"} {
 				t.Setenv(name, "")
-				os.Unsetenv(name)
+				if err := os.Unsetenv(name); err != nil {
+					t.Fatal(err)
+				}
 			}
 			for name, value := range tc.env(home, acct) {
 				t.Setenv(name, value)
@@ -442,8 +444,8 @@ func TestClaudeIsolationKeychain(t *testing.T) {
 			if want := "find-generic-password\n-s\n" + service + "\n-w\n"; argv != want {
 				t.Fatalf("security argv = %q, want %q", argv, want)
 			}
-			if !out.CredsPresent || out.CredsMode != "600" {
-				t.Fatalf("keychain credentials seeded = %v with mode %q; want seeded at 600", out.CredsPresent, out.CredsMode)
+			if !out.CredsPresent || out.CredsMode != "-rw-------" {
+				t.Fatalf("keychain credentials seeded = %v with mode %q; want seeded at -rw-------", out.CredsPresent, out.CredsMode)
 			}
 		})
 	}

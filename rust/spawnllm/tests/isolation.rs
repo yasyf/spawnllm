@@ -68,7 +68,7 @@ async fn isolation_seeds_stripped_account_and_credentials_from_files() {
     );
     assert_eq!(
         std::fs::read_to_string(&modes_path).unwrap(),
-        "700\n600\n",
+        "drwx------\n-rw-------\n",
         "config dir mode then credentials file mode"
     );
     let account: serde_json::Value =
