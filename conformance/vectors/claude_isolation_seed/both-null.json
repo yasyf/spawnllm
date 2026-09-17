@@ -6,6 +6,7 @@
     "credentials_json": null
   },
   "expected": {
-    "files": []
+    "files": [],
+    "env": {}
   }
 }

@@ -9,10 +9,10 @@ import (
 	"strings"
 )
 
-func seedClaudeIsolation() (string, func(), error) {
+func seedClaudeIsolation() (string, map[string]string, func(), error) {
 	sources, err := coreIsolationSources()
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 	accountJSON := readFileOpt(sources.AccountPath)
 	credentialsJSON := readFileOpt(sources.CredentialsPath)
@@ -22,31 +22,31 @@ func seedClaudeIsolation() (string, func(), error) {
 
 	seed, err := coreIsolationSeed(accountJSON, credentialsJSON)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
 	dir, err := os.MkdirTemp("", "spawnllm-claude-config-")
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 	cleanup := func() { _ = os.RemoveAll(dir) }
 	for _, f := range seed.Files {
 		mode, err := parseMode(f.Mode)
 		if err != nil {
 			cleanup()
-			return "", nil, err
+			return "", nil, nil, err
 		}
 		path := filepath.Join(dir, f.Name)
 		if err := os.WriteFile(path, []byte(f.Content), mode); err != nil {
 			cleanup()
-			return "", nil, err
+			return "", nil, nil, err
 		}
 		if err := os.Chmod(path, mode); err != nil {
 			cleanup()
-			return "", nil, err
+			return "", nil, nil, err
 		}
 	}
-	return dir, cleanup, nil
+	return dir, seed.Env, cleanup, nil
 }
 
 func substituteIsolationDir(env map[string]string, dir string) map[string]string {

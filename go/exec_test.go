@@ -26,6 +26,7 @@ func withFakeBin(t *testing.T) {
 type claudeOutput struct {
 	StdoutRegular bool   `json:"stdout_regular"`
 	ConfigDir     string `json:"config_dir"`
+	OauthToken    string `json:"oauth_token"`
 	Seeded        bool   `json:"seeded"`
 	AccountHasMCP bool   `json:"account_has_mcp"`
 	CredsPresent  bool   `json:"creds_present"`
@@ -314,11 +315,14 @@ func TestClaudeIsolationSeeding(t *testing.T) {
 	if out.AccountHasMCP {
 		t.Fatal("seeded .claude.json still carried mcpServers")
 	}
-	if !out.CredsPresent {
-		t.Fatal("isolated config dir was not seeded with .credentials.json")
+	if out.CredsPresent {
+		t.Fatal("isolated config dir carried a .credentials.json")
 	}
-	if out.ConfigDirMode != "drwx------" || out.CredsMode != "-rw-------" {
-		t.Fatalf("isolated config dir mode %q, credentials mode %q; want drwx------ and -rw-------", out.ConfigDirMode, out.CredsMode)
+	if out.OauthToken != "tok" {
+		t.Fatalf("CLAUDE_CODE_OAUTH_TOKEN = %q, want the credentials file's access token", out.OauthToken)
+	}
+	if out.ConfigDirMode != "drwx------" {
+		t.Fatalf("isolated config dir mode %q, want drwx------", out.ConfigDirMode)
 	}
 	if _, err := os.Stat(out.ConfigDir); !os.IsNotExist(err) {
 		t.Fatalf("isolated config dir was not cleaned up: stat err = %v", err)
@@ -444,8 +448,8 @@ func TestClaudeIsolationKeychain(t *testing.T) {
 			if want := "find-generic-password\n-s\n" + service + "\n-w\n"; argv != want {
 				t.Fatalf("security argv = %q, want %q", argv, want)
 			}
-			if !out.CredsPresent || out.CredsMode != "-rw-------" {
-				t.Fatalf("keychain credentials seeded = %v with mode %q; want seeded at -rw-------", out.CredsPresent, out.CredsMode)
+			if out.CredsPresent || out.OauthToken != "kc-tok" {
+				t.Fatalf("credentials file present = %v, CLAUDE_CODE_OAUTH_TOKEN = %q; want the Keychain token in env only", out.CredsPresent, out.OauthToken)
 			}
 		})
 	}
@@ -461,8 +465,8 @@ func TestClaudeIsolationKeychainMissSeedsNoCredentials(t *testing.T) {
 	if want := "find-generic-password\n-s\n" + suffixedKeychainService(acct) + "\n-w\n"; argv != want {
 		t.Fatalf("security argv = %q, want %q", argv, want)
 	}
-	if out.CredsPresent {
-		t.Fatal("a Keychain miss must seed no credentials file")
+	if out.CredsPresent || out.OauthToken != "" {
+		t.Fatalf("credentials file present = %v, CLAUDE_CODE_OAUTH_TOKEN = %q; a Keychain miss must seed no token", out.CredsPresent, out.OauthToken)
 	}
 }
 

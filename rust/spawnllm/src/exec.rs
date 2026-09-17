@@ -10,6 +10,7 @@ use tokio::process::{Child, Command};
 use spawnllm_core::wire::{ExecPlan, FileId, ReadResultFrom};
 
 use crate::backend::resolve_binary;
+use crate::isolate::Isolation;
 use crate::run::{Attempt, AttemptKind, resolve_kind};
 use crate::spec::RunSpec;
 
@@ -17,7 +18,7 @@ pub(crate) async fn exec_attempt(
     plan: &ExecPlan,
     spec: &RunSpec,
     provider: &str,
-    isolated_dir: Option<&Path>,
+    isolation: Option<&Isolation>,
     wants_value: bool,
 ) -> std::io::Result<Attempt> {
     let mut temp_files: Vec<NamedTempFile> = Vec::new();
@@ -66,11 +67,17 @@ pub(crate) async fn exec_attempt(
         cmd.env_remove(key);
     }
     for (key, value) in &plan.env {
-        let value = match isolated_dir {
-            Some(dir) => value.replace("${isolated_config_dir}", &dir.to_string_lossy()),
+        let value = match isolation {
+            Some(isolation) => value.replace(
+                "${isolated_config_dir}",
+                &isolation.dir.path().to_string_lossy(),
+            ),
             None => value.clone(),
         };
         cmd.env(key, value);
+    }
+    if let Some(isolation) = isolation {
+        cmd.envs(&isolation.env);
     }
     if let Some(env) = &spec.env {
         for (key, value) in env {

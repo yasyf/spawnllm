@@ -84,6 +84,20 @@ class BackendCallError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class ClaudeIsolation:
+    """A seeded throwaway config home and the env a claude run adds beside it.
+
+    Attributes:
+        config_dir: Path substituted for `${isolated_config_dir}` in the plan.
+        env: Variables the run sets on the child, such as `CLAUDE_CODE_OAUTH_TOKEN`
+            carrying the claude.ai access token; never written to disk.
+    """
+
+    config_dir: str
+    env: dict[str, str]
+
+
+@dataclass(frozen=True)
 class Invocation:
     """A built CLI invocation: argv, optional stdin, and where to read the result.
 
@@ -382,8 +396,8 @@ class CliBackend(LlmBackend):
         """
         return self.binary
 
-    def claude_isolation(self) -> str:
-        """Return the isolated config home a claude run substitutes into `${isolated_config_dir}`."""
+    def claude_isolation(self) -> ClaudeIsolation:
+        """Return the config home a claude run substitutes into `${isolated_config_dir}` and the env it adds."""
         raise NotImplementedError
 
     def build_command(self, spec: RunSpec) -> list[str]:
@@ -422,9 +436,11 @@ class CliBackend(LlmBackend):
             argv = [tokens.get(arg, arg) for arg in plan["argv"]]
             env = plan["env"]
             if plan["needs_claude_isolation"]:
-                directory = self.claude_isolation()
-                argv = [arg.replace("${isolated_config_dir}", directory) for arg in argv]
-                env = {key: value.replace("${isolated_config_dir}", directory) for key, value in env.items()}
+                isolation = self.claude_isolation()
+                argv = [arg.replace("${isolated_config_dir}", isolation.config_dir) for arg in argv]
+                env = {
+                    key: value.replace("${isolated_config_dir}", isolation.config_dir) for key, value in env.items()
+                } | isolation.env
         except BaseException:
             for path in paths.values():
                 Path(path).unlink(missing_ok=True)
@@ -446,13 +462,16 @@ class CliBackend(LlmBackend):
             spec: The configured run; the plan gates isolation on `spec.isolated`.
 
         Returns:
-            The plan's env map with `${isolated_config_dir}` resolved, or `{}`.
+            The plan's env map with `${isolated_config_dir}` resolved plus the
+            isolation's own entries, or `{}`.
         """
         plan = self.core_plan(spec)
         if not plan["needs_claude_isolation"]:
             return plan["env"]
-        directory = self.claude_isolation()
-        return {key: value.replace("${isolated_config_dir}", directory) for key, value in plan["env"].items()}
+        isolation = self.claude_isolation()
+        return {
+            key: value.replace("${isolated_config_dir}", isolation.config_dir) for key, value in plan["env"].items()
+        } | isolation.env
 
     def accounting(self, raw: str) -> tuple[float | None, dict[str, object] | None]:
         """Return the `(cost_usd, usage)` the core's `resolve` op reads from `raw`."""

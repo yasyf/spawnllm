@@ -41,7 +41,7 @@ async fn isolation_seeds_stripped_account_and_credentials_from_files() {
     .unwrap();
     std::fs::write(
         source.path().join(".credentials.json"),
-        r#"{"token": "abc"}"#,
+        r#"{"claudeAiOauth": {"accessToken": "abc"}}"#,
     )
     .unwrap();
 
@@ -62,14 +62,11 @@ async fn isolation_seeds_stripped_account_and_credentials_from_files() {
     clear_config_dir();
 
     response.outcome.expect("isolated claude run succeeds");
-    assert_eq!(
-        std::fs::read_to_string(&cred_path).unwrap(),
-        r#"{"token": "abc"}"#
-    );
+    assert_eq!(std::fs::read_to_string(&cred_path).unwrap(), "abc");
     assert_eq!(
         std::fs::read_to_string(&modes_path).unwrap(),
-        "drwx------\n-rw-------\n",
-        "config dir mode then credentials file mode"
+        "drwx------\n.claude.json\n",
+        "config dir mode then its only entry"
     );
     let account: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&account_path).unwrap()).unwrap();
@@ -95,7 +92,7 @@ async fn empty_claude_config_dir_uses_the_default_home() {
     std::fs::create_dir(source.path().join(".claude")).unwrap();
     std::fs::write(
         source.path().join(".claude/.credentials.json"),
-        r#"{"token": "home-token"}"#,
+        r#"{"claudeAiOauth": {"accessToken": "home-token"}}"#,
     )
     .unwrap();
     let cred_out = tempfile::NamedTempFile::new().unwrap();
@@ -115,10 +112,7 @@ async fn empty_claude_config_dir_uses_the_default_home() {
     }
 
     response.outcome.expect("isolated claude run succeeds");
-    assert_eq!(
-        std::fs::read_to_string(&cred_path).unwrap(),
-        r#"{"token": "home-token"}"#
-    );
+    assert_eq!(std::fs::read_to_string(&cred_path).unwrap(), "home-token");
 }
 
 #[cfg(target_os = "macos")]

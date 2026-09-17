@@ -4,6 +4,9 @@ import dataclasses
 import hashlib
 import json
 import os
+import subprocess
+import sys
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -308,13 +311,10 @@ class TestClaudeIsolation:
         assert config_dir.is_dir()
         assert config_dir.stat().st_mode & 0o777 == 0o700
         assert backend.env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"] == str(config_dir)
-        # The token is substituted in place of the plan's ${isolated_config_dir} placeholder.
         assert "${isolated_config_dir}" not in env["CLAUDE_CONFIG_DIR"]
-        # The account pointer is seeded sans host mcpServers; the OAuth token comes along.
         assert json.loads((config_dir / ".claude.json").read_text()) == {"oauthAccount": {"accountUuid": "a"}}
-        credentials = config_dir / ".credentials.json"
-        assert json.loads(credentials.read_text()) == {"claudeAiOauth": {"accessToken": "tok"}}
-        assert credentials.stat().st_mode & 0o777 == 0o600
+        assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "tok"
+        assert sorted(path.name for path in config_dir.iterdir()) == [".claude.json"]
 
     @staticmethod
     def fail_on_keychain_call(argv: list[str], **kwargs: object) -> object:
@@ -339,7 +339,7 @@ class TestClaudeIsolation:
 
         monkeypatch.setattr("spawnllm.backends.claude.os.open", observing_open)
         ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))
-        assert created == [(".claude.json", 0o644, 0), (".credentials.json", 0o600, 0)]
+        assert created == [(".claude.json", 0o644, 0)]
 
     def test_env_seeds_from_claude_config_dir_over_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path / "home"))
@@ -347,11 +347,11 @@ class TestClaudeIsolation:
         monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(account_home))
         (account_home / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": "b"}}))
         (account_home / ".credentials.json").write_text('{"claudeAiOauth": {"accessToken": "acct-tok"}}')
-        config_dir = Path(ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"])
+        env = ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))
+        config_dir = Path(env["CLAUDE_CONFIG_DIR"])
         assert json.loads((config_dir / ".claude.json").read_text()) == {"oauthAccount": {"accountUuid": "b"}}
-        assert json.loads((config_dir / ".credentials.json").read_text()) == {
-            "claudeAiOauth": {"accessToken": "acct-tok"}
-        }
+        assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "acct-tok"
+        assert not (config_dir / ".credentials.json").exists()
 
     def test_env_default_home_falls_back_to_the_bare_keychain_item(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -368,11 +368,10 @@ class TestClaudeIsolation:
             return type("P", (), {"returncode": 0, "stdout": '{"claudeAiOauth": {"accessToken": "kc-tok"}}\n'})()
 
         monkeypatch.setattr("spawnllm.backends.claude.subprocess.run", fake_run)
-        config_dir = Path(ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"])
+        env = ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))
         assert calls == [["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"]]
-        credentials = config_dir / ".credentials.json"
-        assert json.loads(credentials.read_text()) == {"claudeAiOauth": {"accessToken": "kc-tok"}}
-        assert credentials.stat().st_mode & 0o777 == 0o600
+        assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "kc-tok"
+        assert not (Path(env["CLAUDE_CONFIG_DIR"]) / ".credentials.json").exists()
 
     def test_env_config_dir_falls_back_to_the_suffixed_keychain_item(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -388,12 +387,11 @@ class TestClaudeIsolation:
             return type("P", (), {"returncode": 0, "stdout": '{"claudeAiOauth": {"accessToken": "kc-tok"}}\n'})()
 
         monkeypatch.setattr("spawnllm.backends.claude.subprocess.run", fake_run)
-        config_dir = Path(ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"])
+        env = ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))
         service = suffixed_keychain_service(str(account_home))
         assert calls == [["security", "find-generic-password", "-s", service, "-w"]]
-        credentials = config_dir / ".credentials.json"
-        assert json.loads(credentials.read_text()) == {"claudeAiOauth": {"accessToken": "kc-tok"}}
-        assert credentials.stat().st_mode & 0o777 == 0o600
+        assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "kc-tok"
+        assert not (Path(env["CLAUDE_CONFIG_DIR"]) / ".credentials.json").exists()
 
     @pytest.mark.parametrize(
         "config_dir_env, expected_service",
@@ -459,12 +457,10 @@ class TestClaudeIsolation:
             return type("P", (), {"returncode": 0, "stdout": '{"claudeAiOauth": {"accessToken": "kc-tok"}}\n'})()
 
         monkeypatch.setattr("spawnllm.backends.claude.subprocess.run", fake_run)
-        config_dir = Path(ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"])
+        env = ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))
         service = expected_service(str(home), str(acct))
         assert calls == [["security", "find-generic-password", "-s", service, "-w"]]
-        assert json.loads((config_dir / ".credentials.json").read_text()) == {
-            "claudeAiOauth": {"accessToken": "kc-tok"}
-        }
+        assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "kc-tok"
 
     def test_env_keychain_miss_seeds_no_credentials(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         (account_home := tmp_path / "acct").mkdir()
@@ -475,11 +471,42 @@ class TestClaudeIsolation:
             "spawnllm.backends.claude.subprocess.run",
             lambda *a, **k: type("P", (), {"returncode": 44, "stdout": ""})(),
         )
-        config_dir = Path(ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"])
-        assert not (config_dir / ".credentials.json").exists()
+        env = ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))
+        assert "CLAUDE_CODE_OAUTH_TOKEN" not in env
+        assert not (Path(env["CLAUDE_CONFIG_DIR"]) / ".credentials.json").exists()
 
     def test_env_non_isolated_adds_nothing(self) -> None:
         assert ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku", isolated=False)) == {}
+
+    def test_killed_run_leaves_no_token_on_disk(self, tmp_path: Path) -> None:
+        token = f"leak-{os.urandom(8).hex()}"
+        (home := tmp_path / "home").mkdir()
+        (home / ".claude").mkdir()
+        (home / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": "k"}}))
+        (home / ".claude" / ".credentials.json").write_text(json.dumps({"claudeAiOauth": {"accessToken": token}}))
+        (bin_dir := tmp_path / "bin").mkdir()
+        (tmpdir := tmp_path / "tmp").mkdir()
+        started = tmp_path / "started"
+        fake = bin_dir / "claude"
+        fake.write_text(f'#!/bin/sh\nprintf "%s\n%s" "$$" "$CLAUDE_CONFIG_DIR" > {started}\nsleep 60\n')
+        fake.chmod(0o755)
+        env = {name: value for name, value in os.environ.items() if not name.startswith("CLAUDE_")} | {
+            "HOME": str(home),
+            "TMPDIR": str(tmpdir),
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        }
+        run = "from spawnllm import ClaudeCliBackend, RunSpec; ClaudeCliBackend().execute(RunSpec('hi', model='haiku'))"
+        parent = subprocess.Popen([sys.executable, "-c", run], env=env)
+        deadline = time.monotonic() + 30
+        while not started.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        parent.kill()
+        parent.wait()
+        pid, config_dir = started.read_text().split("\n")
+        os.kill(int(pid), 9)
+        assert Path(config_dir).is_relative_to(tmpdir)
+        assert Path(config_dir).is_dir()
+        assert not [path for path in tmpdir.rglob("*") if path.is_file() and token in path.read_text()]
 
 
 class TestModels:

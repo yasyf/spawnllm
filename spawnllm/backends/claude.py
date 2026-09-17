@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from spawnllm import _core
-from spawnllm.backends.base import CliBackend
+from spawnllm.backends.base import ClaudeIsolation, CliBackend
 
 if TYPE_CHECKING:
     from spawnllm.types import ProviderName, TModel
@@ -43,7 +43,8 @@ class ClaudeCliBackend(CliBackend):
 
     The core plans the `claude -p` argv (prompt delivered over stdin, result read
     from a stdout file) and lays out the host-free config home this backend seeds
-    with only the active-account pointer and claude.ai OAuth token.
+    with only the active-account pointer; the claude.ai access token reaches the
+    child as `CLAUDE_CODE_OAUTH_TOKEN`, never as a file.
 
     Attributes:
         models: Mapping from abstract model size to a Claude model alias
@@ -61,20 +62,21 @@ class ClaudeCliBackend(CliBackend):
     install_hint: ClassVar[str] = "curl -fsSL https://claude.ai/install.sh | bash"
     schema_dialect: ClassVar[str | None] = "anthropic"
 
-    _isolated_config_dir: str | None = None
+    _isolation: ClaudeIsolation | None = None
 
-    def claude_isolation(self) -> str:
-        """Return the process-lifetime isolated config home, creating and seeding it once.
+    def claude_isolation(self) -> ClaudeIsolation:
+        """Return the process-lifetime isolation, creating and seeding its config home once.
 
         The core's `claude_isolation_sources` op resolves the account pointer,
         credentials file, and Keychain service from the caller's effective config
         home; this host reads those sources (falling back to the Keychain when the
-        credentials file is absent), hands them to `claude_isolation_seed` for the
-        exact files-and-modes to write, and materializes them into a fresh temp
-        dir removed at interpreter exit. The dir is cached on the backend.
+        credentials file is absent) and hands them to `claude_isolation_seed` for
+        the exact files-and-modes to write and the env to set. The files land in a
+        fresh temp dir removed at interpreter exit; the token only ever lives in
+        the env. The result is cached on the backend.
         """
-        if self._isolated_config_dir is not None:
-            return self._isolated_config_dir
+        if self._isolation is not None:
+            return self._isolation
         sources = _core.dispatch(
             "claude_isolation_sources",
             {
@@ -100,5 +102,5 @@ class ClaudeCliBackend(CliBackend):
             with os.fdopen(fd, "w") as handle:
                 handle.write(file["content"])
         atexit.register(shutil.rmtree, config_dir, ignore_errors=True)
-        self._isolated_config_dir = str(config_dir)
-        return self._isolated_config_dir
+        self._isolation = ClaudeIsolation(str(config_dir), seed["env"])
+        return self._isolation

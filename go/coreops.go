@@ -106,7 +106,8 @@ type seedFile struct {
 }
 
 type isolationSeed struct {
-	Files []seedFile `json:"files"`
+	Files []seedFile        `json:"files"`
+	Env   map[string]string `json:"env"`
 }
 
 func coreCall(op string, input any) (json.RawMessage, error) {

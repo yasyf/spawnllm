@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
@@ -24,6 +25,7 @@ struct Sources {
 #[derive(Debug, Deserialize)]
 struct Seed {
     files: Vec<SeedFile>,
+    env: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,7 +35,12 @@ struct SeedFile {
     mode: String,
 }
 
-pub(crate) async fn seed_isolation() -> Result<TempDir, Error> {
+pub(crate) struct Isolation {
+    pub(crate) dir: TempDir,
+    pub(crate) env: BTreeMap<String, String>,
+}
+
+pub(crate) async fn seed_isolation() -> Result<Isolation, Error> {
     let sources: Sources = core_op(
         "claude_isolation_sources",
         json!({ "host": {
@@ -65,7 +72,7 @@ pub(crate) async fn seed_isolation() -> Result<TempDir, Error> {
         handle.write_all(file.content.as_bytes())?;
         handle.flush()?;
     }
-    Ok(dir)
+    Ok(Isolation { dir, env: seed.env })
 }
 
 fn private_tempdir() -> std::io::Result<TempDir> {

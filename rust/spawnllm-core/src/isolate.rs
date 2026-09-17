@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::io;
 
 use serde::{Deserialize, Serialize};
@@ -37,9 +38,22 @@ struct IsolationSeedInput {
     credentials_json: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct Credentials {
+    #[serde(rename = "claudeAiOauth")]
+    claude_ai_oauth: Option<ClaudeAiOauth>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ClaudeAiOauth {
+    #[serde(rename = "accessToken")]
+    access_token: String,
+}
+
 #[derive(Debug, Serialize)]
 struct IsolationSeed {
     files: Vec<SeedFile>,
+    env: BTreeMap<&'static str, String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -153,14 +167,14 @@ fn isolation_seed(input: IsolationSeedInput) -> Result<IsolationSeed, serde_json
             mode: "0644",
         });
     }
+    let mut env = BTreeMap::new();
     if let Some(credentials_json) = input.credentials_json {
-        files.push(SeedFile {
-            name: ".credentials.json",
-            content: credentials_json,
-            mode: "0600",
-        });
+        let credentials = serde_json::from_str::<Credentials>(&credentials_json)?;
+        if let Some(oauth) = credentials.claude_ai_oauth {
+            env.insert("CLAUDE_CODE_OAUTH_TOKEN", oauth.access_token);
+        }
     }
-    Ok(IsolationSeed { files })
+    Ok(IsolationSeed { files, env })
 }
 
 pub(crate) fn dispatch(op: &str, input: Value) -> OpResult {

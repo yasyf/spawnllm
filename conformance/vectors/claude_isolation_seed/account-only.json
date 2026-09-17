@@ -12,6 +12,7 @@
         "content": "{\"oauthAccount\": {\"accountUuid\": \"b\"}}",
         "mode": "0644"
       }
-    ]
+    ],
+    "env": {}
   }
 }
