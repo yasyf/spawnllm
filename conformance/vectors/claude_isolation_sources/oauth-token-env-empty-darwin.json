@@ -1,14 +1,14 @@
 {
-  "name": "config-dir-env-empty-darwin",
+  "name": "oauth-token-env-empty-darwin",
   "op": "claude_isolation_sources",
   "input": {
     "host": {
       "platform": "darwin",
       "home": "/Users/testuser",
-      "claude_config_dir_env": "",
+      "claude_config_dir_env": null,
       "claude_securestorage_config_dir_env": null,
       "claude_code_custom_oauth_url_env": null,
-      "claude_code_oauth_token_env": null
+      "claude_code_oauth_token_env": ""
     }
   },
   "expected": {

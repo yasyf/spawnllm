@@ -296,6 +296,10 @@ def suffixed_keychain_service(config_dir_env: str) -> str:
 
 
 class TestClaudeIsolation:
+    @pytest.fixture(autouse=True)
+    def no_inherited_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+
     def test_env_isolates_and_seeds_config_dir_from_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
         monkeypatch.setenv("HOME", str(tmp_path))
@@ -475,6 +479,33 @@ class TestClaudeIsolation:
         assert "CLAUDE_CODE_OAUTH_TOKEN" not in env
         assert not (Path(env["CLAUDE_CONFIG_DIR"]) / ".credentials.json").exists()
 
+    def test_env_resolves_the_token_on_every_call(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        (tmp_path / ".claude").mkdir()
+        credentials = tmp_path / ".claude" / ".credentials.json"
+        credentials.write_text('{"claudeAiOauth": {"accessToken": "before"}}')
+        backend = ClaudeCliBackend()
+        first = backend.env(RunSpec(prompt="hi", model="haiku"))
+        credentials.write_text('{"claudeAiOauth": {"accessToken": "renewed"}}')
+        second = backend.env(RunSpec(prompt="hi", model="haiku"))
+        assert (first["CLAUDE_CODE_OAUTH_TOKEN"], second["CLAUDE_CODE_OAUTH_TOKEN"]) == ("before", "renewed")
+        assert first["CLAUDE_CONFIG_DIR"] == second["CLAUDE_CONFIG_DIR"]
+
+    def test_env_inherited_token_reads_no_credential_source(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "inherited")
+        (tmp_path / ".claude").mkdir()
+        (tmp_path / ".claude" / ".credentials.json").write_text("not json")
+        monkeypatch.setattr("spawnllm.backends.claude.sys.platform", "darwin")
+        monkeypatch.setattr("spawnllm.backends.claude.subprocess.run", self.fail_on_keychain_call)
+        env = ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))
+        assert "CLAUDE_CODE_OAUTH_TOKEN" not in env
+        assert Path(env["CLAUDE_CONFIG_DIR"]).is_dir()
+
     def test_env_non_isolated_adds_nothing(self) -> None:
         assert ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku", isolated=False)) == {}
 
@@ -488,7 +519,8 @@ class TestClaudeIsolation:
         (tmpdir := tmp_path / "tmp").mkdir()
         started = tmp_path / "started"
         fake = bin_dir / "claude"
-        fake.write_text(f'#!/bin/sh\nprintf "%s\n%s" "$$" "$CLAUDE_CONFIG_DIR" > {started}\nsleep 60\n')
+        publish = f'printf "%s\n%s" "$$" "$CLAUDE_CONFIG_DIR" > {started}.tmp && mv {started}.tmp {started}'
+        fake.write_text(f"#!/bin/sh\n{publish}\nsleep 60\n")
         fake.chmod(0o755)
         env = {name: value for name, value in os.environ.items() if not name.startswith("CLAUDE_")} | {
             "HOME": str(home),
@@ -497,11 +529,13 @@ class TestClaudeIsolation:
         }
         run = "from spawnllm import ClaudeCliBackend, RunSpec; ClaudeCliBackend().execute(RunSpec('hi', model='haiku'))"
         parent = subprocess.Popen([sys.executable, "-c", run], env=env)
-        deadline = time.monotonic() + 30
-        while not started.exists() and time.monotonic() < deadline:
-            time.sleep(0.05)
-        parent.kill()
-        parent.wait()
+        try:
+            deadline = time.monotonic() + 30
+            while not started.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+        finally:
+            parent.kill()
+            parent.wait()
         pid, config_dir = started.read_text().split("\n")
         os.kill(int(pid), 9)
         assert Path(config_dir).is_relative_to(tmpdir)

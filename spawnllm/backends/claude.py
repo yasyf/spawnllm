@@ -62,21 +62,22 @@ class ClaudeCliBackend(CliBackend):
     install_hint: ClassVar[str] = "curl -fsSL https://claude.ai/install.sh | bash"
     schema_dialect: ClassVar[str | None] = "anthropic"
 
-    _isolation: ClaudeIsolation | None = None
+    _isolated_config_dir: str | None = None
 
     def claude_isolation(self) -> ClaudeIsolation:
-        """Return the process-lifetime isolation, creating and seeding its config home once.
+        """Return the isolation for one run: the process-lifetime config home and the env resolved now.
 
         The core's `claude_isolation_sources` op resolves the account pointer,
         credentials file, and Keychain service from the caller's effective config
-        home; this host reads those sources (falling back to the Keychain when the
-        credentials file is absent) and hands them to `claude_isolation_seed` for
-        the exact files-and-modes to write and the env to set. The files land in a
-        fresh temp dir removed at interpreter exit; the token only ever lives in
-        the env. The result is cached on the backend.
+        home, naming no credential source when the process already carries
+        `CLAUDE_CODE_OAUTH_TOKEN`; this host reads those sources (falling back to
+        the Keychain when the credentials file is absent) and hands them to
+        `claude_isolation_seed` for the exact files-and-modes to write and the env
+        to set. The files land in a fresh temp dir removed at interpreter exit,
+        created on the first call and cached on the backend; the env is resolved
+        on every call so a renewed Keychain token reaches the next run, and it
+        only ever lives in memory.
         """
-        if self._isolation is not None:
-            return self._isolation
         sources = _core.dispatch(
             "claude_isolation_sources",
             {
@@ -86,21 +87,23 @@ class ClaudeCliBackend(CliBackend):
                     "claude_config_dir_env": os.environ.get("CLAUDE_CONFIG_DIR") or None,
                     "claude_securestorage_config_dir_env": os.environ.get("CLAUDE_SECURESTORAGE_CONFIG_DIR"),
                     "claude_code_custom_oauth_url_env": os.environ.get("CLAUDE_CODE_CUSTOM_OAUTH_URL"),
+                    "claude_code_oauth_token_env": os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"),
                 }
             },
         )
         account_json = read_file_opt(sources["account_path"])
-        credentials_json = read_file_opt(sources["credentials_path"])
+        credentials_json = read_file_opt(sources["credentials_path"]) if sources["credentials_path"] else None
         if credentials_json is None and sources["keychain_service"] is not None:
             credentials_json = keychain_credentials(sources["keychain_service"])
         seed = _core.dispatch(
             "claude_isolation_seed", {"account_json": account_json, "credentials_json": credentials_json}
         )
-        config_dir = Path(tempfile.mkdtemp(prefix="spawnllm-claude-config-"))
-        for file in seed["files"]:
-            fd = os.open(config_dir / file["name"], os.O_WRONLY | os.O_CREAT | os.O_EXCL, int(file["mode"], 8))
-            with os.fdopen(fd, "w") as handle:
-                handle.write(file["content"])
-        atexit.register(shutil.rmtree, config_dir, ignore_errors=True)
-        self._isolation = ClaudeIsolation(str(config_dir), seed["env"])
-        return self._isolation
+        if self._isolated_config_dir is None:
+            config_dir = Path(tempfile.mkdtemp(prefix="spawnllm-claude-config-"))
+            for file in seed["files"]:
+                fd = os.open(config_dir / file["name"], os.O_WRONLY | os.O_CREAT | os.O_EXCL, int(file["mode"], 8))
+                with os.fdopen(fd, "w") as handle:
+                    handle.write(file["content"])
+            atexit.register(shutil.rmtree, config_dir, ignore_errors=True)
+            self._isolated_config_dir = str(config_dir)
+        return ClaudeIsolation(self._isolated_config_dir, seed["env"])

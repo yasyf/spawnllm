@@ -23,12 +23,14 @@ struct IsolationHost {
     claude_securestorage_config_dir_env: Option<String>,
     #[serde(default)]
     claude_code_custom_oauth_url_env: Option<String>,
+    #[serde(default)]
+    claude_code_oauth_token_env: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 struct IsolationSources {
     account_path: String,
-    credentials_path: String,
+    credentials_path: Option<String>,
     keychain_service: Option<String>,
 }
 
@@ -112,6 +114,7 @@ fn config_dir_digest(config_dir_env: &str) -> String {
 // overrides CLAUDE_CONFIG_DIR for the storage dir and the digest of the NFC value as set.
 fn isolation_sources(input: IsolationSourcesInput) -> IsolationSources {
     let host = input.host;
+    let inherits_token = is_set(&host.claude_code_oauth_token_env);
     let default_home = format!("{}/.claude", host.home);
     let (account_path, config_home) = match &host.claude_config_dir_env {
         Some(config_dir_env) if !config_dir_env.is_empty() => {
@@ -138,13 +141,14 @@ fn isolation_sources(input: IsolationSourcesInput) -> IsolationSources {
     } else {
         ""
     };
-    let keychain_service = (host.platform == "darwin").then(|| {
+    let keychain_service = (host.platform == "darwin" && !inherits_token).then(|| {
         let digest = hashed_dir.map(config_dir_digest).unwrap_or_default();
         format!("Claude Code{oauth_file_suffix}-credentials{digest}")
     });
     IsolationSources {
         account_path,
-        credentials_path: format!("{credentials_home}/.credentials.json"),
+        credentials_path: (!inherits_token)
+            .then(|| format!("{credentials_home}/.credentials.json")),
         keychain_service,
     }
 }

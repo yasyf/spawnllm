@@ -15,7 +15,10 @@ func seedClaudeIsolation() (string, map[string]string, func(), error) {
 		return "", nil, nil, err
 	}
 	accountJSON := readFileOpt(sources.AccountPath)
-	credentialsJSON := readFileOpt(sources.CredentialsPath)
+	var credentialsJSON *string
+	if sources.CredentialsPath != nil {
+		credentialsJSON = readFileOpt(*sources.CredentialsPath)
+	}
 	if credentialsJSON == nil && sources.KeychainService != nil {
 		credentialsJSON = keychainCredentials(*sources.KeychainService)
 	}

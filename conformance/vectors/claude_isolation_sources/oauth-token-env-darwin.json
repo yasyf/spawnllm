@@ -1,19 +1,19 @@
 {
-  "name": "config-dir-env-empty-darwin",
+  "name": "oauth-token-env-darwin",
   "op": "claude_isolation_sources",
   "input": {
     "host": {
       "platform": "darwin",
       "home": "/Users/testuser",
-      "claude_config_dir_env": "",
+      "claude_config_dir_env": null,
       "claude_securestorage_config_dir_env": null,
       "claude_code_custom_oauth_url_env": null,
-      "claude_code_oauth_token_env": null
+      "claude_code_oauth_token_env": "sk-ant-oat01-inherited"
     }
   },
   "expected": {
     "account_path": "/Users/testuser/.claude.json",
-    "credentials_path": "/Users/testuser/.claude/.credentials.json",
-    "keychain_service": "Claude Code-credentials"
+    "credentials_path": null,
+    "keychain_service": null
   }
 }

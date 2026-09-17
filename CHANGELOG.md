@@ -18,11 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   access token back as an `env` map, `CLAUDE_CODE_OAUTH_TOKEN`, that every
   host sets on the child, and seeds only the account pointer; nothing secret
   touches the filesystem, a leaked dir holds no credential, and the child
-  stores nothing in the Keychain. Claude Code authenticates from that
-  variable without refreshing it, so a run started after the Keychain's
-  access token expired fails with its `401 OAuth access token is invalid`
-  instead of refreshing; any Claude Code session on the machine keeps the
-  Keychain token current.
+  stores nothing in the Keychain. A `CLAUDE_CODE_OAUTH_TOKEN` already set
+  on the host process outranks the stored credential, as it does in Claude
+  Code, so the seed reads no credential source and the child inherits it.
+  The Python host resolves the token on every run rather than once per
+  process, so a renewed Keychain token reaches the next run of a long-lived
+  backend. Claude Code authenticates from that variable without refreshing
+  it, so a run started after the Keychain's access token expired fails with
+  its `401 OAuth access token is invalid` instead of refreshing; any Claude
+  Code session on the machine keeps the Keychain token current.
 
 ## [0.13.3] - 2026-09-17
 

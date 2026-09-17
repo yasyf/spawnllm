@@ -8,7 +8,10 @@ use spawnllm::{Backend, RunSpec};
 
 fn set_config_dir(dir: &Path) {
     // SAFETY: gated by ENV_LOCK; this process runs only the isolation tests serially.
-    unsafe { std::env::set_var("CLAUDE_CONFIG_DIR", dir) };
+    unsafe {
+        std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN");
+        std::env::set_var("CLAUDE_CONFIG_DIR", dir);
+    }
 }
 
 fn clear_config_dir() {
@@ -100,6 +103,7 @@ async fn empty_claude_config_dir_uses_the_default_home() {
     let original_home = std::env::var_os("HOME");
 
     unsafe {
+        std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN");
         std::env::set_var("HOME", source.path());
         std::env::set_var("CLAUDE_CONFIG_DIR", "");
     }
@@ -124,10 +128,11 @@ fn suffixed_keychain_service(config_dir_env: &str) -> String {
 }
 
 #[cfg(target_os = "macos")]
-const HOST_KEYCHAIN_VARS: [&str; 3] = [
+const HOST_KEYCHAIN_VARS: [&str; 4] = [
     "CLAUDE_CONFIG_DIR",
     "CLAUDE_SECURESTORAGE_CONFIG_DIR",
     "CLAUDE_CODE_CUSTOM_OAUTH_URL",
+    "CLAUDE_CODE_OAUTH_TOKEN",
 ];
 
 #[cfg(target_os = "macos")]
@@ -356,5 +361,50 @@ async fn keychain_miss_seeds_no_credentials() {
             "find-generic-password\n-s\n{}\n-w\n",
             suffixed_keychain_service(config_dir_env)
         )
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[allow(clippy::await_holding_lock)]
+#[tokio::test]
+async fn inherited_oauth_token_reads_no_credential_source() {
+    common::fixtures();
+    let _guard = common::ENV_LOCK
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+
+    let home = tempfile::tempdir().unwrap();
+    std::fs::create_dir(home.path().join(".claude")).unwrap();
+    std::fs::write(home.path().join(".claude.json"), r#"{"account": "me"}"#).unwrap();
+    std::fs::write(home.path().join(".claude/.credentials.json"), "not json").unwrap();
+    let cred_out = tempfile::NamedTempFile::new().unwrap();
+    let cred_path = cred_out.path().to_str().unwrap().to_owned();
+    let argv_out = tempfile::tempdir().unwrap();
+    let argv_path = argv_out.path().join("argv");
+    let original_home = std::env::var_os("HOME");
+    unsafe {
+        for var in HOST_KEYCHAIN_VARS {
+            std::env::remove_var(var);
+        }
+        std::env::set_var("HOME", home.path());
+        std::env::set_var("CLAUDE_CODE_OAUTH_TOKEN", "inherited");
+        std::env::set_var("SPAWNLLM_FAKE_SECURITY_ARGV_OUT", &argv_path);
+    }
+    let spec = RunSpec::new("hi", "haiku").env(env(&[("SPAWNLLM_FAKE_CRED_OUT", &cred_path)]));
+    let response = spawnllm::run_on(&Backend::Claude, spec).await;
+    unsafe {
+        std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN");
+        std::env::remove_var("SPAWNLLM_FAKE_SECURITY_ARGV_OUT");
+    }
+    match original_home {
+        Some(value) => unsafe { std::env::set_var("HOME", value) },
+        None => unsafe { std::env::remove_var("HOME") },
+    }
+
+    response.outcome.expect("isolated claude run succeeds");
+    assert_eq!(std::fs::read_to_string(&cred_path).unwrap(), "inherited");
+    assert!(
+        !argv_path.exists(),
+        "an inherited token must skip the Keychain"
     );
 }

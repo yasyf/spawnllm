@@ -18,7 +18,7 @@ use crate::host::{home, platform};
 #[derive(Debug, Deserialize)]
 struct Sources {
     account_path: String,
-    credentials_path: String,
+    credentials_path: Option<String>,
     keychain_service: Option<String>,
 }
 
@@ -49,13 +49,18 @@ pub(crate) async fn seed_isolation() -> Result<Isolation, Error> {
             "claude_config_dir_env": std::env::var("CLAUDE_CONFIG_DIR").ok().filter(|value| !value.is_empty()),
             "claude_securestorage_config_dir_env": std::env::var("CLAUDE_SECURESTORAGE_CONFIG_DIR").ok(),
             "claude_code_custom_oauth_url_env": std::env::var("CLAUDE_CODE_CUSTOM_OAUTH_URL").ok(),
+            "claude_code_oauth_token_env": std::env::var("CLAUDE_CODE_OAUTH_TOKEN").ok(),
         } }),
     )?;
 
     let account_json = std::fs::read_to_string(&sources.account_path).ok();
-    let credentials_json = match std::fs::read_to_string(&sources.credentials_path) {
-        Ok(text) => Some(text),
-        Err(_) => match &sources.keychain_service {
+    let credentials_json = match sources
+        .credentials_path
+        .as_deref()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+    {
+        Some(text) => Some(text),
+        None => match &sources.keychain_service {
             Some(service) => keychain_credentials(service).await,
             None => None,
         },
