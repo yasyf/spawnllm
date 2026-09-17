@@ -26,6 +26,8 @@ type claudeOutput struct {
 	Seeded        bool   `json:"seeded"`
 	AccountHasMCP bool   `json:"account_has_mcp"`
 	CredsPresent  bool   `json:"creds_present"`
+	ConfigDirMode string `json:"config_dir_mode"`
+	CredsMode     string `json:"creds_mode"`
 }
 
 func TestClaudeStdinAndStdoutFile(t *testing.T) {
@@ -311,6 +313,9 @@ func TestClaudeIsolationSeeding(t *testing.T) {
 	}
 	if !out.CredsPresent {
 		t.Fatal("isolated config dir was not seeded with .credentials.json")
+	}
+	if out.ConfigDirMode != "700" || out.CredsMode != "600" {
+		t.Fatalf("isolated config dir mode %q, credentials mode %q; want 700 and 600", out.ConfigDirMode, out.CredsMode)
 	}
 	if _, err := os.Stat(out.ConfigDir); !os.IsNotExist(err) {
 		t.Fatalf("isolated config dir was not cleaned up: stat err = %v", err)

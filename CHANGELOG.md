@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   token and failed with `Not logged in · Please run /login`. The core now
   hands the bare name to the host for the default home and the suffixed one
   for a set `CLAUDE_CONFIG_DIR`.
+- **The isolated config dir and its credentials file are owner-only from the
+  moment they exist.** The Rust host created the temp dir with the process
+  umask (0755 under the usual 022) and every seeded file at 0644, wrote the
+  token, and only then chmodded it to 0600, so another local user on a shared
+  tmp could read the token in that window, and a run killed inside it left
+  the file readable. The Python host wrote the file before its chmod too. Both
+  now create the dir 0700 and each file with its final mode, `O_EXCL`, before
+  writing a byte; the Go host already did.
 
 ## [0.13.2] - 2026-09-14
 

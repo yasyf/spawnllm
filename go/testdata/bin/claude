@@ -18,7 +18,13 @@ config_dir="${CLAUDE_CONFIG_DIR:-}"
 seeded=false
 account_has_mcp=false
 creds_present=false
+config_dir_mode=""
+creds_mode=""
+mode_of() {
+	stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1"
+}
 if [ -n "$config_dir" ]; then
+	config_dir_mode="$(mode_of "$config_dir")"
 	if [ -f "$config_dir/.claude.json" ]; then
 		seeded=true
 		if grep -q mcpServers "$config_dir/.claude.json"; then
@@ -27,6 +33,7 @@ if [ -n "$config_dir" ]; then
 	fi
 	if [ -f "$config_dir/.credentials.json" ]; then
 		creds_present=true
+		creds_mode="$(mode_of "$config_dir/.credentials.json")"
 	fi
 fi
 
@@ -43,5 +50,5 @@ if [ -n "$FAKE_TRANSIENT_COUNTER" ]; then
 	fi
 fi
 
-printf '{"type":"result","is_error":false,"result":"%s","stdout_regular":%s,"config_dir":"%s","seeded":%s,"account_has_mcp":%s,"creds_present":%s}\n' \
-	"$prompt" "$stdout_regular" "$config_dir" "$seeded" "$account_has_mcp" "$creds_present"
+printf '{"type":"result","is_error":false,"result":"%s","stdout_regular":%s,"config_dir":"%s","seeded":%s,"account_has_mcp":%s,"creds_present":%s,"config_dir_mode":"%s","creds_mode":"%s"}\n' \
+	"$prompt" "$stdout_regular" "$config_dir" "$seeded" "$account_has_mcp" "$creds_present" "$config_dir_mode" "$creds_mode"

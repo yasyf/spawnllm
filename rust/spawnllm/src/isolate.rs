@@ -1,3 +1,4 @@
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 #[cfg(any(target_os = "macos", test))]
@@ -56,17 +57,24 @@ pub(crate) async fn seed_isolation() -> Result<TempDir, Error> {
         json!({ "account_json": account_json, "credentials_json": credentials_json }),
     )?;
 
-    let dir = tempfile::Builder::new()
-        .prefix("spawnllm-claude-config-")
-        .tempdir()?;
+    let dir = private_tempdir()?;
     for file in &seed.files {
-        let path = dir.path().join(&file.name);
-        let mut handle = std::fs::File::create(&path)?;
+        let mut handle = create_with_mode(&dir.path().join(&file.name), &file.mode)?;
         handle.write_all(file.content.as_bytes())?;
         handle.flush()?;
-        set_mode(&path, &file.mode)?;
     }
     Ok(dir)
+}
+
+fn private_tempdir() -> std::io::Result<TempDir> {
+    let mut builder = tempfile::Builder::new();
+    builder.prefix("spawnllm-claude-config-");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    builder.tempdir()
 }
 
 async fn keychain_credentials(service: &str) -> Option<String> {
@@ -100,16 +108,20 @@ async fn timed_command_output(
 }
 
 #[cfg(unix)]
-fn set_mode(path: &Path, mode: &str) -> std::io::Result<()> {
-    use std::os::unix::fs::PermissionsExt;
+fn create_with_mode(path: &Path, mode: &str) -> std::io::Result<File> {
+    use std::os::unix::fs::OpenOptionsExt;
 
     let bits = u32::from_str_radix(mode, 8).expect("core emits octal file modes");
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(bits))
+    OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(bits)
+        .open(path)
 }
 
 #[cfg(not(unix))]
-fn set_mode(_path: &Path, _mode: &str) -> std::io::Result<()> {
-    Ok(())
+fn create_with_mode(path: &Path, _mode: &str) -> std::io::Result<File> {
+    OpenOptions::new().write(true).create_new(true).open(path)
 }
 
 #[cfg(test)]
@@ -117,6 +129,35 @@ mod tests {
     use std::time::Instant;
 
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn private_tempdir_is_owner_only_at_creation() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = private_tempdir().unwrap();
+
+        assert_eq!(
+            dir.path().metadata().unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn create_with_mode_applies_the_mode_before_any_byte_is_written() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = private_tempdir().unwrap();
+        let path = dir.path().join(".credentials.json");
+        let mut handle = create_with_mode(&path, "0600").unwrap();
+        let created = path.metadata().unwrap();
+
+        assert_eq!(created.len(), 0);
+        assert_eq!(created.permissions().mode() & 0o777, 0o600);
+        handle.write_all(b"{}").unwrap();
+        assert!(create_with_mode(&path, "0600").is_err());
+    }
 
     #[tokio::test]
     async fn timed_command_output_returns_none_on_spawn_failure() {

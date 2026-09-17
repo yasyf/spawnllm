@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -296,16 +297,45 @@ class TestClaudeIsolation:
         )
         (tmp_path / ".claude").mkdir()
         (tmp_path / ".claude" / ".credentials.json").write_text('{"claudeAiOauth": {"accessToken": "tok"}}')
+        monkeypatch.setattr("spawnllm.backends.claude.subprocess.run", self.fail_on_keychain_call)
         backend = ClaudeCliBackend()
         env = backend.env(RunSpec(prompt="hi", model="haiku"))
         config_dir = Path(env["CLAUDE_CONFIG_DIR"])
         assert config_dir.is_dir()
+        assert config_dir.stat().st_mode & 0o777 == 0o700
         assert backend.env(RunSpec(prompt="hi", model="haiku"))["CLAUDE_CONFIG_DIR"] == str(config_dir)
         # The token is substituted in place of the plan's ${isolated_config_dir} placeholder.
         assert "${isolated_config_dir}" not in env["CLAUDE_CONFIG_DIR"]
         # The account pointer is seeded sans host mcpServers; the OAuth token comes along.
         assert json.loads((config_dir / ".claude.json").read_text()) == {"oauthAccount": {"accountUuid": "a"}}
-        assert json.loads((config_dir / ".credentials.json").read_text()) == {"claudeAiOauth": {"accessToken": "tok"}}
+        credentials = config_dir / ".credentials.json"
+        assert json.loads(credentials.read_text()) == {"claudeAiOauth": {"accessToken": "tok"}}
+        assert credentials.stat().st_mode & 0o777 == 0o600
+
+    @staticmethod
+    def fail_on_keychain_call(argv: list[str], **kwargs: object) -> object:
+        raise AssertionError(f"unexpected Keychain call: {argv}")
+
+    def test_env_seeds_each_file_with_its_mode_before_writing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        (tmp_path / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": "a"}}))
+        (tmp_path / ".claude").mkdir()
+        (tmp_path / ".claude" / ".credentials.json").write_text('{"claudeAiOauth": {"accessToken": "tok"}}')
+        real_open = os.open
+        created: list[tuple[str, int, int]] = []
+
+        def observing_open(path: str | os.PathLike[str], flags: int, mode: int = 0o777) -> int:
+            fd = real_open(path, flags, mode)
+            stat = os.stat(fd)
+            created.append((Path(path).name, stat.st_mode & 0o777, stat.st_size))
+            return fd
+
+        monkeypatch.setattr("spawnllm.backends.claude.os.open", observing_open)
+        ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))
+        assert created == [(".claude.json", 0o644, 0), (".credentials.json", 0o600, 0)]
 
     def test_env_seeds_from_claude_config_dir_over_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path / "home"))

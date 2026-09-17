@@ -47,13 +47,16 @@ async fn isolation_seeds_stripped_account_and_credentials_from_files() {
 
     let cred_out = tempfile::NamedTempFile::new().unwrap();
     let account_out = tempfile::NamedTempFile::new().unwrap();
+    let modes_out = tempfile::NamedTempFile::new().unwrap();
     let cred_path = cred_out.path().to_str().unwrap().to_owned();
     let account_path = account_out.path().to_str().unwrap().to_owned();
+    let modes_path = modes_out.path().to_str().unwrap().to_owned();
 
     set_config_dir(source.path());
     let spec = RunSpec::new("hi", "haiku").env(env(&[
         ("SPAWNLLM_FAKE_CRED_OUT", &cred_path),
         ("SPAWNLLM_FAKE_ACCOUNT_OUT", &account_path),
+        ("SPAWNLLM_FAKE_MODES_OUT", &modes_path),
     ]));
     let response = spawnllm::run_on(&Backend::Claude, spec).await;
     clear_config_dir();
@@ -62,6 +65,11 @@ async fn isolation_seeds_stripped_account_and_credentials_from_files() {
     assert_eq!(
         std::fs::read_to_string(&cred_path).unwrap(),
         r#"{"token": "abc"}"#
+    );
+    assert_eq!(
+        std::fs::read_to_string(&modes_path).unwrap(),
+        "700\n600\n",
+        "config dir mode then credentials file mode"
     );
     let account: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&account_path).unwrap()).unwrap();
