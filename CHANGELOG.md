@@ -6,6 +6,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.4] - 2026-09-17
+
+### Security
+- **Isolated `claude` runs no longer write the claude.ai token to disk.** The
+  isolation seed copied the whole Keychain credential into a
+  `.credentials.json` under the per-process `CLAUDE_CONFIG_DIR`, and every
+  host removed that dir only at process exit, so a parent killed by a signal
+  (a hook host at Claude Code's hook timeout, an `os._exit`) left the token
+  copy behind; one machine held 77 such dirs. Claude Code also migrated each
+  seeded file into a Keychain item named after the throwaway dir, and those
+  outlived the run too. The core's `claude_isolation_seed` now hands the
+  access token back as an `env` map, `CLAUDE_CODE_OAUTH_TOKEN`, that every
+  host sets on the child, and seeds only the account pointer; nothing secret
+  touches the filesystem, a leaked dir holds no credential, and the child
+  stores nothing in the Keychain. A `CLAUDE_CODE_OAUTH_TOKEN` already set
+  on the host process outranks the stored credential, as it does in Claude
+  Code, so the seed reads no credential source and the child inherits it.
+  The Python host resolves the token on every run rather than once per
+  process, so a renewed Keychain token reaches the next run of a long-lived
+  backend. Claude Code authenticates from that variable without refreshing
+  it, so a run started after the Keychain's access token expired fails with
+  its `401 OAuth access token is invalid` instead of refreshing; any Claude
+  Code session on the machine keeps the Keychain token current.
+
+## [0.13.3] - 2026-09-17
+
 ### Fixed
 - **Isolated `claude` runs from the default config home find the Keychain
   token again.** With `CLAUDE_CONFIG_DIR` unset, Claude Code stores the
@@ -447,7 +473,10 @@ First release, published to PyPI as `spawnllm`.
   generation.
 - Click CLI: `spawnllm backends` and `spawnllm call`.
 
-[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/yasyf/spawnllm/compare/v0.13.4...HEAD
+[0.13.4]: https://github.com/yasyf/spawnllm/compare/v0.13.3...v0.13.4
+[0.13.3]: https://github.com/yasyf/spawnllm/compare/v0.13.2...v0.13.3
+[0.13.2]: https://github.com/yasyf/spawnllm/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/yasyf/spawnllm/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/yasyf/spawnllm/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/yasyf/spawnllm/compare/v0.11.0...v0.12.0

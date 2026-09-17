@@ -8,7 +8,10 @@ use spawnllm::{Backend, RunSpec};
 
 fn set_config_dir(dir: &Path) {
     // SAFETY: gated by ENV_LOCK; this process runs only the isolation tests serially.
-    unsafe { std::env::set_var("CLAUDE_CONFIG_DIR", dir) };
+    unsafe {
+        std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN");
+        std::env::set_var("CLAUDE_CONFIG_DIR", dir);
+    }
 }
 
 fn clear_config_dir() {
@@ -41,7 +44,7 @@ async fn isolation_seeds_stripped_account_and_credentials_from_files() {
     .unwrap();
     std::fs::write(
         source.path().join(".credentials.json"),
-        r#"{"token": "abc"}"#,
+        r#"{"claudeAiOauth": {"accessToken": "abc"}}"#,
     )
     .unwrap();
 
@@ -62,14 +65,11 @@ async fn isolation_seeds_stripped_account_and_credentials_from_files() {
     clear_config_dir();
 
     response.outcome.expect("isolated claude run succeeds");
-    assert_eq!(
-        std::fs::read_to_string(&cred_path).unwrap(),
-        r#"{"token": "abc"}"#
-    );
+    assert_eq!(std::fs::read_to_string(&cred_path).unwrap(), "abc");
     assert_eq!(
         std::fs::read_to_string(&modes_path).unwrap(),
-        "drwx------\n-rw-------\n",
-        "config dir mode then credentials file mode"
+        "drwx------\n.claude.json\n",
+        "config dir mode then its only entry"
     );
     let account: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&account_path).unwrap()).unwrap();
@@ -95,7 +95,7 @@ async fn empty_claude_config_dir_uses_the_default_home() {
     std::fs::create_dir(source.path().join(".claude")).unwrap();
     std::fs::write(
         source.path().join(".claude/.credentials.json"),
-        r#"{"token": "home-token"}"#,
+        r#"{"claudeAiOauth": {"accessToken": "home-token"}}"#,
     )
     .unwrap();
     let cred_out = tempfile::NamedTempFile::new().unwrap();
@@ -103,6 +103,7 @@ async fn empty_claude_config_dir_uses_the_default_home() {
     let original_home = std::env::var_os("HOME");
 
     unsafe {
+        std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN");
         std::env::set_var("HOME", source.path());
         std::env::set_var("CLAUDE_CONFIG_DIR", "");
     }
@@ -115,10 +116,7 @@ async fn empty_claude_config_dir_uses_the_default_home() {
     }
 
     response.outcome.expect("isolated claude run succeeds");
-    assert_eq!(
-        std::fs::read_to_string(&cred_path).unwrap(),
-        r#"{"token": "home-token"}"#
-    );
+    assert_eq!(std::fs::read_to_string(&cred_path).unwrap(), "home-token");
 }
 
 #[cfg(target_os = "macos")]
@@ -130,10 +128,11 @@ fn suffixed_keychain_service(config_dir_env: &str) -> String {
 }
 
 #[cfg(target_os = "macos")]
-const HOST_KEYCHAIN_VARS: [&str; 3] = [
+const HOST_KEYCHAIN_VARS: [&str; 4] = [
     "CLAUDE_CONFIG_DIR",
     "CLAUDE_SECURESTORAGE_CONFIG_DIR",
     "CLAUDE_CODE_CUSTOM_OAUTH_URL",
+    "CLAUDE_CODE_OAUTH_TOKEN",
 ];
 
 #[cfg(target_os = "macos")]
@@ -362,5 +361,50 @@ async fn keychain_miss_seeds_no_credentials() {
             "find-generic-password\n-s\n{}\n-w\n",
             suffixed_keychain_service(config_dir_env)
         )
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[allow(clippy::await_holding_lock)]
+#[tokio::test]
+async fn inherited_oauth_token_reads_no_credential_source() {
+    common::fixtures();
+    let _guard = common::ENV_LOCK
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+
+    let home = tempfile::tempdir().unwrap();
+    std::fs::create_dir(home.path().join(".claude")).unwrap();
+    std::fs::write(home.path().join(".claude.json"), r#"{"account": "me"}"#).unwrap();
+    std::fs::write(home.path().join(".claude/.credentials.json"), "not json").unwrap();
+    let cred_out = tempfile::NamedTempFile::new().unwrap();
+    let cred_path = cred_out.path().to_str().unwrap().to_owned();
+    let argv_out = tempfile::tempdir().unwrap();
+    let argv_path = argv_out.path().join("argv");
+    let original_home = std::env::var_os("HOME");
+    unsafe {
+        for var in HOST_KEYCHAIN_VARS {
+            std::env::remove_var(var);
+        }
+        std::env::set_var("HOME", home.path());
+        std::env::set_var("CLAUDE_CODE_OAUTH_TOKEN", "inherited");
+        std::env::set_var("SPAWNLLM_FAKE_SECURITY_ARGV_OUT", &argv_path);
+    }
+    let spec = RunSpec::new("hi", "haiku").env(env(&[("SPAWNLLM_FAKE_CRED_OUT", &cred_path)]));
+    let response = spawnllm::run_on(&Backend::Claude, spec).await;
+    unsafe {
+        std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN");
+        std::env::remove_var("SPAWNLLM_FAKE_SECURITY_ARGV_OUT");
+    }
+    match original_home {
+        Some(value) => unsafe { std::env::set_var("HOME", value) },
+        None => unsafe { std::env::remove_var("HOME") },
+    }
+
+    response.outcome.expect("isolated claude run succeeds");
+    assert_eq!(std::fs::read_to_string(&cred_path).unwrap(), "inherited");
+    assert!(
+        !argv_path.exists(),
+        "an inherited token must skip the Keychain"
     );
 }

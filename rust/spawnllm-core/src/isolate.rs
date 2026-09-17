@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::io;
 
 use serde::{Deserialize, Serialize};
@@ -22,12 +23,14 @@ struct IsolationHost {
     claude_securestorage_config_dir_env: Option<String>,
     #[serde(default)]
     claude_code_custom_oauth_url_env: Option<String>,
+    #[serde(default)]
+    claude_code_oauth_token_env: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 struct IsolationSources {
     account_path: String,
-    credentials_path: String,
+    credentials_path: Option<String>,
     keychain_service: Option<String>,
 }
 
@@ -37,9 +40,22 @@ struct IsolationSeedInput {
     credentials_json: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct Credentials {
+    #[serde(rename = "claudeAiOauth")]
+    claude_ai_oauth: Option<ClaudeAiOauth>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ClaudeAiOauth {
+    #[serde(rename = "accessToken")]
+    access_token: String,
+}
+
 #[derive(Debug, Serialize)]
 struct IsolationSeed {
     files: Vec<SeedFile>,
+    env: BTreeMap<&'static str, String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -98,6 +114,7 @@ fn config_dir_digest(config_dir_env: &str) -> String {
 // overrides CLAUDE_CONFIG_DIR for the storage dir and the digest of the NFC value as set.
 fn isolation_sources(input: IsolationSourcesInput) -> IsolationSources {
     let host = input.host;
+    let inherits_token = is_set(&host.claude_code_oauth_token_env);
     let default_home = format!("{}/.claude", host.home);
     let (account_path, config_home) = match &host.claude_config_dir_env {
         Some(config_dir_env) if !config_dir_env.is_empty() => {
@@ -124,13 +141,14 @@ fn isolation_sources(input: IsolationSourcesInput) -> IsolationSources {
     } else {
         ""
     };
-    let keychain_service = (host.platform == "darwin").then(|| {
+    let keychain_service = (host.platform == "darwin" && !inherits_token).then(|| {
         let digest = hashed_dir.map(config_dir_digest).unwrap_or_default();
         format!("Claude Code{oauth_file_suffix}-credentials{digest}")
     });
     IsolationSources {
         account_path,
-        credentials_path: format!("{credentials_home}/.credentials.json"),
+        credentials_path: (!inherits_token)
+            .then(|| format!("{credentials_home}/.credentials.json")),
         keychain_service,
     }
 }
@@ -153,14 +171,14 @@ fn isolation_seed(input: IsolationSeedInput) -> Result<IsolationSeed, serde_json
             mode: "0644",
         });
     }
+    let mut env = BTreeMap::new();
     if let Some(credentials_json) = input.credentials_json {
-        files.push(SeedFile {
-            name: ".credentials.json",
-            content: credentials_json,
-            mode: "0600",
-        });
+        let credentials = serde_json::from_str::<Credentials>(&credentials_json)?;
+        if let Some(oauth) = credentials.claude_ai_oauth {
+            env.insert("CLAUDE_CODE_OAUTH_TOKEN", oauth.access_token);
+        }
     }
-    Ok(IsolationSeed { files })
+    Ok(IsolationSeed { files, env })
 }
 
 pub(crate) fn dispatch(op: &str, input: Value) -> OpResult {

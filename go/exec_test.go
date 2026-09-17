@@ -26,6 +26,7 @@ func withFakeBin(t *testing.T) {
 type claudeOutput struct {
 	StdoutRegular bool   `json:"stdout_regular"`
 	ConfigDir     string `json:"config_dir"`
+	OauthToken    string `json:"oauth_token"`
 	Seeded        bool   `json:"seeded"`
 	AccountHasMCP bool   `json:"account_has_mcp"`
 	CredsPresent  bool   `json:"creds_present"`
@@ -274,11 +275,22 @@ func TestTransientThenSuccessRetry(t *testing.T) {
 	}
 }
 
+func clearHostEnv(t *testing.T, names ...string) {
+	t.Helper()
+	for _, name := range names {
+		t.Setenv(name, "")
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestClaudeIsolationSeeding(t *testing.T) {
 	withFakeBin(t)
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	clearHostEnv(t, "CLAUDE_CODE_OAUTH_TOKEN")
 	if err := os.WriteFile(filepath.Join(home, ".claude.json"),
 		[]byte(`{"oauthAccount":{"accountUuid":"a"},"mcpServers":{"s":{"command":"x"}}}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -314,11 +326,14 @@ func TestClaudeIsolationSeeding(t *testing.T) {
 	if out.AccountHasMCP {
 		t.Fatal("seeded .claude.json still carried mcpServers")
 	}
-	if !out.CredsPresent {
-		t.Fatal("isolated config dir was not seeded with .credentials.json")
+	if out.CredsPresent {
+		t.Fatal("isolated config dir carried a .credentials.json")
 	}
-	if out.ConfigDirMode != "drwx------" || out.CredsMode != "-rw-------" {
-		t.Fatalf("isolated config dir mode %q, credentials mode %q; want drwx------ and -rw-------", out.ConfigDirMode, out.CredsMode)
+	if out.OauthToken != "tok" {
+		t.Fatalf("CLAUDE_CODE_OAUTH_TOKEN = %q, want the credentials file's access token", out.OauthToken)
+	}
+	if out.ConfigDirMode != "drwx------" {
+		t.Fatalf("isolated config dir mode %q, want drwx------", out.ConfigDirMode)
 	}
 	if _, err := os.Stat(out.ConfigDir); !os.IsNotExist(err) {
 		t.Fatalf("isolated config dir was not cleaned up: stat err = %v", err)
@@ -336,6 +351,7 @@ func keychainSeededRun(t *testing.T, service string) (claudeOutput, string) {
 		t.Skip("the Keychain fallback runs only on darwin")
 	}
 	withFakeBin(t)
+	clearHostEnv(t, "CLAUDE_CODE_OAUTH_TOKEN")
 	argvOut := filepath.Join(t.TempDir(), "argv")
 	t.Setenv("FAKE_SECURITY_ARGV_OUT", argvOut)
 	t.Setenv("FAKE_KEYCHAIN_SERVICE", service)
@@ -428,12 +444,7 @@ func TestClaudeIsolationKeychain(t *testing.T) {
 			}
 			writeAccountPointer(t, home)
 			writeAccountPointer(t, acct)
-			for _, name := range []string{"CLAUDE_CONFIG_DIR", "CLAUDE_SECURESTORAGE_CONFIG_DIR", "CLAUDE_CODE_CUSTOM_OAUTH_URL"} {
-				t.Setenv(name, "")
-				if err := os.Unsetenv(name); err != nil {
-					t.Fatal(err)
-				}
-			}
+			clearHostEnv(t, "CLAUDE_CONFIG_DIR", "CLAUDE_SECURESTORAGE_CONFIG_DIR", "CLAUDE_CODE_CUSTOM_OAUTH_URL")
 			for name, value := range tc.env(home, acct) {
 				t.Setenv(name, value)
 			}
@@ -444,8 +455,8 @@ func TestClaudeIsolationKeychain(t *testing.T) {
 			if want := "find-generic-password\n-s\n" + service + "\n-w\n"; argv != want {
 				t.Fatalf("security argv = %q, want %q", argv, want)
 			}
-			if !out.CredsPresent || out.CredsMode != "-rw-------" {
-				t.Fatalf("keychain credentials seeded = %v with mode %q; want seeded at -rw-------", out.CredsPresent, out.CredsMode)
+			if out.CredsPresent || out.OauthToken != "kc-tok" {
+				t.Fatalf("credentials file present = %v, CLAUDE_CODE_OAUTH_TOKEN = %q; want the Keychain token in env only", out.CredsPresent, out.OauthToken)
 			}
 		})
 	}
@@ -461,8 +472,43 @@ func TestClaudeIsolationKeychainMissSeedsNoCredentials(t *testing.T) {
 	if want := "find-generic-password\n-s\n" + suffixedKeychainService(acct) + "\n-w\n"; argv != want {
 		t.Fatalf("security argv = %q, want %q", argv, want)
 	}
-	if out.CredsPresent {
-		t.Fatal("a Keychain miss must seed no credentials file")
+	if out.CredsPresent || out.OauthToken != "" {
+		t.Fatalf("credentials file present = %v, CLAUDE_CODE_OAUTH_TOKEN = %q; a Keychain miss must seed no token", out.CredsPresent, out.OauthToken)
+	}
+}
+
+func TestClaudeIsolationInheritedTokenReadsNoCredentialSource(t *testing.T) {
+	withFakeBin(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	clearHostEnv(t, "CLAUDE_CONFIG_DIR", "CLAUDE_SECURESTORAGE_CONFIG_DIR", "CLAUDE_CODE_CUSTOM_OAUTH_URL")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "inherited")
+	writeAccountPointer(t, home)
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".claude", ".credentials.json"), []byte("not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	argvOut := filepath.Join(t.TempDir(), "argv")
+	t.Setenv("FAKE_SECURITY_ARGV_OUT", argvOut)
+
+	resp, err := RunOn(context.Background(), ClaudeBackend(), RunSpec{Prompt: "iso", Model: "haiku"})
+	if err != nil {
+		t.Fatalf("RunOn: %v", err)
+	}
+	if resp.Err != nil {
+		t.Fatalf("unexpected provider error: %v", resp.Err)
+	}
+	var out claudeOutput
+	if err := json.Unmarshal([]byte(resp.Output), &out); err != nil {
+		t.Fatalf("decode output %q: %v", resp.Output, err)
+	}
+	if out.OauthToken != "inherited" || out.CredsPresent {
+		t.Fatalf("CLAUDE_CODE_OAUTH_TOKEN = %q, credentials file present = %v; want the inherited token and no file", out.OauthToken, out.CredsPresent)
+	}
+	if _, err := os.Stat(argvOut); !os.IsNotExist(err) {
+		t.Fatalf("an inherited token must skip the Keychain: stat err = %v", err)
 	}
 }
 

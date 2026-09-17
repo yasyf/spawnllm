@@ -95,7 +95,7 @@ type authProbes struct {
 
 type isolationSources struct {
 	AccountPath     string  `json:"account_path"`
-	CredentialsPath string  `json:"credentials_path"`
+	CredentialsPath *string `json:"credentials_path"`
 	KeychainService *string `json:"keychain_service"`
 }
 
@@ -106,7 +106,8 @@ type seedFile struct {
 }
 
 type isolationSeed struct {
-	Files []seedFile `json:"files"`
+	Files []seedFile        `json:"files"`
+	Env   map[string]string `json:"env"`
 }
 
 func coreCall(op string, input any) (json.RawMessage, error) {
@@ -204,6 +205,7 @@ func coreIsolationSources() (isolationSources, error) {
 		"claude_config_dir_env":               nil,
 		"claude_securestorage_config_dir_env": nil,
 		"claude_code_custom_oauth_url_env":    nil,
+		"claude_code_oauth_token_env":         nil,
 	}
 	if dir := configDirEnv(); dir != "" {
 		host["claude_config_dir_env"] = dir
@@ -213,6 +215,9 @@ func coreIsolationSources() (isolationSources, error) {
 	}
 	if url, defined := os.LookupEnv("CLAUDE_CODE_CUSTOM_OAUTH_URL"); defined {
 		host["claude_code_custom_oauth_url_env"] = url
+	}
+	if token, defined := os.LookupEnv("CLAUDE_CODE_OAUTH_TOKEN"); defined {
+		host["claude_code_oauth_token_env"] = token
 	}
 	return coreInto[isolationSources]("claude_isolation_sources", struct {
 		Host map[string]any `json:"host"`

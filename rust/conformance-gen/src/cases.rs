@@ -1030,6 +1030,7 @@ struct IsoHost {
     config_dir_env: Option<&'static str>,
     securestorage_config_dir_env: Option<&'static str>,
     custom_oauth_url_env: Option<&'static str>,
+    oauth_token_env: Option<&'static str>,
 }
 
 const ISO_DARWIN: IsoHost = IsoHost {
@@ -1038,6 +1039,7 @@ const ISO_DARWIN: IsoHost = IsoHost {
     config_dir_env: None,
     securestorage_config_dir_env: None,
     custom_oauth_url_env: None,
+    oauth_token_env: None,
 };
 
 const ISO_LINUX: IsoHost = IsoHost {
@@ -1057,6 +1059,7 @@ fn iso_sources_case(name: &str, host: IsoHost) -> Case {
                 "claude_config_dir_env": host.config_dir_env,
                 "claude_securestorage_config_dir_env": host.securestorage_config_dir_env,
                 "claude_code_custom_oauth_url_env": host.custom_oauth_url_env,
+                "claude_code_oauth_token_env": host.oauth_token_env,
             }
         }),
     }
@@ -1143,6 +1146,20 @@ fn iso_sources_cases() -> Vec<Case> {
             IsoHost {
                 config_dir_env: Some("/Users/testuser/.acct"),
                 custom_oauth_url_env: Some(""),
+                ..ISO_DARWIN
+            },
+        ),
+        iso_sources_case(
+            "oauth-token-env-darwin",
+            IsoHost {
+                oauth_token_env: Some("sk-ant-oat01-inherited"),
+                ..ISO_DARWIN
+            },
+        ),
+        iso_sources_case(
+            "oauth-token-env-empty-darwin",
+            IsoHost {
+                oauth_token_env: Some(""),
                 ..ISO_DARWIN
             },
         ),

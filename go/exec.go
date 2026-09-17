@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"runtime"
@@ -51,12 +52,13 @@ func runExecPlan(ctx context.Context, plan execPlan, spec RunSpec) (output strin
 
 	env := plan.Env
 	if plan.NeedsClaudeIsolation {
-		dir, cleanup, e := seedClaudeIsolation()
+		dir, seedEnv, cleanup, e := seedClaudeIsolation()
 		if e != nil {
 			return "", 0, "", false, e
 		}
 		cleanups = append(cleanups, cleanup)
 		env = substituteIsolationDir(plan.Env, dir)
+		maps.Copy(env, seedEnv)
 	}
 
 	argv := substituteFiles(plan.Argv, paths)

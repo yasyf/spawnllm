@@ -40,9 +40,9 @@ case "$stdin" in DUMP_SCHEMA_TO=*) printf '%s' "$schema" > "${stdin#DUMP_SCHEMA_
 if [ -n "$SPAWNLLM_FAKE_MARKER" ]; then
   if [ -f /dev/stdout ]; then printf 'regular' > "$SPAWNLLM_FAKE_MARKER"; else printf 'pipe' > "$SPAWNLLM_FAKE_MARKER"; fi
 fi
-if [ -n "$SPAWNLLM_FAKE_CRED_OUT" ]; then cat "$CLAUDE_CONFIG_DIR/.credentials.json" > "$SPAWNLLM_FAKE_CRED_OUT" 2>/dev/null || true; fi
+if [ -n "$SPAWNLLM_FAKE_CRED_OUT" ]; then printf '%s' "${CLAUDE_CODE_OAUTH_TOKEN-}" > "$SPAWNLLM_FAKE_CRED_OUT"; fi
 if [ -n "$SPAWNLLM_FAKE_ACCOUNT_OUT" ]; then cat "$CLAUDE_CONFIG_DIR/.claude.json" > "$SPAWNLLM_FAKE_ACCOUNT_OUT" 2>/dev/null || true; fi
-if [ -n "$SPAWNLLM_FAKE_MODES_OUT" ]; then { ls -ld "$CLAUDE_CONFIG_DIR" "$CLAUDE_CONFIG_DIR/.credentials.json" | cut -c1-10; } > "$SPAWNLLM_FAKE_MODES_OUT"; fi
+if [ -n "$SPAWNLLM_FAKE_MODES_OUT" ]; then { ls -ld "$CLAUDE_CONFIG_DIR" | cut -c1-10; ls -A "$CLAUDE_CONFIG_DIR"; } > "$SPAWNLLM_FAKE_MODES_OUT"; fi
 if [ -n "$SPAWNLLM_FAKE_EXIT" ]; then printf 'boom' >&2; exit "$SPAWNLLM_FAKE_EXIT"; fi
 if [ -n "$SPAWNLLM_FAKE_SLEEP" ]; then sleep "$SPAWNLLM_FAKE_SLEEP"; fi
 if [ -n "$SPAWNLLM_FAKE_COUNTER" ]; then
@@ -84,7 +84,7 @@ fi
 const SECURITY_FAKE: &str = r#"#!/bin/sh
 if [ -n "$SPAWNLLM_FAKE_SECURITY_ARGV_OUT" ]; then printf '%s\n' "$@" > "$SPAWNLLM_FAKE_SECURITY_ARGV_OUT"; fi
 if [ "$1" = "find-generic-password" ] && [ "$2" = "-s" ] && [ "$3" = "$SPAWNLLM_FAKE_KEYCHAIN_SERVICE" ] && [ "$4" = "-w" ] && [ $# -eq 4 ]; then
-  printf 'keychain-token-xyz'; exit 0
+  printf '{"claudeAiOauth": {"accessToken": "keychain-token-xyz"}}'; exit 0
 fi
 exit 44
 "#;

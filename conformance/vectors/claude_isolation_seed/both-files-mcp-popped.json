@@ -11,12 +11,10 @@
         "name": ".claude.json",
         "content": "{\"oauthAccount\": {\"accountUuid\": \"a\"}}",
         "mode": "0644"
-      },
-      {
-        "name": ".credentials.json",
-        "content": "{\"claudeAiOauth\": {\"accessToken\": \"tok\"}}",
-        "mode": "0600"
       }
-    ]
+    ],
+    "env": {
+      "CLAUDE_CODE_OAUTH_TOKEN": "tok"
+    }
   }
 }

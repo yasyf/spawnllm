@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
@@ -17,13 +18,14 @@ use crate::host::{home, platform};
 #[derive(Debug, Deserialize)]
 struct Sources {
     account_path: String,
-    credentials_path: String,
+    credentials_path: Option<String>,
     keychain_service: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct Seed {
     files: Vec<SeedFile>,
+    env: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,7 +35,12 @@ struct SeedFile {
     mode: String,
 }
 
-pub(crate) async fn seed_isolation() -> Result<TempDir, Error> {
+pub(crate) struct Isolation {
+    pub(crate) dir: TempDir,
+    pub(crate) env: BTreeMap<String, String>,
+}
+
+pub(crate) async fn seed_isolation() -> Result<Isolation, Error> {
     let sources: Sources = core_op(
         "claude_isolation_sources",
         json!({ "host": {
@@ -42,13 +49,18 @@ pub(crate) async fn seed_isolation() -> Result<TempDir, Error> {
             "claude_config_dir_env": std::env::var("CLAUDE_CONFIG_DIR").ok().filter(|value| !value.is_empty()),
             "claude_securestorage_config_dir_env": std::env::var("CLAUDE_SECURESTORAGE_CONFIG_DIR").ok(),
             "claude_code_custom_oauth_url_env": std::env::var("CLAUDE_CODE_CUSTOM_OAUTH_URL").ok(),
+            "claude_code_oauth_token_env": std::env::var("CLAUDE_CODE_OAUTH_TOKEN").ok(),
         } }),
     )?;
 
     let account_json = std::fs::read_to_string(&sources.account_path).ok();
-    let credentials_json = match std::fs::read_to_string(&sources.credentials_path) {
-        Ok(text) => Some(text),
-        Err(_) => match &sources.keychain_service {
+    let credentials_json = match sources
+        .credentials_path
+        .as_deref()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+    {
+        Some(text) => Some(text),
+        None => match &sources.keychain_service {
             Some(service) => keychain_credentials(service).await,
             None => None,
         },
@@ -65,7 +77,7 @@ pub(crate) async fn seed_isolation() -> Result<TempDir, Error> {
         handle.write_all(file.content.as_bytes())?;
         handle.flush()?;
     }
-    Ok(dir)
+    Ok(Isolation { dir, env: seed.env })
 }
 
 fn private_tempdir() -> std::io::Result<TempDir> {

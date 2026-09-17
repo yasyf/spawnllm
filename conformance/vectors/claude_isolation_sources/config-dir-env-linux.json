@@ -7,7 +7,8 @@
       "home": "/home/testuser",
       "claude_config_dir_env": "/home/testuser/.acct",
       "claude_securestorage_config_dir_env": null,
-      "claude_code_custom_oauth_url_env": null
+      "claude_code_custom_oauth_url_env": null,
+      "claude_code_oauth_token_env": null
     }
   },
   "expected": {

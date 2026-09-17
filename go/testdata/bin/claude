@@ -15,6 +15,7 @@ else
 fi
 
 config_dir="${CLAUDE_CONFIG_DIR:-}"
+oauth_token="${CLAUDE_CODE_OAUTH_TOKEN:-}"
 seeded=false
 account_has_mcp=false
 creds_present=false
@@ -50,5 +51,5 @@ if [ -n "$FAKE_TRANSIENT_COUNTER" ]; then
 	fi
 fi
 
-printf '{"type":"result","is_error":false,"result":"%s","stdout_regular":%s,"config_dir":"%s","seeded":%s,"account_has_mcp":%s,"creds_present":%s,"config_dir_mode":"%s","creds_mode":"%s"}\n' \
-	"$prompt" "$stdout_regular" "$config_dir" "$seeded" "$account_has_mcp" "$creds_present" "$config_dir_mode" "$creds_mode"
+printf '{"type":"result","is_error":false,"result":"%s","stdout_regular":%s,"config_dir":"%s","oauth_token":"%s","seeded":%s,"account_has_mcp":%s,"creds_present":%s,"config_dir_mode":"%s","creds_mode":"%s"}\n' \
+	"$prompt" "$stdout_regular" "$config_dir" "$oauth_token" "$seeded" "$account_has_mcp" "$creds_present" "$config_dir_mode" "$creds_mode"

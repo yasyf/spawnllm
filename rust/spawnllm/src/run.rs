@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use serde_json::{Map, Value, json};
-use tempfile::TempDir;
 
 use spawnllm_core::wire::{ExecPlan, InvocationPlan, Resolved};
 use spawnllm_core::{RetryInput, retry_decision};
@@ -151,9 +150,9 @@ async fn exec_loop(
     provider: &'static str,
     wants_value: bool,
 ) -> Response {
-    let isolated_dir = if plan.needs_claude_isolation {
+    let isolation = if plan.needs_claude_isolation {
         match crate::isolate::seed_isolation().await {
-            Ok(dir) => Some(dir),
+            Ok(isolation) => Some(isolation),
             Err(error) => return error_response(spec, error, Vec::new()),
         }
     } else {
@@ -163,14 +162,9 @@ async fn exec_loop(
     let mut discarded = Vec::new();
     let max = spec.max_attempts.max(1);
     for attempt in 0..max {
-        let outcome = crate::exec::exec_attempt(
-            &plan,
-            &spec,
-            provider,
-            isolated_dir.as_ref().map(TempDir::path),
-            wants_value,
-        )
-        .await;
+        let outcome =
+            crate::exec::exec_attempt(&plan, &spec, provider, isolation.as_ref(), wants_value)
+                .await;
         let att = match outcome {
             Ok(att) => att,
             Err(error) => return error_response(spec, error.into(), discarded),
