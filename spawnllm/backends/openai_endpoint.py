@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from spawnllm.backends.base import BackendStatus
     from spawnllm.response import Response
     from spawnllm.spec import RunSpec
-    from spawnllm.types import ProviderName, TModel
+    from spawnllm.types import ProviderName, TModel, TReasoningEffort
 
 
 class OpenAiEndpointBackend(LlmBackend):
@@ -30,6 +30,9 @@ class OpenAiEndpointBackend(LlmBackend):
         model: The literal model id sent in every request body.
         api_key: Bearer token for the `Authorization` header; defaults to
             `"local"` for self-hosted servers that ignore it.
+        reasoning_effort: The `reasoning_effort` sent in every request body;
+            `None` omits it and leaves the server's default, which on a
+            reasoning model can spend most of a call's latency thinking.
         transport: Async transport injected into the `httpx.AsyncClient` used by
             `aexecute` — e.g. a record/replay caching transport; `None` uses
             httpx's default transport. The synchronous `execute` path always uses
@@ -44,17 +47,29 @@ class OpenAiEndpointBackend(LlmBackend):
     schema_dialect: ClassVar[str | None] = "openai"
 
     def __init__(
-        self, base_url: str, model: str, *, api_key: str = "local", transport: httpx.AsyncBaseTransport | None = None
+        self,
+        base_url: str,
+        model: str,
+        *,
+        api_key: str = "local",
+        reasoning_effort: TReasoningEffort | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key = api_key
+        self.reasoning_effort = reasoning_effort
         self.transport = transport
         self.models: dict[TModel, str] = {"small": model, "medium": model, "large": model}
 
     def openai_section(self) -> dict[str, Any]:
         """Return the `openai_endpoint` wire section the core turns into the HTTP request."""
-        return {"api_key": self.api_key, "base_url": self.base_url, "model": self.model}
+        return {
+            "api_key": self.api_key,
+            "base_url": self.base_url,
+            "model": self.model,
+            "reasoning_effort": self.reasoning_effort,
+        }
 
     def resolve(self, resp: httpx.Response, spec: RunSpec) -> Response:
         return self.to_response(

@@ -136,7 +136,12 @@ class TestWireSpec:
     def test_openai_endpoint_section_set_only_by_owning_backend(self) -> None:
         assert ClaudeCliBackend().wire_spec(RunSpec(prompt="hi", model="haiku"))["openai_endpoint"] is None
         endpoint = OpenAiEndpointBackend(ENDPOINT, "q", api_key="sk").wire_spec(RunSpec(prompt="hi", model="q"))
-        assert endpoint["openai_endpoint"] == {"api_key": "sk", "base_url": ENDPOINT, "model": "q"}
+        assert endpoint["openai_endpoint"] == {
+            "api_key": "sk",
+            "base_url": ENDPOINT,
+            "model": "q",
+            "reasoning_effort": None,
+        }
 
     def test_schema_and_response_model_together_raise(self) -> None:
         with pytest.raises(ValueError, match="either response_model or schema"):
@@ -647,6 +652,21 @@ class TestOpenAiEndpointBackend:
         assert resp.error is None
         assert resp.result.raw == "pong"
         assert resp.result.parsed is None
+
+    def test_execute_sends_reasoning_effort(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        seen: dict[str, object] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["body"] = json.loads(request.content)
+            return httpx.Response(200, json=completion("pong"))
+
+        mock_transport(monkeypatch, handler)
+        OpenAiEndpointBackend(ENDPOINT, "qwen3", reasoning_effort="none").execute(RunSpec(prompt="ping", model="q"))
+        assert seen["body"] == {
+            "model": "qwen3",
+            "messages": [{"role": "user", "content": "ping"}],
+            "reasoning_effort": "none",
+        }
 
     async def test_aexecute_posts_and_reads_content(self, monkeypatch: pytest.MonkeyPatch) -> None:
         mock_transport(monkeypatch, lambda _request: httpx.Response(200, json=completion("pong")))

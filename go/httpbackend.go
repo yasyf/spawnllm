@@ -9,10 +9,11 @@ import (
 )
 
 type openaiBackend struct {
-	baseURL string
-	model   string
-	apiKey  string
-	client  *http.Client
+	baseURL         string
+	model           string
+	apiKey          string
+	reasoningEffort ReasoningEffort
+	client          *http.Client
 }
 
 func (b *openaiBackend) Provider() Provider { return ProviderOpenAIEndpoint }
@@ -24,7 +25,11 @@ func (b *openaiBackend) CheckStatus(_ context.Context) BackendStatus {
 func (b *openaiBackend) execute(ctx context.Context, spec RunSpec, wantsValue bool) (*attempt, error) {
 	cs := spec.core()
 	cs.Model = b.model
-	cs.OpenAIEndpoint = &coreOpenAI{APIKey: b.apiKey, BaseURL: b.baseURL, Model: b.model}
+	var effort *ReasoningEffort
+	if b.reasoningEffort != "" {
+		effort = &b.reasoningEffort
+	}
+	cs.OpenAIEndpoint = &coreOpenAI{APIKey: b.apiKey, BaseURL: b.baseURL, Model: b.model, ReasoningEffort: effort}
 	kind, _, plan, err := corePlan(ProviderOpenAIEndpoint, cs)
 	if err != nil {
 		return nil, err

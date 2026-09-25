@@ -51,6 +51,17 @@
         },
         "model": {
           "type": "string"
+        },
+        "reasoning_effort": {
+          "enum": [
+            "none",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            null
+          ]
         }
       },
       "type": [

@@ -28,6 +28,8 @@ mod http;
 pub use backend::OpenAiEndpoint;
 pub use backend::{Backend, BackendStatus, select_backend};
 pub use error::{Error, RunError};
+#[cfg(feature = "openai")]
+pub use spawnllm_core::wire::ReasoningEffort;
 pub use spec::{
     AppleConfig, AppleGuardrails, AppleSampling, AppleUseCase, CallOpts, ClaudeConfig, CodexConfig,
     DiscardedAttempt, GeminiConfig, ModelTier, Response, RunResult, RunSpec, Specialty,

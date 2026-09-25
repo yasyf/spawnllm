@@ -2,6 +2,7 @@ package spawnllm
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -34,6 +35,36 @@ func TestOpenAIEndpointSuccess(t *testing.T) {
 	}
 	if resp.Result.Raw != "pong" {
 		t.Fatalf("result = %q, want pong", resp.Result.Raw)
+	}
+}
+
+func TestOpenAIEndpointSendsReasoningEffortOnlyWhenSet(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		effort ReasoningEffort
+		want   any
+	}{
+		{"unset", "", nil},
+		{"none", ReasoningEffortNone, "none"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var body map[string]any
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Errorf("decode body: %v", err)
+				}
+				_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"pong"}}]}`)
+			}))
+			defer srv.Close()
+
+			b := OpenAIEndpoint(srv.URL, "qwen3", OpenAIOpts{ReasoningEffort: tc.effort})
+			if _, err := RunOn(context.Background(), b, RunSpec{Prompt: "ping"}); err != nil {
+				t.Fatalf("RunOn: %v", err)
+			}
+			if got, ok := body["reasoning_effort"]; got != tc.want || ok != (tc.want != nil) {
+				t.Fatalf("reasoning_effort = %v (present %v), want %v", got, ok, tc.want)
+			}
+		})
 	}
 }
 

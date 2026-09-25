@@ -34,7 +34,7 @@ from spawnllm.extract import extract, extract_sync
 from spawnllm.response import DiscardedAttempt, Error, Output, Response, Result
 from spawnllm.run import run, run_sync
 from spawnllm.spec import AppleConfig, ClaudeConfig, CodexConfig, GeminiConfig, RunSpec
-from spawnllm.types import ProviderName, TModel, TSpecialty
+from spawnllm.types import ProviderName, TModel, TReasoningEffort, TSpecialty
 
 __all__ = [
     "AntigravityCliBackend",
@@ -66,6 +66,7 @@ __all__ = [
     "Result",
     "RunSpec",
     "TModel",
+    "TReasoningEffort",
     "TSpecialty",
     "call",
     "call_sync",
