@@ -19,7 +19,8 @@
       "openai_endpoint": {
         "api_key": "sk-test",
         "base_url": "http://local.test/v1",
-        "model": "qwen3"
+        "model": "qwen3",
+        "reasoning_effort": null
       }
     },
     "host": {

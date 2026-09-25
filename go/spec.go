@@ -229,9 +229,10 @@ type coreGemini struct {
 }
 
 type coreOpenAI struct {
-	APIKey  string `json:"api_key"`
-	BaseURL string `json:"base_url"`
-	Model   string `json:"model"`
+	APIKey          string           `json:"api_key"`
+	BaseURL         string           `json:"base_url"`
+	Model           string           `json:"model"`
+	ReasoningEffort *ReasoningEffort `json:"reasoning_effort"`
 }
 
 func optString(s string) *string {

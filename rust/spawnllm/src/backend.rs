@@ -14,6 +14,8 @@ use crate::spec::{ModelTier, Specialty};
 
 #[cfg(feature = "openai")]
 use serde_json::Map;
+#[cfg(feature = "openai")]
+use spawnllm_core::wire::ReasoningEffort;
 
 /// An OpenAI-compatible `/chat/completions` endpoint.
 #[cfg(feature = "openai")]
@@ -22,6 +24,7 @@ pub struct OpenAiEndpoint {
     pub api_key: String,
     pub base_url: String,
     pub model: String,
+    pub reasoning_effort: Option<ReasoningEffort>,
 }
 
 /// A concrete LLM backend: one of the five CLIs, or an OpenAI-compatible endpoint.
@@ -98,6 +101,10 @@ impl Backend {
                 ("api_key".to_owned(), json!(endpoint.api_key)),
                 ("base_url".to_owned(), json!(endpoint.base_url)),
                 ("model".to_owned(), json!(endpoint.model)),
+                (
+                    "reasoning_effort".to_owned(),
+                    json!(endpoint.reasoning_effort),
+                ),
             ]))),
             _ => None,
         }

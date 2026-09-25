@@ -16,6 +16,9 @@ pub(super) fn plan(spec: &RunSpec) -> InvocationPlan {
             json!([{"role": "user", "content": spec.prompt}]),
         ),
     ]);
+    if let Some(effort) = endpoint.reasoning_effort {
+        body.insert("reasoning_effort".to_string(), json!(effort));
+    }
     if let Some(schema) = &spec.schema {
         body.insert(
             "response_format".to_string(),
@@ -49,7 +52,7 @@ mod tests {
     use serde_json::{Value, json};
 
     use super::*;
-    use crate::wire::OpenAiEndpoint;
+    use crate::wire::{OpenAiEndpoint, ReasoningEffort};
 
     fn spec(schema: Option<Value>) -> RunSpec {
         RunSpec {
@@ -69,6 +72,7 @@ mod tests {
                 api_key: "sk-test".to_string(),
                 base_url: "http://local.test/v1".to_string(),
                 model: "qwen3".to_string(),
+                reasoning_effort: None,
             }),
         }
     }
@@ -120,6 +124,27 @@ mod tests {
                             },
                         },
                     },
+                },
+            })
+        );
+    }
+
+    #[test]
+    fn reasoning_effort_plan_matches_vector() {
+        let mut spec = spec(None);
+        spec.openai_endpoint.as_mut().unwrap().reasoning_effort = Some(ReasoningEffort::None);
+
+        assert_eq!(
+            serde_json::to_value(plan(&spec)).unwrap(),
+            json!({
+                "kind": "http",
+                "method": "POST",
+                "url": "http://local.test/v1/chat/completions",
+                "headers": {"Authorization": "Bearer sk-test"},
+                "body": {
+                    "model": "qwen3",
+                    "messages": [{"role": "user", "content": "ping"}],
+                    "reasoning_effort": "none",
                 },
             })
         );

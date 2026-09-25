@@ -122,11 +122,27 @@ func AntigravityBackend() Backend { return &cliBackend{provider: ProviderAntigra
 // passing it explicitly.
 func AppleBackend() Backend { return &cliBackend{provider: ProviderApple} }
 
+// ReasoningEffort is the reasoning_effort an OpenAIEndpoint backend sends with
+// every request. The empty string sends none, leaving the server default.
+type ReasoningEffort string
+
+// The reasoning efforts an OpenAI-compatible /chat/completions server accepts.
+const (
+	ReasoningEffortNone    ReasoningEffort = "none"
+	ReasoningEffortMinimal ReasoningEffort = "minimal"
+	ReasoningEffortLow     ReasoningEffort = "low"
+	ReasoningEffortMedium  ReasoningEffort = "medium"
+	ReasoningEffortHigh    ReasoningEffort = "high"
+	ReasoningEffortXhigh   ReasoningEffort = "xhigh"
+)
+
 // OpenAIOpts configures an OpenAIEndpoint backend. APIKey "" becomes "local";
-// Client nil uses http.DefaultClient.
+// Client nil uses http.DefaultClient; ReasoningEffort "" sends no
+// reasoning_effort.
 type OpenAIOpts struct {
-	APIKey string
-	Client *http.Client
+	APIKey          string
+	Client          *http.Client
+	ReasoningEffort ReasoningEffort
 }
 
 // OpenAIEndpoint returns a backend that POSTs to an OpenAI-compatible
@@ -140,7 +156,7 @@ func OpenAIEndpoint(baseURL, model string, opts OpenAIOpts) Backend {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	return &openaiBackend{baseURL: baseURL, model: model, apiKey: apiKey, client: client}
+	return &openaiBackend{baseURL: baseURL, model: model, apiKey: apiKey, reasoningEffort: opts.ReasoningEffort, client: client}
 }
 
 func backendForProvider(p Provider) Backend {

@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 use spawnllm_core::wire::{
     AppleConfig, AppleGuardrails, AppleSampling, AppleUseCase, ClaudeConfig, CodexConfig,
-    GeminiConfig, OpenAiEndpoint, RunSpec,
+    GeminiConfig, OpenAiEndpoint, ReasoningEffort, RunSpec,
 };
 
 pub struct Case {
@@ -131,7 +131,11 @@ fn gemini_cfg_case(name: &str, cfg: GeminiConfig) -> Case {
     )
 }
 
-fn endpoint_case(name: &str, schema: Option<Value>) -> Case {
+fn endpoint_case(
+    name: &str,
+    schema: Option<Value>,
+    reasoning_effort: Option<ReasoningEffort>,
+) -> Case {
     plan_case(
         name,
         "openai_endpoint",
@@ -141,6 +145,7 @@ fn endpoint_case(name: &str, schema: Option<Value>) -> Case {
                 api_key: "sk-test".to_owned(),
                 base_url: "http://local.test/v1".to_owned(),
                 model: "qwen3".to_owned(),
+                reasoning_effort,
             }),
             ..spec("ping", "qwen3")
         },
@@ -561,8 +566,13 @@ fn plan_cases() -> Vec<Case> {
                 ..AppleConfig::default()
             },
         ),
-        endpoint_case("openai-endpoint-plain", None),
-        endpoint_case("openai-endpoint-schema", Some(schema_value())),
+        endpoint_case("openai-endpoint-plain", None, None),
+        endpoint_case("openai-endpoint-schema", Some(schema_value()), None),
+        endpoint_case(
+            "openai-endpoint-reasoning-effort",
+            None,
+            Some(ReasoningEffort::None),
+        ),
     ]
 }
 

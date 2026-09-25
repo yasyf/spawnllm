@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **The OpenAI-compatible endpoint backend sets `reasoning_effort`.** A typed
+  `reasoning_effort` (`none`, `minimal`, `low`, `medium`, `high` or `xhigh`)
+  on the endpoint config goes into every `/chat/completions` request body,
+  and leaving it unset sends nothing, as before. Python takes
+  `OpenAiEndpointBackend(..., reasoning_effort="none")`, typed
+  `TReasoningEffort`; Go takes `OpenAIOpts{ReasoningEffort:
+  ReasoningEffortNone}`; Rust takes `OpenAiEndpoint { reasoning_effort:
+  Some(ReasoningEffort::None), .. }`. Cerebras' `qwen-3.8-27b` reasons by
+  default. For one 850-token rewrite prompt it spent a median 6,300
+  reasoning tokens to produce 520 output tokens, 4.4s at p50 and 7.4s at p95
+  over 12 calls. With `reasoning_effort: "none"` the same calls took 0.73s at
+  p50 and 1.15s at p95. The Rust `OpenAiEndpoint` struct gains a public
+  field, so a struct literal that names every field must add it.
+
 ## [0.13.4] - 2026-09-17
 
 ### Security
