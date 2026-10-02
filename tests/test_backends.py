@@ -554,8 +554,8 @@ class TestModels:
 
     def test_codex(self) -> None:
         assert CodexCliBackend().models == {
-            "small": "gpt-5.6-luna:low",
-            "medium": "gpt-5.6-luna:medium",
+            "small": "gpt-6-luna:low",
+            "medium": "gpt-6-luna:medium",
             "large": "gpt-5.5:medium",
         }
 
