@@ -3,16 +3,16 @@
   "schema": 1,
   "name": "spawnllm-apple",
   "kind": "release-binary",
-  "version": {"static": "0.14.0"},
+  "version": {"static": "0.15.0"},
   "platforms": {
     "macos-aarch64": {
-      "size": 89503,
+      "size": 89500,
       "hash": "sha256",
-      "digest": "a658518e0851642563d6440a4949d94b23d752acba0c020552734166274e3c21",
+      "digest": "483e29688f03c9f910f9da9bad7fdbd550e3b271e05bfe5fc95ac0ce5ac78324",
       "format": "tar.gz",
       "path": "spawnllm-apple",
       "providers": [
-        {"type": "github-release", "repo": "yasyf/spawnllm", "tag": "v0.14.0", "name": "spawnllm-apple_0.14.0_darwin_arm64.tar.gz"}
+        {"type": "github-release", "repo": "yasyf/spawnllm", "tag": "v0.15.0", "name": "spawnllm-apple_0.15.0_darwin_arm64.tar.gz"}
       ]
     }
   }
