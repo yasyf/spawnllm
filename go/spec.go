@@ -116,6 +116,9 @@ type CodexConfig struct {
 	// other value selects that tier.
 	ServiceTier           *string
 	DeveloperInstructions string
+	// BypassApprovalsAndSandbox replaces --sandbox with
+	// --dangerously-bypass-approvals-and-sandbox for an externally sandboxed host.
+	BypassApprovalsAndSandbox bool
 }
 
 // GeminiConfig passes knobs through to the gemini and antigravity CLIs.
@@ -216,11 +219,12 @@ type coreClaude struct {
 }
 
 type coreCodex struct {
-	DeveloperInstructions *string `json:"developer_instructions"`
-	EnableHooks           bool    `json:"enable_hooks"`
-	EnableMCP             bool    `json:"enable_mcp"`
-	Sandbox               *string `json:"sandbox"`
-	ServiceTier           *string `json:"service_tier"`
+	BypassApprovalsAndSandbox bool    `json:"bypass_approvals_and_sandbox"`
+	DeveloperInstructions     *string `json:"developer_instructions"`
+	EnableHooks               bool    `json:"enable_hooks"`
+	EnableMCP                 bool    `json:"enable_mcp"`
+	Sandbox                   *string `json:"sandbox"`
+	ServiceTier               *string `json:"service_tier"`
 }
 
 type coreGemini struct {
@@ -339,11 +343,12 @@ func coreCodexOf(c *CodexConfig) *coreCodex {
 		tier = nil
 	}
 	return &coreCodex{
-		DeveloperInstructions: optString(c.DeveloperInstructions),
-		EnableHooks:           c.EnableHooks,
-		EnableMCP:             c.EnableMCP,
-		Sandbox:               optString(c.Sandbox),
-		ServiceTier:           tier,
+		BypassApprovalsAndSandbox: c.BypassApprovalsAndSandbox,
+		DeveloperInstructions:     optString(c.DeveloperInstructions),
+		EnableHooks:               c.EnableHooks,
+		EnableMCP:                 c.EnableMCP,
+		Sandbox:                   optString(c.Sandbox),
+		ServiceTier:               tier,
 	}
 }
 

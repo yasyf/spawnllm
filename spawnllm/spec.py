@@ -105,10 +105,16 @@ class CodexConfig:
     user-level tier pin applies only with `isolated=False`. `developer_instructions` injects
     the system-prompt layer via `-c developer_instructions=<value>`, serialized as
     a TOML string so any text — multi-line, or TOML-ambiguous words like `true` —
-    arrives as a string.
+    arrives as a string. `bypass_approvals_and_sandbox` replaces `--sandbox` with
+    `--dangerously-bypass-approvals-and-sandbox` for a host that is already
+    externally sandboxed; it cannot be combined with `sandbox`.
 
     Example:
         >>> CodexConfig(sandbox="read-only", enable_mcp=True)
+
+    Raises:
+        ValueError: When `bypass_approvals_and_sandbox` is set together with a
+            `sandbox`, two policies the CLI cannot apply at once.
     """
 
     sandbox: str | None = None
@@ -116,6 +122,11 @@ class CodexConfig:
     enable_mcp: bool = False
     service_tier: str | None = "fast"
     developer_instructions: str | None = None
+    bypass_approvals_and_sandbox: bool = False
+
+    def __post_init__(self) -> None:
+        if self.bypass_approvals_and_sandbox and self.sandbox is not None:
+            raise ValueError("CodexConfig accepts either sandbox or bypass_approvals_and_sandbox, not both")
 
 
 @dataclass(frozen=True, slots=True)

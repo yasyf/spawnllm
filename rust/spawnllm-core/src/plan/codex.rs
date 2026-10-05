@@ -14,20 +14,24 @@ pub(super) fn plan(spec: &RunSpec) -> InvocationPlan {
         .map_or((spec.model.as_str(), None), |(model, effort)| {
             (model, (!effort.is_empty()).then_some(effort))
         });
-    let mut argv = vec![
-        "codex".into(),
-        "exec".into(),
-        "--ephemeral".into(),
-        "--sandbox".into(),
-        config
-            .and_then(|config| config.sandbox.clone())
-            .unwrap_or_else(|| "read-only".into()),
+    let mut argv: Vec<String> = vec!["codex".into(), "exec".into(), "--ephemeral".into()];
+    if config.is_some_and(|config| config.bypass_approvals_and_sandbox) {
+        argv.push("--dangerously-bypass-approvals-and-sandbox".into());
+    } else {
+        argv.extend([
+            "--sandbox".into(),
+            config
+                .and_then(|config| config.sandbox.clone())
+                .unwrap_or_else(|| "read-only".into()),
+        ]);
+    }
+    argv.extend([
         "--skip-git-repo-check".into(),
         "--color".into(),
         "never".into(),
         "--model".into(),
         model.into(),
-    ];
+    ]);
 
     if let Some(effort) = effort {
         push_config(&mut argv, format!("model_reasoning_effort={effort}"));

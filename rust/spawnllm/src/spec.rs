@@ -43,9 +43,11 @@ pub struct ClaudeConfig {
 /// `service_tier` defaults to `"fast"`, matching the Python reference: an isolated
 /// run passes `--ignore-user-config`, dropping any user-level tier pin, and the
 /// standard tier turns long prompts into multi-minute runs. Set it to `None` to
-/// drop the flag.
+/// drop the flag. `bypass_approvals_and_sandbox` replaces `--sandbox` with
+/// `--dangerously-bypass-approvals-and-sandbox` for an externally sandboxed host.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CodexConfig {
+    pub bypass_approvals_and_sandbox: bool,
     pub developer_instructions: Option<String>,
     pub enable_hooks: bool,
     pub enable_mcp: bool,
@@ -56,6 +58,7 @@ pub struct CodexConfig {
 impl Default for CodexConfig {
     fn default() -> Self {
         Self {
+            bypass_approvals_and_sandbox: false,
             developer_instructions: None,
             enable_hooks: false,
             enable_mcp: false,
