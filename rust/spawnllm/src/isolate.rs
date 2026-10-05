@@ -17,7 +17,7 @@ use crate::host::{home, platform};
 
 #[derive(Debug, Deserialize)]
 struct Sources {
-    account_path: String,
+    account_path: Option<String>,
     credentials_path: Option<String>,
     keychain_service: Option<String>,
 }
@@ -40,7 +40,7 @@ pub(crate) struct Isolation {
     pub(crate) env: BTreeMap<String, String>,
 }
 
-pub(crate) async fn seed_isolation() -> Result<Isolation, Error> {
+pub(crate) async fn seed_isolation(api_auth: bool) -> Result<Isolation, Error> {
     let sources: Sources = core_op(
         "claude_isolation_sources",
         json!({ "host": {
@@ -50,10 +50,13 @@ pub(crate) async fn seed_isolation() -> Result<Isolation, Error> {
             "claude_securestorage_config_dir_env": std::env::var("CLAUDE_SECURESTORAGE_CONFIG_DIR").ok(),
             "claude_code_custom_oauth_url_env": std::env::var("CLAUDE_CODE_CUSTOM_OAUTH_URL").ok(),
             "claude_code_oauth_token_env": std::env::var("CLAUDE_CODE_OAUTH_TOKEN").ok(),
-        } }),
+        }, "api_auth": api_auth }),
     )?;
 
-    let account_json = std::fs::read_to_string(&sources.account_path).ok();
+    let account_json = sources
+        .account_path
+        .as_deref()
+        .and_then(|path| std::fs::read_to_string(path).ok());
     let credentials_json = match sources
         .credentials_path
         .as_deref()

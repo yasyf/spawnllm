@@ -60,6 +60,7 @@ fn claude() -> ClaudeConfig {
 
 fn codex() -> CodexConfig {
     CodexConfig {
+        bypass_approvals_and_sandbox: false,
         developer_instructions: None,
         enable_hooks: false,
         enable_mcp: false,
@@ -387,6 +388,13 @@ fn plan_cases() -> Vec<Case> {
             "codex-sandbox-override",
             CodexConfig {
                 sandbox: Some("workspace-write".to_owned()),
+                ..codex()
+            },
+        ),
+        codex_cfg_case(
+            "codex-bypass-approvals-and-sandbox",
+            CodexConfig {
+                bypass_approvals_and_sandbox: true,
                 ..codex()
             },
         ),
@@ -1075,8 +1083,15 @@ fn iso_sources_case(name: &str, host: IsoHost) -> Case {
     }
 }
 
+fn iso_api_case(name: &str, host: IsoHost) -> Case {
+    let mut case = iso_sources_case(name, host);
+    case.input["api_auth"] = json!(true);
+    case
+}
+
 fn iso_sources_cases() -> Vec<Case> {
     vec![
+        iso_api_case("api-auth-darwin", ISO_DARWIN),
         iso_sources_case("default-home-darwin", ISO_DARWIN),
         iso_sources_case("default-home-linux", ISO_LINUX),
         iso_sources_case(

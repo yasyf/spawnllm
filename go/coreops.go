@@ -94,7 +94,7 @@ type authProbes struct {
 }
 
 type isolationSources struct {
-	AccountPath     string  `json:"account_path"`
+	AccountPath     *string `json:"account_path"`
 	CredentialsPath *string `json:"credentials_path"`
 	KeychainService *string `json:"keychain_service"`
 }
@@ -198,7 +198,7 @@ func coreAuthProbes(provider Provider) (authProbes, error) {
 	}{Provider: provider, Host: map[string]string{"platform": platform(), "home": home()}})
 }
 
-func coreIsolationSources() (isolationSources, error) {
+func coreIsolationSources(apiAuth bool) (isolationSources, error) {
 	host := map[string]any{
 		"platform":                            platform(),
 		"home":                                home(),
@@ -220,8 +220,9 @@ func coreIsolationSources() (isolationSources, error) {
 		host["claude_code_oauth_token_env"] = token
 	}
 	return coreInto[isolationSources]("claude_isolation_sources", struct {
-		Host map[string]any `json:"host"`
-	}{Host: host})
+		Host    map[string]any `json:"host"`
+		APIAuth bool           `json:"api_auth"`
+	}{Host: host, APIAuth: apiAuth})
 }
 
 func coreIsolationSeed(accountJSON, credentialsJSON *string) (isolationSeed, error) {

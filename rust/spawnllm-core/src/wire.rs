@@ -83,6 +83,7 @@ pub struct ClaudeConfig {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CodexConfig {
+    pub bypass_approvals_and_sandbox: bool,
     pub developer_instructions: Option<String>,
     pub enable_hooks: bool,
     pub enable_mcp: bool,

@@ -151,7 +151,7 @@ async fn exec_loop(
     wants_value: bool,
 ) -> Response {
     let isolation = if plan.needs_claude_isolation {
-        match crate::isolate::seed_isolation().await {
+        match crate::isolate::seed_isolation(spec.api_auth).await {
             Ok(isolation) => Some(isolation),
             Err(error) => return error_response(spec, error, Vec::new()),
         }

@@ -52,7 +52,7 @@ func runExecPlan(ctx context.Context, plan execPlan, spec RunSpec) (output strin
 
 	env := plan.Env
 	if plan.NeedsClaudeIsolation {
-		dir, seedEnv, cleanup, e := seedClaudeIsolation()
+		dir, seedEnv, cleanup, e := seedClaudeIsolation(spec.APIAuth)
 		if e != nil {
 			return "", 0, "", false, e
 		}
