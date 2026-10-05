@@ -15,6 +15,7 @@
       "apple": null,
       "claude": null,
       "codex": {
+        "bypass_approvals_and_sandbox": false,
         "developer_instructions": null,
         "enable_hooks": true,
         "enable_mcp": false,

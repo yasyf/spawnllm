@@ -1,5 +1,5 @@
 {
-  "name": "codex-enable-mcp",
+  "name": "codex-bypass-approvals-and-sandbox",
   "op": "plan",
   "input": {
     "provider": "codex",
@@ -15,10 +15,10 @@
       "apple": null,
       "claude": null,
       "codex": {
-        "bypass_approvals_and_sandbox": false,
+        "bypass_approvals_and_sandbox": true,
         "developer_instructions": null,
         "enable_hooks": false,
-        "enable_mcp": true,
+        "enable_mcp": false,
         "sandbox": null,
         "service_tier": "fast"
       },
@@ -35,8 +35,7 @@
       "codex",
       "exec",
       "--ephemeral",
-      "--sandbox",
-      "read-only",
+      "--dangerously-bypass-approvals-and-sandbox",
       "--skip-git-repo-check",
       "--color",
       "never",
@@ -47,6 +46,8 @@
       "--ignore-user-config",
       "-c",
       "features.hooks=false",
+      "-c",
+      "features.mcp_servers=false",
       "-o",
       "${file:result}"
     ],

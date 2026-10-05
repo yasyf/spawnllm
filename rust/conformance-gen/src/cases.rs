@@ -1083,8 +1083,15 @@ fn iso_sources_case(name: &str, host: IsoHost) -> Case {
     }
 }
 
+fn iso_api_case(name: &str, host: IsoHost) -> Case {
+    let mut case = iso_sources_case(name, host);
+    case.input["api_auth"] = json!(true);
+    case
+}
+
 fn iso_sources_cases() -> Vec<Case> {
     vec![
+        iso_api_case("api-auth-darwin", ISO_DARWIN),
         iso_sources_case("default-home-darwin", ISO_DARWIN),
         iso_sources_case("default-home-linux", ISO_LINUX),
         iso_sources_case(

@@ -12,6 +12,8 @@ use crate::{OpError, OpResult, from_input, unimplemented};
 #[derive(Debug, Deserialize)]
 struct IsolationSourcesInput {
     host: IsolationHost,
+    #[serde(default)]
+    api_auth: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -29,7 +31,7 @@ struct IsolationHost {
 
 #[derive(Debug, Serialize)]
 struct IsolationSources {
-    account_path: String,
+    account_path: Option<String>,
     credentials_path: Option<String>,
     keychain_service: Option<String>,
 }
@@ -113,6 +115,13 @@ fn config_dir_digest(config_dir_env: &str) -> String {
 // Mirrors Claude Code 2.1.274's lb()/mI(): a defined CLAUDE_SECURESTORAGE_CONFIG_DIR
 // overrides CLAUDE_CONFIG_DIR for the storage dir and the digest of the NFC value as set.
 fn isolation_sources(input: IsolationSourcesInput) -> IsolationSources {
+    if input.api_auth {
+        return IsolationSources {
+            account_path: None,
+            credentials_path: None,
+            keychain_service: None,
+        };
+    }
     let host = input.host;
     let inherits_token = is_set(&host.claude_code_oauth_token_env);
     let default_home = format!("{}/.claude", host.home);
@@ -146,7 +155,7 @@ fn isolation_sources(input: IsolationSourcesInput) -> IsolationSources {
         format!("Claude Code{oauth_file_suffix}-credentials{digest}")
     });
     IsolationSources {
-        account_path,
+        account_path: Some(account_path),
         credentials_path: (!inherits_token)
             .then(|| format!("{credentials_home}/.credentials.json")),
         keychain_service,

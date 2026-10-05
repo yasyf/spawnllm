@@ -109,6 +109,7 @@ class TestWireSpec:
             "enable_mcp": False,
             "service_tier": "standard",
             "developer_instructions": None,
+            "bypass_approvals_and_sandbox": False,
         }
 
     def test_gemini_config_distinguishes_nil_from_empty_extensions(self) -> None:
@@ -733,3 +734,18 @@ class TestOpenAiEndpointBackend:
     def test_extract_sync_drives_structured_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
         mock_transport(monkeypatch, lambda _request: httpx.Response(200, json=completion(json.dumps({"x": 9}))))
         assert extract_sync("hi", M, backend=OpenAiEndpointBackend(ENDPOINT, "qwen3")) == M(x=9)
+
+
+def test_api_auth_isolation_reads_no_account_credentials_or_keychain(monkeypatch: pytest.MonkeyPatch) -> None:
+    import spawnllm.backends.claude as claude
+
+    for name in ("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CONFIG_DIR"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(claude, "read_file_opt", lambda path: pytest.fail(f"API isolation read {path}"))
+    monkeypatch.setattr(claude, "keychain_credentials", lambda service: pytest.fail(f"API isolation read {service}"))
+    backend = claude.ClaudeCliBackend()
+    spec = RunSpec(prompt="hi", model="haiku", api_auth=True, env={"ANTHROPIC_API_KEY": "sk-synthetic-isolation-7e21"})
+    env = backend.env(spec)
+    assert "CLAUDE_CODE_OAUTH_TOKEN" not in env
+    assert os.listdir(env["CLAUDE_CONFIG_DIR"]) == []

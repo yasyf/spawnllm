@@ -396,7 +396,7 @@ class CliBackend(LlmBackend):
         """
         return self.binary
 
-    def claude_isolation(self) -> ClaudeIsolation:
+    def claude_isolation(self, api_auth: bool) -> ClaudeIsolation:
         """Return the config home a claude run substitutes into `${isolated_config_dir}` and the env it adds."""
         raise NotImplementedError
 
@@ -436,7 +436,7 @@ class CliBackend(LlmBackend):
             argv = [tokens.get(arg, arg) for arg in plan["argv"]]
             env = plan["env"]
             if plan["needs_claude_isolation"]:
-                isolation = self.claude_isolation()
+                isolation = self.claude_isolation(spec.api_auth)
                 argv = [arg.replace("${isolated_config_dir}", isolation.config_dir) for arg in argv]
                 env = {
                     key: value.replace("${isolated_config_dir}", isolation.config_dir) for key, value in env.items()
@@ -468,7 +468,7 @@ class CliBackend(LlmBackend):
         plan = self.core_plan(spec)
         if not plan["needs_claude_isolation"]:
             return plan["env"]
-        isolation = self.claude_isolation()
+        isolation = self.claude_isolation(spec.api_auth)
         return {
             key: value.replace("${isolated_config_dir}", isolation.config_dir) for key, value in plan["env"].items()
         } | isolation.env

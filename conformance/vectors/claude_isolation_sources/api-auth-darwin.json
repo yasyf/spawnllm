@@ -1,0 +1,20 @@
+{
+  "name": "api-auth-darwin",
+  "op": "claude_isolation_sources",
+  "input": {
+    "host": {
+      "platform": "darwin",
+      "home": "/Users/testuser",
+      "claude_config_dir_env": null,
+      "claude_securestorage_config_dir_env": null,
+      "claude_code_custom_oauth_url_env": null,
+      "claude_code_oauth_token_env": null
+    },
+    "api_auth": true
+  },
+  "expected": {
+    "account_path": null,
+    "credentials_path": null,
+    "keychain_service": null
+  }
+}

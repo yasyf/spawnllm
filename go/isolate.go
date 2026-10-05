@@ -9,12 +9,15 @@ import (
 	"strings"
 )
 
-func seedClaudeIsolation() (string, map[string]string, func(), error) {
-	sources, err := coreIsolationSources()
+func seedClaudeIsolation(apiAuth bool) (string, map[string]string, func(), error) {
+	sources, err := coreIsolationSources(apiAuth)
 	if err != nil {
 		return "", nil, nil, err
 	}
-	accountJSON := readFileOpt(sources.AccountPath)
+	var accountJSON *string
+	if sources.AccountPath != nil {
+		accountJSON = readFileOpt(*sources.AccountPath)
+	}
 	var credentialsJSON *string
 	if sources.CredentialsPath != nil {
 		credentialsJSON = readFileOpt(*sources.CredentialsPath)
