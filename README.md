@@ -105,6 +105,26 @@ print(call_sync("Reply with just the word: pong", backend=AppleBackend()))
 
 Auto-selection tries this backend last and only for `model="small"`; an explicit `backend=AppleBackend()` always reaches it. Session and decoding knobs (`use_case`, `guardrails`, `instructions`, `temperature`, sampling) ride in via `RunSpec(provider_configs={"apple": AppleConfig(...)})`. Structured `extract_sync` works too, nested models included, and schema constraints now bind during decoding: `minimum`/`maximum`, `minItems`/`maxItems`, and string-valued `enum`s are enforced exactly (a non-string `enum` such as `Literal[1, 2]` fails before generation, `extract_sync` raising `BackendCallError`), and a `Field(pattern=...)` constrains the value's shape — length, separators, and character families. Apple's decoder rejects bracket character classes, so the sidecar widens each to the narrowest escape it accepts (`^[A-Z]{3}-\d{4}$` decodes as `\w{3}-\d{4}`), and pydantic stays the exact validator: a value that fits the widened shape but violates your regex raises a plain `ValidationError`. Self-referential models extract cleanly; a mutually recursive pair (A referencing B referencing A) fails cleanly instead, `extract_sync` raising `BackendCallError` and `run` returning an error `Response`. Requires macOS 26+ on Apple Silicon with Apple Intelligence enabled — every other platform gets the pure-Python wheel and reports the backend as not installed.
 
+### Ask a yes/no, label, or score question in about 120 ms
+
+A classifier that runs on every hook event or every PR comment can't wait seconds for a chat model to write JSON. `decide_sync` asks TypeSafe's Jev or OpenAI Decisions instead. Both return probabilities, not prose, and one question set runs unchanged on either:
+
+```python
+from spawnllm import Binary, Label, decide_sync
+
+decision = decide_sync(
+    "Our nightly release has failed for 3 days. Please roll it back now.",
+    {
+        "rollback": Binary("Does the message ask to roll back a release?"),
+        "action": Label("Which release action does it ask for?", {"none": None, "release": None, "rollback": None}),
+    },
+)
+print(decision.answers["rollback"].p_yes)  # 0.99
+print(decision.answers["action"].choice)  # rollback
+```
+
+On a warm keep-alive connection from a Mac, a three-question Jev call took 120 to 130 ms end to end. Pass `provider=OPENAI` to ask `gpt-6-luna` instead. Retries cover 408, 429, 5xx, and 529 and stop at `timeout`. Keys come from `TYPESAFE_API_KEY` or `OPENAI_API_KEY`, or on macOS from a Keychain item that `spawnllm key set jev` (or `openai`) writes from stdin.
+
 ### Call the same backends from Go or Rust
 
 All three languages run the identical engine: argv planning, output parsing, schema strictification, and retry policy live once in a Rust core — linked natively by the Rust crate, embedded as WASM by the Go module and the Python package — pinned by a shared golden-vector suite and released in lockstep.
@@ -119,9 +139,10 @@ Both expose `Call`/`call` and typed `Extract`/`extract` against your existing CL
 ## More in the docs
 
 - **Spec-driven runs** — a literal model id, per-provider flag passthrough, and envelope-aware retry via `RunSpec` — [Running reference](https://yasyf.github.io/spawnllm/reference/#running)
+- **Decisions** — every question and answer type, the provider pins, and the retry and key-lookup rules — [Deciding reference](https://yasyf.github.io/spawnllm/reference/#deciding)
 - **Backend selection** — the priority chain, plus `specialty=` routing (`debugging` and `review` go to Codex, `general` to the Claude Agent SDK backend) — [Backends reference](https://yasyf.github.io/spawnllm/reference/#backends)
 - **Transport helpers** — `run_cli`, `collect_process`, and `map_concurrent`, the subprocess plumbing shared by every CLI backend — [Transport reference](https://yasyf.github.io/spawnllm/reference/#transport)
-- **The CLI** — `spawnllm call`, `status`, and `backends` from any shell — [CLI reference](https://yasyf.github.io/spawnllm/reference/cli/)
+- **The CLI** — `spawnllm call`, `status`, `backends`, and `key set` from any shell — [CLI reference](https://yasyf.github.io/spawnllm/reference/cli/)
 - **MLX internals** — the adapter codec, fuser, and runtime patches behind the local engine — [MLX reference](https://yasyf.github.io/spawnllm/reference/#mlx)
 
 Read the [docs](https://yasyf.github.io/spawnllm/) for the full guide and API reference. Licensed under [MIT](https://github.com/yasyf/spawnllm/blob/main/LICENSE).

@@ -1227,6 +1227,252 @@ fn iso_seed_cases() -> Vec<Case> {
     ]
 }
 
+fn decide_questions() -> Value {
+    json!([
+        {"type": "binary", "id": "is_rollback_request", "instructions": "Does the message ask to roll back a release?"},
+        {"type": "label", "id": "action", "instructions": "Which release action does the message ask for?", "options": [
+            {"value": "none", "description": "No release action"},
+            {"value": "release", "description": "Ship a new release"},
+            {"value": "rollback", "description": "Roll back a release"},
+        ]},
+        {"type": "score", "id": "urgency", "instructions": "How urgent is the message?", "levels": [
+            {"label": "Not urgent", "description": null},
+            {"label": "Somewhat urgent", "description": null},
+            {"label": "Blocking, needs action now", "description": "customers are blocked"},
+        ]},
+    ])
+}
+
+const DECIDE_STATE: &str = "Help! Our nightly release has been failing for 3 days and customers are blocked. Please roll it back now.";
+
+fn decide_plan_case(
+    name: &str,
+    provider: &str,
+    model: &str,
+    state: Value,
+    questions: Value,
+) -> Case {
+    Case {
+        op: "decide_plan",
+        name: name.to_owned(),
+        input: json!({
+            "provider": {"name": provider, "model": model},
+            "api_key": "test-key",
+            "state": state,
+            "questions": questions,
+        }),
+    }
+}
+
+fn decide_plan_cases() -> Vec<Case> {
+    let binary_with_criteria = json!([{
+        "type": "binary",
+        "id": "is_urgent",
+        "instructions": "Does this convey urgency?",
+        "yes": "Explicitly time-sensitive",
+        "no": "No urgency expressed",
+    }]);
+    let structured = json!({"thread": [{"from": "user", "text": "ship it"}, {"from": "bot", "text": "queued", "attempt": 2}]});
+    vec![
+        decide_plan_case(
+            "jev-three-questions",
+            "jev",
+            "jev-1.13.0",
+            json!(DECIDE_STATE),
+            decide_questions(),
+        ),
+        decide_plan_case(
+            "openai-three-questions",
+            "openai",
+            "gpt-6-luna",
+            json!(DECIDE_STATE),
+            decide_questions(),
+        ),
+        decide_plan_case(
+            "jev-binary-criteria",
+            "jev",
+            "jev-1.13.0",
+            json!(DECIDE_STATE),
+            binary_with_criteria.clone(),
+        ),
+        decide_plan_case(
+            "openai-binary-criteria",
+            "openai",
+            "gpt-6-luna",
+            json!(DECIDE_STATE),
+            binary_with_criteria,
+        ),
+        decide_plan_case(
+            "jev-structured-state-verbatim",
+            "jev",
+            "jev-1.13.0",
+            structured.clone(),
+            decide_questions(),
+        ),
+        decide_plan_case(
+            "openai-structured-state-compact",
+            "openai",
+            "gpt-6-luna",
+            structured,
+            decide_questions(),
+        ),
+    ]
+}
+
+fn decide_resolve_case(
+    name: &str,
+    provider: &str,
+    status: Option<u16>,
+    body: &str,
+    retry_after: Option<&str>,
+    retry_after_ms: Option<&str>,
+    attempt: u32,
+) -> Case {
+    Case {
+        op: "decide_resolve",
+        name: name.to_owned(),
+        input: json!({
+            "provider": {"name": provider, "model": "m"},
+            "questions": decide_questions(),
+            "status": status,
+            "body": body,
+            "retry_after": retry_after,
+            "retry_after_ms": retry_after_ms,
+            "attempt": attempt,
+        }),
+    }
+}
+
+const JEV_RECORDED: &str = r#"{"model":"jev-1.13.0","answers":{"is_rollback_request":{"type":"noul","noul":0.99},"action":{"type":"choice","choice":"rollback","confidence":1.0,"probabilities":{"release":0.0,"rollback":1.0,"none":0.0}},"urgency":{"type":"score","score":2.0,"confidence":1.0,"legend":{"0":"Not urgent","1":"Somewhat urgent","2":"Blocking, needs action now"},"probabilities":{"0":0.0,"1":0.0,"2":1.0}}},"usage":{"input_tokens":414,"output_tokens":73}}"#;
+
+const OPENAI_RECORDED: &str = r#"{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"is_rollback_request","probability":1.0},{"type":"choice","name":"action","choice":"rollback","probabilities":[{"value":"none","probability":0.0},{"value":"release","probability":0.0},{"value":"rollback","probability":1.0}],"confidence":1.0},{"type":"score","name":"urgency","score":2.0,"probabilities":[{"value":0,"label":"Not urgent","probability":0.0},{"value":1,"label":"Somewhat urgent","probability":0.0},{"value":2,"label":"Blocking, needs action now","probability":1.0}],"confidence":1.0}],"usage":{"input_tokens":419,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":419}}"#;
+
+const OPENAI_REFUSAL: &str = r#"{"model":"gpt-6-luna","answers":[{"type":"refusal","name":"is_rollback_request"},{"type":"choice","name":"action","choice":"none","probabilities":[{"value":"rollback","probability":0.1},{"value":"none","probability":0.8},{"value":"release","probability":0.1}],"confidence":0.7},{"type":"score","name":"urgency","score":0.9,"probabilities":[{"value":2,"label":"Blocking, needs action now","probability":0.2},{"value":0,"label":"Not urgent","probability":0.3},{"value":1,"label":"Somewhat urgent","probability":0.5}],"confidence":0.2}],"usage":{"input_tokens":419}}"#;
+
+fn decide_resolve_cases() -> Vec<Case> {
+    vec![
+        decide_resolve_case(
+            "jev-recorded-reorders-to-declared",
+            "jev",
+            Some(200),
+            JEV_RECORDED,
+            None,
+            None,
+            0,
+        ),
+        decide_resolve_case(
+            "openai-recorded",
+            "openai",
+            Some(200),
+            OPENAI_RECORDED,
+            None,
+            None,
+            0,
+        ),
+        decide_resolve_case(
+            "openai-refusal-beside-answers",
+            "openai",
+            Some(200),
+            OPENAI_REFUSAL,
+            None,
+            None,
+            0,
+        ),
+        decide_resolve_case(
+            "openai-misnamed-answer-fails",
+            "openai",
+            Some(200),
+            r#"{"model":"gpt-6-luna","answers":[{"type":"refusal","name":"urgency"},{"type":"refusal"},{"type":"refusal"}],"usage":{"input_tokens":1}}"#,
+            None,
+            None,
+            0,
+        ),
+        decide_resolve_case(
+            "jev-missing-answer-fails",
+            "jev",
+            Some(200),
+            r#"{"model":"jev-1.13.0","answers":{},"usage":{"input_tokens":1}}"#,
+            None,
+            None,
+            0,
+        ),
+        decide_resolve_case(
+            "success-body-not-json-fails",
+            "jev",
+            Some(200),
+            "<html>",
+            None,
+            None,
+            0,
+        ),
+        decide_resolve_case(
+            "jev-529-first-backoff",
+            "jev",
+            Some(529),
+            "overloaded",
+            None,
+            None,
+            0,
+        ),
+        decide_resolve_case(
+            "jev-429-retry-after-seconds",
+            "jev",
+            Some(429),
+            "",
+            Some("2"),
+            None,
+            0,
+        ),
+        decide_resolve_case(
+            "openai-429-retry-after-ms-wins",
+            "openai",
+            Some(429),
+            "",
+            Some("2"),
+            Some("250"),
+            1,
+        ),
+        decide_resolve_case(
+            "openai-503-http-date-retry-after-backs-off",
+            "openai",
+            Some(503),
+            "",
+            Some("Wed, 21 Oct 2026 07:28:00 GMT"),
+            None,
+            2,
+        ),
+        decide_resolve_case(
+            "openai-500-backoff-caps-at-5s",
+            "openai",
+            Some(500),
+            "",
+            None,
+            None,
+            6,
+        ),
+        decide_resolve_case("jev-408-retries", "jev", Some(408), "", None, None, 1),
+        decide_resolve_case("no-response-retries", "jev", None, "", None, None, 0),
+        decide_resolve_case(
+            "openai-401-fails",
+            "openai",
+            Some(401),
+            r#"{"error":{"message":"Incorrect API key provided","type":"invalid_request_error"}}"#,
+            None,
+            None,
+            0,
+        ),
+        decide_resolve_case(
+            "jev-422-fails",
+            "jev",
+            Some(422),
+            r#"{"detail":[{"loc":["body","questions","urgency","criteria"],"msg":"too short"}]}"#,
+            None,
+            None,
+            0,
+        ),
+    ]
+}
+
 pub fn all_cases() -> Vec<Case> {
     let mut cases = plan_cases();
     cases.extend(resolve_cases());
@@ -1237,6 +1483,8 @@ pub fn all_cases() -> Vec<Case> {
     cases.extend(capabilities_cases());
     cases.extend(iso_sources_cases());
     cases.extend(iso_seed_cases());
+    cases.extend(decide_plan_cases());
+    cases.extend(decide_resolve_cases());
     cases
 }
 

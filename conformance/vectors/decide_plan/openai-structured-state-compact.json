@@ -1,0 +1,124 @@
+{
+  "name": "openai-structured-state-compact",
+  "op": "decide_plan",
+  "input": {
+    "provider": {
+      "name": "openai",
+      "model": "gpt-6-luna"
+    },
+    "api_key": "test-key",
+    "state": {
+      "thread": [
+        {
+          "from": "user",
+          "text": "ship it"
+        },
+        {
+          "from": "bot",
+          "text": "queued",
+          "attempt": 2
+        }
+      ]
+    },
+    "questions": [
+      {
+        "type": "binary",
+        "id": "is_rollback_request",
+        "instructions": "Does the message ask to roll back a release?"
+      },
+      {
+        "type": "label",
+        "id": "action",
+        "instructions": "Which release action does the message ask for?",
+        "options": [
+          {
+            "value": "none",
+            "description": "No release action"
+          },
+          {
+            "value": "release",
+            "description": "Ship a new release"
+          },
+          {
+            "value": "rollback",
+            "description": "Roll back a release"
+          }
+        ]
+      },
+      {
+        "type": "score",
+        "id": "urgency",
+        "instructions": "How urgent is the message?",
+        "levels": [
+          {
+            "label": "Not urgent",
+            "description": null
+          },
+          {
+            "label": "Somewhat urgent",
+            "description": null
+          },
+          {
+            "label": "Blocking, needs action now",
+            "description": "customers are blocked"
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "kind": "http",
+    "method": "POST",
+    "url": "https://api.openai.com/v1/decisions",
+    "headers": {
+      "Authorization": "Bearer test-key"
+    },
+    "body": {
+      "model": "gpt-6-luna",
+      "input": "{\"thread\":[{\"from\":\"user\",\"text\":\"ship it\"},{\"from\":\"bot\",\"text\":\"queued\",\"attempt\":2}]}",
+      "questions": [
+        {
+          "type": "predicate",
+          "name": "is_rollback_request",
+          "instructions": "Does the message ask to roll back a release?"
+        },
+        {
+          "type": "choice",
+          "name": "action",
+          "instructions": "Which release action does the message ask for?",
+          "choices": [
+            {
+              "value": "none",
+              "description": "No release action"
+            },
+            {
+              "value": "release",
+              "description": "Ship a new release"
+            },
+            {
+              "value": "rollback",
+              "description": "Roll back a release"
+            }
+          ]
+        },
+        {
+          "type": "score",
+          "name": "urgency",
+          "instructions": "How urgent is the message?",
+          "levels": [
+            {
+              "label": "Not urgent"
+            },
+            {
+              "label": "Somewhat urgent"
+            },
+            {
+              "label": "Blocking, needs action now",
+              "description": "customers are blocked"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

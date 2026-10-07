@@ -1,4 +1,5 @@
 mod auth;
+mod decide;
 mod extract;
 mod isolate;
 mod plan;
@@ -96,6 +97,7 @@ fn run(op: &str, input: Value) -> OpResult {
         "strict_schema" => schema::dispatch(input),
         "auth_probes" => probe::dispatch(input),
         "claude_isolation_sources" | "claude_isolation_seed" => isolate::dispatch(op, input),
+        "decide_plan" | "decide_resolve" => decide::dispatch(op, input),
         other => Err(OpError {
             kind: "unknown_op",
             msg: other.to_string(),

@@ -1,0 +1,90 @@
+{
+  "name": "openai-refusal-beside-answers",
+  "op": "decide_resolve",
+  "input": {
+    "provider": {
+      "name": "openai",
+      "model": "m"
+    },
+    "questions": [
+      {
+        "type": "binary",
+        "id": "is_rollback_request",
+        "instructions": "Does the message ask to roll back a release?"
+      },
+      {
+        "type": "label",
+        "id": "action",
+        "instructions": "Which release action does the message ask for?",
+        "options": [
+          {
+            "value": "none",
+            "description": "No release action"
+          },
+          {
+            "value": "release",
+            "description": "Ship a new release"
+          },
+          {
+            "value": "rollback",
+            "description": "Roll back a release"
+          }
+        ]
+      },
+      {
+        "type": "score",
+        "id": "urgency",
+        "instructions": "How urgent is the message?",
+        "levels": [
+          {
+            "label": "Not urgent",
+            "description": null
+          },
+          {
+            "label": "Somewhat urgent",
+            "description": null
+          },
+          {
+            "label": "Blocking, needs action now",
+            "description": "customers are blocked"
+          }
+        ]
+      }
+    ],
+    "status": 200,
+    "body": "{\"model\":\"gpt-6-luna\",\"answers\":[{\"type\":\"refusal\",\"name\":\"is_rollback_request\"},{\"type\":\"choice\",\"name\":\"action\",\"choice\":\"none\",\"probabilities\":[{\"value\":\"rollback\",\"probability\":0.1},{\"value\":\"none\",\"probability\":0.8},{\"value\":\"release\",\"probability\":0.1}],\"confidence\":0.7},{\"type\":\"score\",\"name\":\"urgency\",\"score\":0.9,\"probabilities\":[{\"value\":2,\"label\":\"Blocking, needs action now\",\"probability\":0.2},{\"value\":0,\"label\":\"Not urgent\",\"probability\":0.3},{\"value\":1,\"label\":\"Somewhat urgent\",\"probability\":0.5}],\"confidence\":0.2}],\"usage\":{\"input_tokens\":419}}",
+    "retry_after": null,
+    "retry_after_ms": null,
+    "attempt": 0
+  },
+  "expected": {
+    "kind": "decision",
+    "model": "gpt-6-luna",
+    "input_tokens": 419,
+    "answers": {
+      "is_rollback_request": {
+        "type": "refused"
+      },
+      "action": {
+        "type": "label",
+        "choice": "none",
+        "probabilities": [
+          0.8,
+          0.1,
+          0.1
+        ],
+        "confidence": 0.7
+      },
+      "urgency": {
+        "type": "score",
+        "score": 0.9,
+        "probabilities": [
+          0.3,
+          0.5,
+          0.2
+        ],
+        "confidence": 0.2
+      }
+    }
+  }
+}
