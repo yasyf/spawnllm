@@ -14,7 +14,6 @@ import subprocess
 import sys
 import threading
 import time
-import weakref
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -53,7 +52,6 @@ DEFAULT_TIMEOUT = 10.0
 
 CLIENT_LOCK = threading.Lock()
 CLIENT: httpx.Client | None = None
-ASYNC_CLIENTS: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, httpx.AsyncClient] = weakref.WeakKeyDictionary()
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,7 +221,7 @@ def keychain_item(name: TDecideProvider) -> tuple[str, str]:
     return f"spawnllm-{name}-api-key", name
 
 
-def api_key(provider: Provider) -> str:
+def api_key(provider: Provider, *, timeout: float = DEFAULT_TIMEOUT) -> str:
     """Return the provider's API key from its environment variable, else from the macOS Keychain.
 
     Jev reads `TYPESAFE_API_KEY` and OpenAI reads `OPENAI_API_KEY`; on macOS an unset variable falls
@@ -231,23 +229,24 @@ def api_key(provider: Provider) -> str:
 
     Raises:
         DecideKeyMissing: When neither source holds a key.
+        TimeoutError: When the Keychain read outlasts `timeout`.
     """
     if key := os.environ.get(KEY_ENV[provider.name]):
         return key
     service, account = keychain_item(provider.name)
-    if (
-        sys.platform == "darwin"
-        and (
-            found := subprocess.run(
+    if sys.platform == "darwin":
+        try:
+            found = subprocess.run(
                 ["security", "find-generic-password", "-s", service, "-a", account, "-w"],
                 capture_output=True,
                 text=True,
                 check=False,
+                timeout=timeout,
             )
-        ).returncode
-        == 0
-    ):
-        return found.stdout.strip()
+        except subprocess.TimeoutExpired as exc:
+            raise TimeoutError(f"the Keychain read for the {provider.name} key outlasted {timeout:g}s") from exc
+        if found.returncode == 0:
+            return found.stdout.strip()
     raise DecideKeyMissing(
         f"no {provider.name} API key: set {KEY_ENV[provider.name]} or run `spawnllm key set {provider.name}`"
     )
@@ -282,18 +281,10 @@ def sync_client() -> httpx.Client:
         return CLIENT
 
 
-def async_client() -> httpx.AsyncClient:
-    loop = asyncio.get_running_loop()
-    if (client := ASYNC_CLIENTS.get(loop)) is None:
-        client = ASYNC_CLIENTS[loop] = httpx.AsyncClient()
-    return client
-
-
 def fork_reset() -> None:
     global CLIENT, CLIENT_LOCK
     CLIENT_LOCK = threading.Lock()
     CLIENT = None
-    ASYNC_CLIENTS.clear()
 
 
 os.register_at_fork(after_in_child=fork_reset)
@@ -360,10 +351,11 @@ class Call:
         timeout: float,
         key: str | None,
     ) -> Call:
+        deadline = time.monotonic() + timeout
         wired = [wire_question(id, question) for id, question in questions.items()]
         planned = {
             "provider": {"name": provider.name, "model": provider.model},
-            "api_key": key or api_key(provider),
+            "api_key": key or api_key(provider, timeout=timeout),
             "state": state,
             "questions": wired,
         }
@@ -371,7 +363,7 @@ class Call:
             request = _core.dispatch("decide_plan", planned)
         except _core.CoreError as error:
             raise ValueError(error.msg) from error
-        return cls(provider, questions, wired, request, time.monotonic() + timeout, timeout)
+        return cls(provider, questions, wired, request, deadline, timeout)
 
     def remaining(self) -> float:
         if (left := self.deadline - time.monotonic()) <= 0:
@@ -424,7 +416,8 @@ def decide_sync(
     Keep each question to one observable fact and combine the answers in code; put counting,
     dates, and arithmetic in code too. Retries 408, 429, 5xx, 529, and a lost connection with
     backoff from 0.5s doubling to 5s, honoring `retry-after`, and only while the retry still fits
-    inside `timeout`.
+    inside `timeout`. The Keychain read counts against `timeout` too, and an answer that arrives
+    after it raises `TimeoutError` rather than returning late.
 
     Args:
         state: The text to judge, or JSON data; Jev reads structure natively and OpenAI receives
@@ -466,6 +459,7 @@ def decide_sync(
             raise TimeoutError(f"no {provider.name} decision within {timeout:g}s") from exc
         except httpx.TransportError:
             response = None
+        call.remaining()
         match call.outcome(response, tries, started):
             case Decision() as decision:
                 return decision
@@ -484,31 +478,12 @@ async def decide(
 ) -> Decision:
     """Ask every question about `state` in one request, asynchronously; `decide_sync` documents the contract.
 
-    Each event loop keeps one keep-alive client.
+    The call runs `decide_sync` on a worker thread, so it shares the process's keep-alive client and
+    holds no connection to the event loop.
 
     Example:
         >>> decision = await decide({"title": "Revert the release"}, {
         ...     "kind": Label("What does the title ask for?", {"other": None, "rollback": None}),
         ... }, provider=OPENAI)
     """
-    call = Call.plan(state, questions, provider, timeout, api_key)
-    tries = 0
-    while True:
-        started = time.monotonic()
-        try:
-            response = await async_client().post(
-                call.request["url"],
-                headers=call.request["headers"],
-                json=call.request["body"],
-                timeout=call.remaining(),
-            )
-        except httpx.TimeoutException as exc:
-            raise TimeoutError(f"no {provider.name} decision within {timeout:g}s") from exc
-        except httpx.TransportError:
-            response = None
-        match call.outcome(response, tries, started):
-            case Decision() as decision:
-                return decision
-            case float() as sleep_s:
-                await asyncio.sleep(sleep_s)
-                tries += 1
+    return await asyncio.to_thread(decide_sync, state, questions, provider=provider, timeout=timeout, api_key=api_key)

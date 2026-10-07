@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import json
 import subprocess
+import time
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -109,7 +110,6 @@ def serve(monkeypatch: pytest.MonkeyPatch, *replies: Reply) -> list[httpx.Reques
 
     transport = httpx.MockTransport(handler)
     monkeypatch.setattr(module, "sync_client", lambda: httpx.Client(transport=transport))
-    monkeypatch.setattr(module, "async_client", lambda: httpx.AsyncClient(transport=transport))
     return seen
 
 
@@ -220,17 +220,37 @@ def test_an_invalid_question_set_fails_before_any_request(monkeypatch: pytest.Mo
 
 async def test_async_decide_shares_the_contract(monkeypatch: pytest.MonkeyPatch) -> None:
     serve(monkeypatch, httpx.Response(503), httpx.Response(200, json=JEV_RECORDED))
-    slept: list[float] = []
-
-    async def record(seconds: float) -> None:
-        slept.append(seconds)
-
-    monkeypatch.setattr(module.asyncio, "sleep", record)
+    recorded = sleeps(monkeypatch)
 
     decision = await decide(STATE, QUESTIONS, api_key="test-key")
 
-    assert slept == [0.5]
+    assert recorded == [0.5]
     assert decision.answers["is_rollback_request"] == BinaryAnswer(p_yes=0.99, confidence=0.98)
+
+
+def test_an_answer_that_arrives_after_the_deadline_raises_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    def slow(request: httpx.Request) -> httpx.Response:
+        time.sleep(0.15)
+        return httpx.Response(200, json=JEV_RECORDED)
+
+    transport = httpx.MockTransport(slow)
+    monkeypatch.setattr(module, "sync_client", lambda: httpx.Client(transport=transport))
+
+    with pytest.raises(TimeoutError, match="no jev decision within 0.05s"):
+        decide_sync(STATE, QUESTIONS, api_key="test-key", timeout=0.05)
+
+
+def test_a_stalled_keychain_read_counts_against_the_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.setattr(module.sys, "platform", "darwin")
+
+    def stalled(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+
+    monkeypatch.setattr(module.subprocess, "run", stalled)
+
+    with pytest.raises(TimeoutError, match="outlasted 0.5s"):
+        decide_sync(STATE, QUESTIONS, timeout=0.5)
 
 
 def security(monkeypatch: pytest.MonkeyPatch, returncode: int, stdout: str = "") -> list[dict[str, Any]]:
