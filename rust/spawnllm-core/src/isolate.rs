@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::io;
+use std::sync::LazyLock;
 
+use regex_lite::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::ser::Formatter;
 use serde_json::{Map, Value};
@@ -8,6 +10,10 @@ use sha2::{Digest, Sha256};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::{OpError, OpResult, from_input, unimplemented};
+
+static AUTH_REJECTION: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"Failed to authenticate|OAuth (?:access )?token (?:has been )?revoked|authentication_error|API Error: 401\b").unwrap()
+});
 
 #[derive(Debug, Deserialize)]
 struct IsolationSourcesInput {
@@ -39,7 +45,18 @@ struct IsolationSources {
 #[derive(Debug, Deserialize)]
 struct IsolationSeedInput {
     account_json: Option<String>,
-    credentials_json: Option<String>,
+    credentials_json: Vec<String>,
+    rejected_tokens: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AuthRejectedInput {
+    error_msg: String,
+}
+
+#[derive(Debug, Serialize)]
+struct AuthRejected {
+    rejected: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -181,13 +198,27 @@ fn isolation_seed(input: IsolationSeedInput) -> Result<IsolationSeed, serde_json
         });
     }
     let mut env = BTreeMap::new();
-    if let Some(credentials_json) = input.credentials_json {
-        let credentials = serde_json::from_str::<Credentials>(&credentials_json)?;
-        if let Some(oauth) = credentials.claude_ai_oauth {
-            env.insert("CLAUDE_CODE_OAUTH_TOKEN", oauth.access_token);
-        }
+    if let Some(token) = access_token(&input.credentials_json, &input.rejected_tokens)? {
+        env.insert("CLAUDE_CODE_OAUTH_TOKEN", token);
     }
     Ok(IsolationSeed { files, env })
+}
+
+fn access_token(
+    credentials_json: &[String],
+    rejected_tokens: &[String],
+) -> Result<Option<String>, serde_json::Error> {
+    let mut first_rejected = None;
+    for credentials in credentials_json {
+        let Some(oauth) = serde_json::from_str::<Credentials>(credentials)?.claude_ai_oauth else {
+            continue;
+        };
+        if !rejected_tokens.contains(&oauth.access_token) {
+            return Ok(Some(oauth.access_token));
+        }
+        first_rejected.get_or_insert(oauth.access_token);
+    }
+    Ok(first_rejected)
 }
 
 pub(crate) fn dispatch(op: &str, input: Value) -> OpResult {
@@ -200,6 +231,13 @@ pub(crate) fn dispatch(op: &str, input: Value) -> OpResult {
             let input = from_input::<IsolationSeedInput>(input)?;
             let seed = isolation_seed(input).map_err(OpError::internal)?;
             serde_json::to_value(seed).map_err(OpError::internal)
+        }
+        "claude_auth_rejected" => {
+            let input = from_input::<AuthRejectedInput>(input)?;
+            serde_json::to_value(AuthRejected {
+                rejected: AUTH_REJECTION.is_match(&input.error_msg),
+            })
+            .map_err(OpError::internal)
         }
         other => Err(unimplemented(other)),
     }

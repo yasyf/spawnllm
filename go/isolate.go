@@ -2,57 +2,106 @@ package spawnllm
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 )
 
-func seedClaudeIsolation(apiAuth bool) (string, map[string]string, func(), error) {
+const seededAuthEnv = "CLAUDE_CODE_OAUTH_TOKEN"
+
+var rejectedTokens = struct {
+	sync.Mutex
+	set map[string]bool
+}{set: map[string]bool{}}
+
+type claudeIsolation struct {
+	dir     string
+	env     map[string]string
+	cleanup func()
+}
+
+func seedClaudeIsolation(apiAuth bool) (*claudeIsolation, error) {
 	sources, err := coreIsolationSources(apiAuth)
 	if err != nil {
-		return "", nil, nil, err
+		return nil, err
 	}
 	var accountJSON *string
 	if sources.AccountPath != nil {
 		accountJSON = readFileOpt(*sources.AccountPath)
 	}
-	var credentialsJSON *string
-	if sources.CredentialsPath != nil {
-		credentialsJSON = readFileOpt(*sources.CredentialsPath)
+	credentialsJSON := []string{}
+	if sources.KeychainService != nil {
+		if credentials := keychainCredentials(*sources.KeychainService); credentials != nil {
+			credentialsJSON = append(credentialsJSON, *credentials)
+		}
 	}
-	if credentialsJSON == nil && sources.KeychainService != nil {
-		credentialsJSON = keychainCredentials(*sources.KeychainService)
+	if sources.CredentialsPath != nil {
+		if credentials := readFileOpt(*sources.CredentialsPath); credentials != nil {
+			credentialsJSON = append(credentialsJSON, *credentials)
+		}
 	}
 
-	seed, err := coreIsolationSeed(accountJSON, credentialsJSON)
+	seed, err := coreIsolationSeed(accountJSON, credentialsJSON, rejectedTokenList())
 	if err != nil {
-		return "", nil, nil, err
+		return nil, err
 	}
 
 	dir, err := os.MkdirTemp("", "spawnllm-claude-config-")
 	if err != nil {
-		return "", nil, nil, err
+		return nil, err
 	}
 	cleanup := func() { _ = os.RemoveAll(dir) }
 	for _, f := range seed.Files {
 		mode, err := parseMode(f.Mode)
 		if err != nil {
 			cleanup()
-			return "", nil, nil, err
+			return nil, err
 		}
 		path := filepath.Join(dir, f.Name)
 		if err := os.WriteFile(path, []byte(f.Content), mode); err != nil {
 			cleanup()
-			return "", nil, nil, err
+			return nil, err
 		}
 		if err := os.Chmod(path, mode); err != nil {
 			cleanup()
-			return "", nil, nil, err
+			return nil, err
 		}
 	}
-	return dir, seed.Env, cleanup, nil
+	return &claudeIsolation{dir: dir, env: seed.Env, cleanup: cleanup}, nil
+}
+
+func rejectedTokenList() []string {
+	rejectedTokens.Lock()
+	defer rejectedTokens.Unlock()
+	tokens := slices.AppendSeq([]string{}, maps.Keys(rejectedTokens.set))
+	slices.Sort(tokens)
+	return tokens
+}
+
+func (i *claudeIsolation) rejectCredentials(errMsg string) (bool, error) {
+	token, ok := i.env[seededAuthEnv]
+	if !ok {
+		return false, nil
+	}
+	rejected, err := coreAuthRejected(errMsg)
+	if err != nil || !rejected {
+		return false, err
+	}
+	rejectedTokens.Lock()
+	defer rejectedTokens.Unlock()
+	rejectedTokens.set[token] = true
+	return true, nil
+}
+
+func (i *claudeIsolation) tokenRejected() bool {
+	rejectedTokens.Lock()
+	defer rejectedTokens.Unlock()
+	return rejectedTokens.set[i.env[seededAuthEnv]]
 }
 
 func substituteIsolationDir(env map[string]string, dir string) map[string]string {

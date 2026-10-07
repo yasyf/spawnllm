@@ -41,6 +41,7 @@ if [ -n "$SPAWNLLM_FAKE_MARKER" ]; then
   if [ -f /dev/stdout ]; then printf 'regular' > "$SPAWNLLM_FAKE_MARKER"; else printf 'pipe' > "$SPAWNLLM_FAKE_MARKER"; fi
 fi
 if [ -n "$SPAWNLLM_FAKE_CRED_OUT" ]; then printf '%s' "${CLAUDE_CODE_OAUTH_TOKEN-}" > "$SPAWNLLM_FAKE_CRED_OUT"; fi
+if [ -n "$SPAWNLLM_FAKE_REJECTED_TOKEN" ] && [ "${CLAUDE_CODE_OAUTH_TOKEN-}" = "$SPAWNLLM_FAKE_REJECTED_TOKEN" ]; then printf 'Failed to authenticate: OAuth token revoked.'; exit 1; fi
 if [ -n "$SPAWNLLM_FAKE_ACCOUNT_OUT" ]; then cat "$CLAUDE_CONFIG_DIR/.claude.json" > "$SPAWNLLM_FAKE_ACCOUNT_OUT" 2>/dev/null || true; fi
 if [ -n "$SPAWNLLM_FAKE_MODES_OUT" ]; then { ls -ld "$CLAUDE_CONFIG_DIR" | cut -c1-10; ls -A "$CLAUDE_CONFIG_DIR"; } > "$SPAWNLLM_FAKE_MODES_OUT"; fi
 if [ -n "$SPAWNLLM_FAKE_EXIT" ]; then printf 'boom' >&2; exit "$SPAWNLLM_FAKE_EXIT"; fi

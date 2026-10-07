@@ -3,7 +3,10 @@
   "op": "claude_isolation_seed",
   "input": {
     "account_json": "{\"oauthAccount\": {\"accountUuid\": \"a\"}, \"mcpServers\": {\"semble\": {\"command\": \"x\"}}}",
-    "credentials_json": "{\"claudeAiOauth\": {\"accessToken\": \"tok\"}}"
+    "credentials_json": [
+      "{\"claudeAiOauth\": {\"accessToken\": \"tok\"}}"
+    ],
+    "rejected_tokens": []
   },
   "expected": {
     "files": [

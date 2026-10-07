@@ -1,0 +1,10 @@
+{
+  "name": "access-token-has-been-revoked",
+  "op": "claude_auth_rejected",
+  "input": {
+    "error_msg": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"OAuth access token has been revoked\"}}"
+  },
+  "expected": {
+    "rejected": true
+  }
+}

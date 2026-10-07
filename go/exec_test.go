@@ -477,6 +477,51 @@ func TestClaudeIsolationKeychainMissSeedsNoCredentials(t *testing.T) {
 	}
 }
 
+func TestClaudeIsolationFallsThroughARejectedKeychainToken(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the Keychain runs only on darwin")
+	}
+	withFakeBin(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	clearHostEnv(t, "CLAUDE_CONFIG_DIR", "CLAUDE_SECURESTORAGE_CONFIG_DIR", "CLAUDE_CODE_CUSTOM_OAUTH_URL", "CLAUDE_CODE_OAUTH_TOKEN")
+	writeAccountPointer(t, home)
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".claude", ".credentials.json"),
+		[]byte(`{"claudeAiOauth":{"accessToken":"fallthrough-file-tok"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FAKE_KEYCHAIN_SERVICE", "Claude Code-credentials")
+	t.Setenv("FAKE_KEYCHAIN_CREDENTIAL", `{"claudeAiOauth":{"accessToken":"fallthrough-kc-tok"}}`)
+	t.Setenv("FAKE_REJECTED_TOKEN", "fallthrough-kc-tok")
+
+	resp, err := RunOn(context.Background(), ClaudeBackend(), RunSpec{Prompt: "iso", Model: "haiku", MaxAttempts: 1})
+	if err != nil {
+		t.Fatalf("RunOn: %v", err)
+	}
+	if resp.Err != nil {
+		t.Fatalf("a rejected Keychain token must fall through to the credentials file: %v", resp.Err)
+	}
+	var out claudeOutput
+	if err := json.Unmarshal([]byte(resp.Output), &out); err != nil {
+		t.Fatalf("decode output %q: %v", resp.Output, err)
+	}
+	if out.OauthToken != "fallthrough-file-tok" {
+		t.Fatalf("CLAUDE_CODE_OAUTH_TOKEN = %q, want the credentials file's token", out.OauthToken)
+	}
+
+	t.Setenv("FAKE_REJECTED_TOKEN", "fallthrough-file-tok")
+	resp, err = RunOn(context.Background(), ClaudeBackend(), RunSpec{Prompt: "iso", Model: "haiku", MaxAttempts: 1})
+	if err != nil {
+		t.Fatalf("RunOn: %v", err)
+	}
+	if resp.Err == nil || !strings.Contains(resp.Err.Msg, "OAuth token revoked") {
+		t.Fatalf("with every source rejected, want the rejection, got %+v", resp.Err)
+	}
+}
+
 func TestClaudeIsolationInheritedTokenReadsNoCredentialSource(t *testing.T) {
 	withFakeBin(t)
 	home := t.TempDir()

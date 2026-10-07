@@ -1,0 +1,10 @@
+{
+  "name": "api-401-authentication-error",
+  "op": "claude_auth_rejected",
+  "input": {
+    "error_msg": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"Invalid bearer token\"}}"
+  },
+  "expected": {
+    "rejected": true
+  }
+}

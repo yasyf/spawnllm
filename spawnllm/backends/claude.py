@@ -15,6 +15,8 @@ from spawnllm import _core
 from spawnllm.backends.base import ClaudeIsolation, CliBackend
 
 if TYPE_CHECKING:
+    from spawnllm.response import Response
+    from spawnllm.spec import RunSpec
     from spawnllm.types import ProviderName, TModel
 
 CLAUDE_MODELS: dict[TModel, str] = {"small": "haiku", "medium": "sonnet", "large": "opus"}
@@ -64,6 +66,7 @@ class ClaudeCliBackend(CliBackend):
 
     _isolated_config_dir: str | None = None
     _api_config_dir: str | None = None
+    _rejected_tokens: frozenset[str] = frozenset()
 
     def claude_isolation(self, api_auth: bool) -> ClaudeIsolation:
         """Return the isolation for one run: the process-lifetime config home and the env resolved now.
@@ -71,13 +74,14 @@ class ClaudeCliBackend(CliBackend):
         The core's `claude_isolation_sources` op resolves the account pointer,
         credentials file, and Keychain service from the caller's effective config
         home, naming no credential source when the process already carries
-        `CLAUDE_CODE_OAUTH_TOKEN`; this host reads those sources (falling back to
-        the Keychain when the credentials file is absent) and hands them to
-        `claude_isolation_seed` for the exact files-and-modes to write and the env
-        to set. The files land in a fresh temp dir removed at interpreter exit,
-        created on the first call and cached on the backend; the env is resolved
-        on every call so a renewed Keychain token reaches the next run, and it
-        only ever lives in memory. An `api_auth` run names no source at all, so it
+        `CLAUDE_CODE_OAUTH_TOKEN`; this host reads those sources (the Keychain
+        before the credentials file, the order Claude Code itself reads them) and
+        hands them, with every token a run saw rejected, to `claude_isolation_seed`
+        for the exact files-and-modes to write and the env to set. The files land
+        in a fresh temp dir removed at interpreter exit, created on the first
+        call and cached on the backend; the env is resolved on every call so a
+        renewed Keychain token reaches the next run, and it only ever lives in
+        memory. An `api_auth` run names no source at all, so it
         reads no account, credentials file, or Keychain item and gets an empty home
         of its own.
         """
@@ -96,11 +100,21 @@ class ClaudeCliBackend(CliBackend):
             },
         )
         account_json = read_file_opt(sources["account_path"]) if sources["account_path"] else None
-        credentials_json = read_file_opt(sources["credentials_path"]) if sources["credentials_path"] else None
-        if credentials_json is None and sources["keychain_service"] is not None:
-            credentials_json = keychain_credentials(sources["keychain_service"])
+        credentials_json = [
+            credentials
+            for credentials in (
+                keychain_credentials(sources["keychain_service"]) if sources["keychain_service"] else None,
+                read_file_opt(sources["credentials_path"]) if sources["credentials_path"] else None,
+            )
+            if credentials is not None
+        ]
         seed = _core.dispatch(
-            "claude_isolation_seed", {"account_json": account_json, "credentials_json": credentials_json}
+            "claude_isolation_seed",
+            {
+                "account_json": account_json,
+                "credentials_json": credentials_json,
+                "rejected_tokens": sorted(self._rejected_tokens),
+            },
         )
         cached = self._api_config_dir if api_auth else self._isolated_config_dir
         if cached is None:
@@ -116,3 +130,33 @@ class ClaudeCliBackend(CliBackend):
             else:
                 self._isolated_config_dir = cached
         return ClaudeIsolation(cached, seed["env"])
+
+    def reject_credentials(self, spec: RunSpec, env: dict[str, str], response: Response) -> bool:
+        """Record the OAuth token in a run's `env` as rejected when the core reads `response` as an auth failure.
+
+        Returns:
+            `True` when another credential source remains to retry the run with.
+        """
+        token = env.get("CLAUDE_CODE_OAUTH_TOKEN")
+        if token is None or response.error is None:
+            return False
+        if not _core.dispatch("claude_auth_rejected", {"error_msg": response.error.msg})["rejected"]:
+            return False
+        self._rejected_tokens |= {token}
+        return self.claude_isolation(spec.api_auth).env.get("CLAUDE_CODE_OAUTH_TOKEN") not in self._rejected_tokens
+
+    async def aexecute(self, spec: RunSpec) -> Response:
+        env = self.env(spec)
+        response = await self.aexecute_invocation(spec, self.invocation(spec), env)
+        while self.reject_credentials(spec, env, response):
+            env = self.env(spec)
+            response = await self.aexecute_invocation(spec, self.invocation(spec), env)
+        return response
+
+    def execute(self, spec: RunSpec) -> Response:
+        env = self.env(spec)
+        response = self.execute_invocation(spec, self.invocation(spec), env)
+        while self.reject_credentials(spec, env, response):
+            env = self.env(spec)
+            response = self.execute_invocation(spec, self.invocation(spec), env)
+        return response

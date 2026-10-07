@@ -408,3 +408,47 @@ async fn inherited_oauth_token_reads_no_credential_source() {
         "an inherited token must skip the Keychain"
     );
 }
+
+#[cfg(target_os = "macos")]
+#[allow(clippy::await_holding_lock)]
+#[tokio::test]
+async fn rejected_keychain_token_falls_through_to_the_credentials_file() {
+    common::fixtures();
+    let _guard = common::ENV_LOCK
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+
+    let home = tempfile::tempdir().unwrap();
+    std::fs::create_dir(home.path().join(".claude")).unwrap();
+    std::fs::write(home.path().join(".claude.json"), r#"{"account": "me"}"#).unwrap();
+    std::fs::write(
+        home.path().join(".claude/.credentials.json"),
+        r#"{"claudeAiOauth": {"accessToken": "file-token"}}"#,
+    )
+    .unwrap();
+    let cred_out = tempfile::NamedTempFile::new().unwrap();
+    let cred_path = cred_out.path().to_str().unwrap().to_owned();
+    let original_home = std::env::var_os("HOME");
+    unsafe {
+        for var in HOST_KEYCHAIN_VARS {
+            std::env::remove_var(var);
+        }
+        std::env::set_var("HOME", home.path());
+        std::env::set_var("SPAWNLLM_FAKE_KEYCHAIN_SERVICE", "Claude Code-credentials");
+    }
+    let spec = RunSpec::new("hi", "haiku").max_attempts(1).env(env(&[
+        ("SPAWNLLM_FAKE_CRED_OUT", &cred_path),
+        ("SPAWNLLM_FAKE_REJECTED_TOKEN", "keychain-token-xyz"),
+    ]));
+    let response = spawnllm::run_on(&Backend::Claude, spec).await;
+    unsafe { std::env::remove_var("SPAWNLLM_FAKE_KEYCHAIN_SERVICE") };
+    match original_home {
+        Some(value) => unsafe { std::env::set_var("HOME", value) },
+        None => unsafe { std::env::remove_var("HOME") },
+    }
+
+    response
+        .outcome
+        .expect("a rejected Keychain token falls through to the credentials file");
+    assert_eq!(std::fs::read_to_string(&cred_path).unwrap(), "file-token");
+}
