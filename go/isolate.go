@@ -78,7 +78,9 @@ func seedClaudeIsolation(apiAuth bool) (*claudeIsolation, error) {
 func rejectedTokenList() []string {
 	rejectedTokens.Lock()
 	defer rejectedTokens.Unlock()
-	return slices.Sorted(maps.Keys(rejectedTokens.set))
+	tokens := slices.AppendSeq([]string{}, maps.Keys(rejectedTokens.set))
+	slices.Sort(tokens)
+	return tokens
 }
 
 func (i *claudeIsolation) rejectCredentials(errMsg string) (bool, error) {
