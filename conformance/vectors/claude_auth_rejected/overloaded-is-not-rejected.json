@@ -1,0 +1,10 @@
+{
+  "name": "overloaded-is-not-rejected",
+  "op": "claude_auth_rejected",
+  "input": {
+    "error_msg": "API Error: 529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}"
+  },
+  "expected": {
+    "rejected": false
+  }
+}

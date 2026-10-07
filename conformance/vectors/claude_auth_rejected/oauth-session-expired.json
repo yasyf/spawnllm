@@ -1,0 +1,10 @@
+{
+  "name": "oauth-session-expired",
+  "op": "claude_auth_rejected",
+  "input": {
+    "error_msg": "claude exited 1: Failed to authenticate: OAuth session expired and could not be refreshed"
+  },
+  "expected": {
+    "rejected": true
+  }
+}

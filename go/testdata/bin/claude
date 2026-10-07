@@ -1,7 +1,8 @@
 #!/bin/sh
 # Fake claude CLI for spawnllm integration tests. Reads the prompt from stdin,
 # reports whether its stdout fd is a regular file, echoes its isolated config
-# home, and supports a one-shot transient failure and a sleep for timeout tests.
+# home, and supports a one-shot transient failure, a revoked OAuth token, and a
+# sleep for timeout tests.
 prompt="$(cat)"
 
 if [ -n "$FAKE_SLEEP" ]; then
@@ -49,6 +50,11 @@ if [ -n "$FAKE_TRANSIENT_COUNTER" ]; then
 		printf '{"type":"result","is_error":true,"result":"529 overloaded"}\n'
 		exit 0
 	fi
+fi
+
+if [ -n "$FAKE_REJECTED_TOKEN" ] && [ "$oauth_token" = "$FAKE_REJECTED_TOKEN" ]; then
+	echo "Failed to authenticate: OAuth token revoked. Please log in again or contact your administrator."
+	exit 1
 fi
 
 printf '{"type":"result","is_error":false,"result":"%s","stdout_regular":%s,"config_dir":"%s","oauth_token":"%s","seeded":%s,"account_has_mcp":%s,"creds_present":%s,"config_dir_mode":"%s","creds_mode":"%s"}\n' \

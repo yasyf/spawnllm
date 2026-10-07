@@ -500,14 +500,17 @@ class CliBackend(LlmBackend):
         return Response(spec=spec, output=Output(""), error=Error(msg, TimeoutError(msg)))
 
     async def aexecute(self, spec: RunSpec) -> Response:
-        inv = self.invocation(spec)
+        return await self.aexecute_invocation(spec, self.invocation(spec))
+
+    async def aexecute_invocation(self, spec: RunSpec, inv: Invocation) -> Response:
+        """Run a materialized `inv` asynchronously and resolve it, removing its temp files."""
         try:
             try:
                 rr = await acapture_cli(
                     inv.argv,
                     input=inv.stdin,
                     env={key: value for key, value in os.environ.items() if key not in inv.env_unset}
-                    | self.env(spec)
+                    | inv.env
                     | (spec.env or {}),
                     cwd=spec.cwd,
                     timeout=spec.timeout,
@@ -522,14 +525,17 @@ class CliBackend(LlmBackend):
         return self.to_response(raw, returncode=rr.returncode, stderr=rr.stderr, spec=spec)
 
     def execute(self, spec: RunSpec) -> Response:
-        inv = self.invocation(spec)
+        return self.execute_invocation(spec, self.invocation(spec))
+
+    def execute_invocation(self, spec: RunSpec, inv: Invocation) -> Response:
+        """Run a materialized `inv` and resolve it, removing its temp files."""
         try:
             try:
                 rr = capture_cli(
                     inv.argv,
                     input=inv.stdin,
                     env={key: value for key, value in os.environ.items() if key not in inv.env_unset}
-                    | self.env(spec)
+                    | inv.env
                     | (spec.env or {}),
                     cwd=spec.cwd,
                     timeout=spec.timeout,

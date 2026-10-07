@@ -3,7 +3,8 @@
   "op": "claude_isolation_seed",
   "input": {
     "account_json": null,
-    "credentials_json": null
+    "credentials_json": [],
+    "rejected_tokens": []
   },
   "expected": {
     "files": [],

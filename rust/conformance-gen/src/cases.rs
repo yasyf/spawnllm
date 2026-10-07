@@ -1191,13 +1191,25 @@ fn iso_sources_cases() -> Vec<Case> {
     ]
 }
 
-fn iso_seed_case(name: &str, account_json: Option<&str>, credentials_json: Option<&str>) -> Case {
+fn iso_seed_case(
+    name: &str,
+    account_json: Option<&str>,
+    credentials_json: &[&str],
+    rejected_tokens: &[&str],
+) -> Case {
     Case {
         op: "claude_isolation_seed",
         name: name.to_owned(),
-        input: json!({"account_json": account_json, "credentials_json": credentials_json}),
+        input: json!({
+            "account_json": account_json,
+            "credentials_json": credentials_json,
+            "rejected_tokens": rejected_tokens,
+        }),
     }
 }
+
+const KEYCHAIN_CREDENTIALS: &str = r#"{"claudeAiOauth": {"accessToken": "kc-tok"}}"#;
+const FILE_CREDENTIALS: &str = r#"{"claudeAiOauth": {"accessToken": "file-tok"}}"#;
 
 fn iso_seed_cases() -> Vec<Case> {
     vec![
@@ -1206,23 +1218,83 @@ fn iso_seed_cases() -> Vec<Case> {
             Some(
                 r#"{"oauthAccount": {"accountUuid": "a"}, "mcpServers": {"semble": {"command": "x"}}}"#,
             ),
-            Some(r#"{"claudeAiOauth": {"accessToken": "tok"}}"#),
+            &[r#"{"claudeAiOauth": {"accessToken": "tok"}}"#],
+            &[],
         ),
         iso_seed_case(
             "account-only",
             Some(r#"{"oauthAccount": {"accountUuid": "b"}, "mcpServers": {"s": {}}}"#),
-            None,
+            &[],
+            &[],
         ),
-        iso_seed_case(
-            "credentials-only",
-            None,
-            Some(r#"{"claudeAiOauth": {"accessToken": "kc-tok"}}"#),
-        ),
-        iso_seed_case("both-null", None, None),
+        iso_seed_case("credentials-only", None, &[KEYCHAIN_CREDENTIALS], &[]),
+        iso_seed_case("both-null", None, &[], &[]),
         iso_seed_case(
             "account-without-mcp-servers",
             Some(r#"{"oauthAccount": {"accountUuid": "c"}}"#),
+            &[],
+            &[],
+        ),
+        iso_seed_case(
+            "first-credentials-win",
             None,
+            &[KEYCHAIN_CREDENTIALS, FILE_CREDENTIALS],
+            &[],
+        ),
+        iso_seed_case(
+            "rejected-token-falls-through",
+            None,
+            &[KEYCHAIN_CREDENTIALS, FILE_CREDENTIALS],
+            &["kc-tok"],
+        ),
+        iso_seed_case(
+            "all-rejected-keeps-first",
+            None,
+            &[KEYCHAIN_CREDENTIALS, FILE_CREDENTIALS],
+            &["file-tok", "kc-tok"],
+        ),
+        iso_seed_case(
+            "credentials-without-oauth-skipped",
+            None,
+            &[r#"{"mcpOAuth": {}}"#, FILE_CREDENTIALS],
+            &[],
+        ),
+    ]
+}
+
+fn auth_rejected_case(name: &str, error_msg: &str) -> Case {
+    Case {
+        op: "claude_auth_rejected",
+        name: name.to_owned(),
+        input: json!({"error_msg": error_msg}),
+    }
+}
+
+fn auth_rejected_cases() -> Vec<Case> {
+    vec![
+        auth_rejected_case(
+            "oauth-token-revoked",
+            "claude exited 1: Failed to authenticate: OAuth token revoked. Please log in again or contact your administrator.",
+        ),
+        auth_rejected_case(
+            "oauth-session-expired",
+            "claude exited 1: Failed to authenticate: OAuth session expired and could not be refreshed",
+        ),
+        auth_rejected_case(
+            "api-401-authentication-error",
+            r#"API Error: 401 {"type":"error","error":{"type":"authentication_error","message":"Invalid bearer token"}}"#,
+        ),
+        auth_rejected_case(
+            "access-token-has-been-revoked",
+            r#"API Error: 401 {"type":"error","error":{"type":"permission_error","message":"OAuth access token has been revoked"}}"#,
+        ),
+        auth_rejected_case(
+            "overloaded-is-not-rejected",
+            r#"API Error: 529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#,
+        ),
+        auth_rejected_case(
+            "nonzero-exit-is-not-rejected",
+            "claude exited 1: tool use failed",
         ),
     ]
 }
@@ -1483,6 +1555,7 @@ pub fn all_cases() -> Vec<Case> {
     cases.extend(capabilities_cases());
     cases.extend(iso_sources_cases());
     cases.extend(iso_seed_cases());
+    cases.extend(auth_rejected_cases());
     cases.extend(decide_plan_cases());
     cases.extend(decide_resolve_cases());
     cases

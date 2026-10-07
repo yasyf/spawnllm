@@ -96,7 +96,9 @@ fn run(op: &str, input: Value) -> OpResult {
         "resolve" => resolve::dispatch(input),
         "strict_schema" => schema::dispatch(input),
         "auth_probes" => probe::dispatch(input),
-        "claude_isolation_sources" | "claude_isolation_seed" => isolate::dispatch(op, input),
+        "claude_isolation_sources" | "claude_isolation_seed" | "claude_auth_rejected" => {
+            isolate::dispatch(op, input)
+        }
         "decide_plan" | "decide_resolve" => decide::dispatch(op, input),
         other => Err(OpError {
             kind: "unknown_op",

@@ -1,0 +1,10 @@
+{
+  "name": "oauth-token-revoked",
+  "op": "claude_auth_rejected",
+  "input": {
+    "error_msg": "claude exited 1: Failed to authenticate: OAuth token revoked. Please log in again or contact your administrator."
+  },
+  "expected": {
+    "rejected": true
+  }
+}

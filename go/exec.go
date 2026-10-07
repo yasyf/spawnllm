@@ -22,7 +22,35 @@ func (b *cliBackend) execute(ctx context.Context, spec RunSpec, wantsValue bool)
 	if kind != "exec" {
 		return nil, fmt.Errorf("spawnllm: provider %q planned a %s invocation, want exec", b.provider, kind)
 	}
-	output, returncode, stderr, timedOut, err := runExecPlan(ctx, plan, spec)
+	if !plan.NeedsClaudeIsolation {
+		return b.runAttempt(ctx, plan, spec, nil, wantsValue)
+	}
+	isolation, err := seedClaudeIsolation(spec.APIAuth)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		att, err := b.runAttempt(ctx, plan, spec, isolation, wantsValue)
+		isolation.cleanup()
+		if err != nil || att.resp.Err == nil {
+			return att, err
+		}
+		rejected, err := isolation.rejectCredentials(att.resp.Err.Msg)
+		if err != nil || !rejected {
+			return att, err
+		}
+		if isolation, err = seedClaudeIsolation(spec.APIAuth); err != nil {
+			return nil, err
+		}
+		if isolation.tokenRejected() {
+			isolation.cleanup()
+			return att, nil
+		}
+	}
+}
+
+func (b *cliBackend) runAttempt(ctx context.Context, plan execPlan, spec RunSpec, isolation *claudeIsolation, wantsValue bool) (*attempt, error) {
+	output, returncode, stderr, timedOut, err := runExecPlan(ctx, plan, spec, isolation)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +60,7 @@ func (b *cliBackend) execute(ctx context.Context, spec RunSpec, wantsValue bool)
 	return finishAttempt(spec, b.provider, output, returncode, stderr, wantsValue)
 }
 
-func runExecPlan(ctx context.Context, plan execPlan, spec RunSpec) (output string, returncode int, stderr string, timedOut bool, err error) {
+func runExecPlan(ctx context.Context, plan execPlan, spec RunSpec, isolation *claudeIsolation) (output string, returncode int, stderr string, timedOut bool, err error) {
 	var cleanups []func()
 	defer func() {
 		for _, c := range cleanups {
@@ -51,14 +79,9 @@ func runExecPlan(ctx context.Context, plan execPlan, spec RunSpec) (output strin
 	}
 
 	env := plan.Env
-	if plan.NeedsClaudeIsolation {
-		dir, seedEnv, cleanup, e := seedClaudeIsolation(spec.APIAuth)
-		if e != nil {
-			return "", 0, "", false, e
-		}
-		cleanups = append(cleanups, cleanup)
-		env = substituteIsolationDir(plan.Env, dir)
-		maps.Copy(env, seedEnv)
+	if isolation != nil {
+		env = substituteIsolationDir(plan.Env, isolation.dir)
+		maps.Copy(env, isolation.env)
 	}
 
 	argv := substituteFiles(plan.Argv, paths)

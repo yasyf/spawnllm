@@ -1,0 +1,10 @@
+{
+  "name": "nonzero-exit-is-not-rejected",
+  "op": "claude_auth_rejected",
+  "input": {
+    "error_msg": "claude exited 1: tool use failed"
+  },
+  "expected": {
+    "rejected": false
+  }
+}

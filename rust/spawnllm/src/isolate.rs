@@ -1,9 +1,10 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 #[cfg(any(target_os = "macos", test))]
 use std::process::Output;
+use std::sync::Mutex;
 #[cfg(any(target_os = "macos", test))]
 use std::time::Duration;
 
@@ -14,6 +15,10 @@ use tempfile::TempDir;
 use crate::core_io::core_op;
 use crate::error::Error;
 use crate::host::{home, platform};
+
+const OAUTH_TOKEN_ENV: &str = "CLAUDE_CODE_OAUTH_TOKEN";
+
+static REJECTED_TOKENS: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
 
 #[derive(Debug, Deserialize)]
 struct Sources {
@@ -35,9 +40,34 @@ struct SeedFile {
     mode: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct AuthRejected {
+    rejected: bool,
+}
+
 pub(crate) struct Isolation {
     pub(crate) dir: TempDir,
     pub(crate) env: BTreeMap<String, String>,
+}
+
+impl Isolation {
+    pub(crate) fn reject_credentials(&self, error_msg: &str) -> Result<bool, Error> {
+        let Some(token) = self.env.get(OAUTH_TOKEN_ENV) else {
+            return Ok(false);
+        };
+        let verdict: AuthRejected =
+            core_op("claude_auth_rejected", json!({ "error_msg": error_msg }))?;
+        if verdict.rejected {
+            REJECTED_TOKENS.lock().unwrap().insert(token.clone());
+        }
+        Ok(verdict.rejected)
+    }
+
+    pub(crate) fn token_rejected(&self) -> bool {
+        self.env
+            .get(OAUTH_TOKEN_ENV)
+            .is_some_and(|token| REJECTED_TOKENS.lock().unwrap().contains(token))
+    }
 }
 
 pub(crate) async fn seed_isolation(api_auth: bool) -> Result<Isolation, Error> {
@@ -57,21 +87,24 @@ pub(crate) async fn seed_isolation(api_auth: bool) -> Result<Isolation, Error> {
         .account_path
         .as_deref()
         .and_then(|path| std::fs::read_to_string(path).ok());
-    let credentials_json = match sources
+    let keychain_json = match &sources.keychain_service {
+        Some(service) => keychain_credentials(service).await,
+        None => None,
+    };
+    let file_json = sources
         .credentials_path
         .as_deref()
-        .and_then(|path| std::fs::read_to_string(path).ok())
-    {
-        Some(text) => Some(text),
-        None => match &sources.keychain_service {
-            Some(service) => keychain_credentials(service).await,
-            None => None,
-        },
-    };
+        .and_then(|path| std::fs::read_to_string(path).ok());
+    let credentials_json: Vec<String> = keychain_json.into_iter().chain(file_json).collect();
+    let rejected_tokens: Vec<String> = REJECTED_TOKENS.lock().unwrap().iter().cloned().collect();
 
     let seed: Seed = core_op(
         "claude_isolation_seed",
-        json!({ "account_json": account_json, "credentials_json": credentials_json }),
+        json!({
+            "account_json": account_json,
+            "credentials_json": credentials_json,
+            "rejected_tokens": rejected_tokens,
+        }),
     )?;
 
     let dir = private_tempdir()?;

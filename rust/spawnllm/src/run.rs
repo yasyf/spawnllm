@@ -150,7 +150,7 @@ async fn exec_loop(
     provider: &'static str,
     wants_value: bool,
 ) -> Response {
-    let isolation = if plan.needs_claude_isolation {
+    let mut isolation = if plan.needs_claude_isolation {
         match crate::isolate::seed_isolation(spec.api_auth).await {
             Ok(isolation) => Some(isolation),
             Err(error) => return error_response(spec, error, Vec::new()),
@@ -162,12 +162,30 @@ async fn exec_loop(
     let mut discarded = Vec::new();
     let max = spec.max_attempts.max(1);
     for attempt in 0..max {
-        let outcome =
-            crate::exec::exec_attempt(&plan, &spec, provider, isolation.as_ref(), wants_value)
-                .await;
-        let att = match outcome {
-            Ok(att) => att,
-            Err(error) => return error_response(spec, error.into(), discarded),
+        let att = loop {
+            let outcome =
+                crate::exec::exec_attempt(&plan, &spec, provider, isolation.as_ref(), wants_value)
+                    .await;
+            let att = match outcome {
+                Ok(att) => att,
+                Err(error) => return error_response(spec, error.into(), discarded),
+            };
+            let (Some(current), AttemptKind::Error { msg, .. }) = (&isolation, &att.kind) else {
+                break att;
+            };
+            match current.reject_credentials(msg) {
+                Ok(true) => {}
+                Ok(false) => break att,
+                Err(error) => return error_response(spec, error, discarded),
+            }
+            let next = match crate::isolate::seed_isolation(spec.api_auth).await {
+                Ok(next) => next,
+                Err(error) => return error_response(spec, error, discarded),
+            };
+            if next.token_rejected() {
+                break att;
+            }
+            isolation = Some(next);
         };
         if let Some((output, outcome)) = settle(provider, attempt, max, att, &mut discarded).await {
             return Response {

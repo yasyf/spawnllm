@@ -1,0 +1,20 @@
+{
+  "name": "rejected-token-falls-through",
+  "op": "claude_isolation_seed",
+  "input": {
+    "account_json": null,
+    "credentials_json": [
+      "{\"claudeAiOauth\": {\"accessToken\": \"kc-tok\"}}",
+      "{\"claudeAiOauth\": {\"accessToken\": \"file-tok\"}}"
+    ],
+    "rejected_tokens": [
+      "kc-tok"
+    ]
+  },
+  "expected": {
+    "files": [],
+    "env": {
+      "CLAUDE_CODE_OAUTH_TOKEN": "file-tok"
+    }
+  }
+}

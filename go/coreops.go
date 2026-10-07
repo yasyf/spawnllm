@@ -225,11 +225,21 @@ func coreIsolationSources(apiAuth bool) (isolationSources, error) {
 	}{Host: host, APIAuth: apiAuth})
 }
 
-func coreIsolationSeed(accountJSON, credentialsJSON *string) (isolationSeed, error) {
+func coreIsolationSeed(accountJSON *string, credentialsJSON, rejectedTokens []string) (isolationSeed, error) {
 	return coreInto[isolationSeed]("claude_isolation_seed", struct {
-		AccountJSON     *string `json:"account_json"`
-		CredentialsJSON *string `json:"credentials_json"`
-	}{AccountJSON: accountJSON, CredentialsJSON: credentialsJSON})
+		AccountJSON     *string  `json:"account_json"`
+		CredentialsJSON []string `json:"credentials_json"`
+		RejectedTokens  []string `json:"rejected_tokens"`
+	}{AccountJSON: accountJSON, CredentialsJSON: credentialsJSON, RejectedTokens: rejectedTokens})
+}
+
+func coreAuthRejected(errorMsg string) (bool, error) {
+	out, err := coreInto[struct {
+		Rejected bool `json:"rejected"`
+	}]("claude_auth_rejected", struct {
+		ErrorMsg string `json:"error_msg"`
+	}{ErrorMsg: errorMsg})
+	return out.Rejected, err
 }
 
 func coreStrictSchema(dialect string, schema json.RawMessage) (json.RawMessage, error) {

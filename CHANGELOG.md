@@ -39,6 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   p50 and 1.15s at p95. The Rust `OpenAiEndpoint` struct gains a public
   field, so a struct literal that names every field must add it.
 
+### Fixed
+- **Isolated Claude runs read the macOS Keychain before
+  `~/.claude/.credentials.json`.** Claude Code reads its Keychain item first
+  and the plaintext file only when the item is missing; every host read them
+  the other way round, so a stale file shadowed the live login and runs
+  failed with `Failed to authenticate: OAuth token revoked`. A run whose
+  token the CLI rejects now retries once per remaining source and skips that
+  token for the rest of the process. The new `claude_auth_rejected` core op
+  recognizes the rejection, and `claude_isolation_seed` takes an ordered
+  `credentials_json` list plus `rejected_tokens`.
+
 ## [0.13.4] - 2026-09-17
 
 ### Security

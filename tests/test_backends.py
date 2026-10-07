@@ -204,7 +204,7 @@ class TestInvocationMaterialization:
 
 
 class TestCliEnvironment:
-    def test_execute_strips_planned_keys_with_two_plan_calls(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_execute_strips_planned_keys_with_one_plan_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-key")
         monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "inherited-token")
         monkeypatch.setenv("SPAWNLLM_KEEP", "kept")
@@ -231,9 +231,9 @@ class TestCliEnvironment:
         assert "ANTHROPIC_API_KEY" not in env
         assert "ANTHROPIC_AUTH_TOKEN" not in env
         assert env["SPAWNLLM_KEEP"] == "kept"
-        assert plan_calls == 2
+        assert plan_calls == 1
 
-    async def test_aexecute_api_auth_preserves_parent_env_with_two_plan_calls(
+    async def test_aexecute_api_auth_preserves_parent_env_with_one_plan_call(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-key")
@@ -260,9 +260,9 @@ class TestCliEnvironment:
         assert isinstance(env, dict)
         assert env["ANTHROPIC_API_KEY"] == "inherited-key"
         assert env["ANTHROPIC_AUTH_TOKEN"] == "inherited-token"
-        assert plan_calls == 2
+        assert plan_calls == 1
 
-    def test_execute_explicit_env_restores_stripped_key_with_two_plan_calls(
+    def test_execute_explicit_env_restores_stripped_key_with_one_plan_call(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-key")
@@ -294,7 +294,7 @@ class TestCliEnvironment:
         env = captured["env"]
         assert isinstance(env, dict)
         assert env["ANTHROPIC_API_KEY"] == "explicit-key"
-        assert plan_calls == 2
+        assert plan_calls == 1
 
 
 def suffixed_keychain_service(config_dir_env: str) -> str:
@@ -305,6 +305,7 @@ class TestClaudeIsolation:
     @pytest.fixture(autouse=True)
     def no_inherited_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+        monkeypatch.setattr("spawnllm.backends.claude.sys.platform", "linux")
 
     def test_env_isolates_and_seeds_config_dir_from_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
@@ -382,6 +383,85 @@ class TestClaudeIsolation:
         assert calls == [["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"]]
         assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "kc-tok"
         assert not (Path(env["CLAUDE_CONFIG_DIR"]) / ".credentials.json").exists()
+
+    @staticmethod
+    def darwin_home_with_both_sources(home: Path, monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+        monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+        monkeypatch.setenv("HOME", str(home))
+        (home / ".claude").mkdir()
+        (home / ".claude" / ".credentials.json").write_text('{"claudeAiOauth": {"accessToken": "file-tok"}}')
+        monkeypatch.setattr("spawnllm.backends.claude.sys.platform", "darwin")
+        calls: list[list[str]] = []
+
+        def fake_run(argv: list[str], **kwargs: object) -> object:
+            calls.append(argv)
+            return type("P", (), {"returncode": 0, "stdout": '{"claudeAiOauth": {"accessToken": "kc-tok"}}\n'})()
+
+        monkeypatch.setattr("spawnllm.backends.claude.subprocess.run", fake_run)
+        return calls
+
+    def test_env_prefers_the_keychain_over_the_credentials_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls = self.darwin_home_with_both_sources(tmp_path, monkeypatch)
+        env = ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku"))
+        assert calls == [["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"]]
+        assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "kc-tok"
+
+    @staticmethod
+    def rejecting(*rejected: str) -> tuple[list[str], Callable[..., RunResult]]:
+        tokens: list[str] = []
+
+        def fake_capture_cli(argv: list[str], **kwargs: object) -> RunResult:
+            env = kwargs["env"]
+            assert isinstance(env, dict)
+            tokens.append(env["CLAUDE_CODE_OAUTH_TOKEN"])
+            if env["CLAUDE_CODE_OAUTH_TOKEN"] in rejected:
+                revoked = (
+                    "Failed to authenticate: OAuth token revoked. Please log in again or contact your administrator."
+                )
+                return RunResult(revoked, "", 1)
+            return RunResult(json.dumps({"type": "result", "is_error": False, "result": "ok"}), "", 0)
+
+        return tokens, fake_capture_cli
+
+    def test_execute_falls_through_a_rejected_token_to_the_next_source(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self.darwin_home_with_both_sources(tmp_path, monkeypatch)
+        tokens, fake_capture_cli = self.rejecting("kc-tok")
+        monkeypatch.setattr(base, "capture_cli", fake_capture_cli)
+        backend = ClaudeCliBackend()
+        first = backend.execute(RunSpec(prompt="hi", model="haiku"))
+        second = backend.execute(RunSpec(prompt="hi", model="haiku"))
+        assert first.error is None
+        assert second.error is None
+        assert tokens == ["kc-tok", "file-tok", "file-tok"]
+
+    async def test_aexecute_falls_through_a_rejected_token_to_the_next_source(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self.darwin_home_with_both_sources(tmp_path, monkeypatch)
+        tokens, fake_capture_cli = self.rejecting("kc-tok")
+
+        async def fake_acapture_cli(argv: list[str], **kwargs: object) -> RunResult:
+            return fake_capture_cli(argv, **kwargs)
+
+        monkeypatch.setattr(base, "acapture_cli", fake_acapture_cli)
+        response = await ClaudeCliBackend().aexecute(RunSpec(prompt="hi", model="haiku"))
+        assert response.error is None
+        assert tokens == ["kc-tok", "file-tok"]
+
+    def test_execute_returns_the_rejection_once_every_source_is_rejected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self.darwin_home_with_both_sources(tmp_path, monkeypatch)
+        tokens, fake_capture_cli = self.rejecting("kc-tok", "file-tok")
+        monkeypatch.setattr(base, "capture_cli", fake_capture_cli)
+        response = ClaudeCliBackend().execute(RunSpec(prompt="hi", model="haiku"))
+        assert response.error is not None
+        assert "OAuth token revoked" in response.error.msg
+        assert tokens == ["kc-tok", "file-tok"]
 
     def test_env_config_dir_falls_back_to_the_suffixed_keychain_item(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
