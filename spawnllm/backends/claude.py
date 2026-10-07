@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from spawnllm import _core
-from spawnllm.backends.base import ClaudeIsolation, CliBackend, Invocation
+from spawnllm.backends.base import ClaudeIsolation, CliBackend
 
 if TYPE_CHECKING:
     from spawnllm.response import Response
@@ -131,13 +131,13 @@ class ClaudeCliBackend(CliBackend):
                 self._isolated_config_dir = cached
         return ClaudeIsolation(cached, seed["env"])
 
-    def reject_credentials(self, spec: RunSpec, inv: Invocation, response: Response) -> bool:
-        """Record `inv`'s OAuth token as rejected when the core reads `response` as an auth failure.
+    def reject_credentials(self, spec: RunSpec, env: dict[str, str], response: Response) -> bool:
+        """Record the OAuth token in a run's `env` as rejected when the core reads `response` as an auth failure.
 
         Returns:
             `True` when another credential source remains to retry the run with.
         """
-        token = inv.env.get("CLAUDE_CODE_OAUTH_TOKEN")
+        token = env.get("CLAUDE_CODE_OAUTH_TOKEN")
         if token is None or response.error is None:
             return False
         if not _core.dispatch("claude_auth_rejected", {"error_msg": response.error.msg})["rejected"]:
@@ -146,17 +146,17 @@ class ClaudeCliBackend(CliBackend):
         return self.claude_isolation(spec.api_auth).env.get("CLAUDE_CODE_OAUTH_TOKEN") not in self._rejected_tokens
 
     async def aexecute(self, spec: RunSpec) -> Response:
-        inv = self.invocation(spec)
-        response = await self.aexecute_invocation(spec, inv)
-        while self.reject_credentials(spec, inv, response):
-            inv = self.invocation(spec)
-            response = await self.aexecute_invocation(spec, inv)
+        env = self.env(spec)
+        response = await self.aexecute_invocation(spec, self.invocation(spec), env)
+        while self.reject_credentials(spec, env, response):
+            env = self.env(spec)
+            response = await self.aexecute_invocation(spec, self.invocation(spec), env)
         return response
 
     def execute(self, spec: RunSpec) -> Response:
-        inv = self.invocation(spec)
-        response = self.execute_invocation(spec, inv)
-        while self.reject_credentials(spec, inv, response):
-            inv = self.invocation(spec)
-            response = self.execute_invocation(spec, inv)
+        env = self.env(spec)
+        response = self.execute_invocation(spec, self.invocation(spec), env)
+        while self.reject_credentials(spec, env, response):
+            env = self.env(spec)
+            response = self.execute_invocation(spec, self.invocation(spec), env)
         return response

@@ -204,7 +204,7 @@ class TestInvocationMaterialization:
 
 
 class TestCliEnvironment:
-    def test_execute_strips_planned_keys_with_one_plan_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_execute_strips_planned_keys_with_two_plan_calls(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-key")
         monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "inherited-token")
         monkeypatch.setenv("SPAWNLLM_KEEP", "kept")
@@ -231,9 +231,9 @@ class TestCliEnvironment:
         assert "ANTHROPIC_API_KEY" not in env
         assert "ANTHROPIC_AUTH_TOKEN" not in env
         assert env["SPAWNLLM_KEEP"] == "kept"
-        assert plan_calls == 1
+        assert plan_calls == 2
 
-    async def test_aexecute_api_auth_preserves_parent_env_with_one_plan_call(
+    async def test_aexecute_api_auth_preserves_parent_env_with_two_plan_calls(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-key")
@@ -260,9 +260,9 @@ class TestCliEnvironment:
         assert isinstance(env, dict)
         assert env["ANTHROPIC_API_KEY"] == "inherited-key"
         assert env["ANTHROPIC_AUTH_TOKEN"] == "inherited-token"
-        assert plan_calls == 1
+        assert plan_calls == 2
 
-    def test_execute_explicit_env_restores_stripped_key_with_one_plan_call(
+    def test_execute_explicit_env_restores_stripped_key_with_two_plan_calls(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-key")
@@ -294,7 +294,7 @@ class TestCliEnvironment:
         env = captured["env"]
         assert isinstance(env, dict)
         assert env["ANTHROPIC_API_KEY"] == "explicit-key"
-        assert plan_calls == 1
+        assert plan_calls == 2
 
 
 def suffixed_keychain_service(config_dir_env: str) -> str:

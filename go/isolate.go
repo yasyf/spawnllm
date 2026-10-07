@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-const oauthTokenEnv = "CLAUDE_CODE_OAUTH_TOKEN"
+const seededAuthEnv = "CLAUDE_CODE_OAUTH_TOKEN"
 
 var rejectedTokens = struct {
 	sync.Mutex
@@ -82,7 +82,7 @@ func rejectedTokenList() []string {
 }
 
 func (i *claudeIsolation) rejectCredentials(errMsg string) (bool, error) {
-	token, ok := i.env[oauthTokenEnv]
+	token, ok := i.env[seededAuthEnv]
 	if !ok {
 		return false, nil
 	}
@@ -99,7 +99,7 @@ func (i *claudeIsolation) rejectCredentials(errMsg string) (bool, error) {
 func (i *claudeIsolation) tokenRejected() bool {
 	rejectedTokens.Lock()
 	defer rejectedTokens.Unlock()
-	return rejectedTokens.set[i.env[oauthTokenEnv]]
+	return rejectedTokens.set[i.env[seededAuthEnv]]
 }
 
 func substituteIsolationDir(env map[string]string, dir string) map[string]string {
