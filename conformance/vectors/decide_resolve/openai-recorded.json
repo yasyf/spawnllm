@@ -1,0 +1,92 @@
+{
+  "name": "openai-recorded",
+  "op": "decide_resolve",
+  "input": {
+    "provider": {
+      "name": "openai",
+      "model": "m"
+    },
+    "questions": [
+      {
+        "type": "binary",
+        "id": "is_rollback_request",
+        "instructions": "Does the message ask to roll back a release?"
+      },
+      {
+        "type": "label",
+        "id": "action",
+        "instructions": "Which release action does the message ask for?",
+        "options": [
+          {
+            "value": "none",
+            "description": "No release action"
+          },
+          {
+            "value": "release",
+            "description": "Ship a new release"
+          },
+          {
+            "value": "rollback",
+            "description": "Roll back a release"
+          }
+        ]
+      },
+      {
+        "type": "score",
+        "id": "urgency",
+        "instructions": "How urgent is the message?",
+        "levels": [
+          {
+            "label": "Not urgent",
+            "description": null
+          },
+          {
+            "label": "Somewhat urgent",
+            "description": null
+          },
+          {
+            "label": "Blocking, needs action now",
+            "description": "customers are blocked"
+          }
+        ]
+      }
+    ],
+    "status": 200,
+    "body": "{\"model\":\"gpt-6-luna\",\"answers\":[{\"type\":\"predicate\",\"name\":\"is_rollback_request\",\"probability\":1.0},{\"type\":\"choice\",\"name\":\"action\",\"choice\":\"rollback\",\"probabilities\":[{\"value\":\"none\",\"probability\":0.0},{\"value\":\"release\",\"probability\":0.0},{\"value\":\"rollback\",\"probability\":1.0}],\"confidence\":1.0},{\"type\":\"score\",\"name\":\"urgency\",\"score\":2.0,\"probabilities\":[{\"value\":0,\"label\":\"Not urgent\",\"probability\":0.0},{\"value\":1,\"label\":\"Somewhat urgent\",\"probability\":0.0},{\"value\":2,\"label\":\"Blocking, needs action now\",\"probability\":1.0}],\"confidence\":1.0}],\"usage\":{\"input_tokens\":419,\"input_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0},\"output_tokens\":0,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":419}}",
+    "retry_after": null,
+    "retry_after_ms": null,
+    "attempt": 0
+  },
+  "expected": {
+    "kind": "decision",
+    "model": "gpt-6-luna",
+    "input_tokens": 419,
+    "answers": {
+      "is_rollback_request": {
+        "type": "binary",
+        "p_yes": 1.0,
+        "confidence": 1.0
+      },
+      "action": {
+        "type": "label",
+        "choice": "rollback",
+        "probabilities": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "confidence": 1.0
+      },
+      "urgency": {
+        "type": "score",
+        "score": 2.0,
+        "probabilities": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "confidence": 1.0
+      }
+    }
+  }
+}

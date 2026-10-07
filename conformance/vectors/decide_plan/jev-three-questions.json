@@ -1,0 +1,93 @@
+{
+  "name": "jev-three-questions",
+  "op": "decide_plan",
+  "input": {
+    "provider": {
+      "name": "jev",
+      "model": "jev-1.13.0"
+    },
+    "api_key": "test-key",
+    "state": "Help! Our nightly release has been failing for 3 days and customers are blocked. Please roll it back now.",
+    "questions": [
+      {
+        "type": "binary",
+        "id": "is_rollback_request",
+        "instructions": "Does the message ask to roll back a release?"
+      },
+      {
+        "type": "label",
+        "id": "action",
+        "instructions": "Which release action does the message ask for?",
+        "options": [
+          {
+            "value": "none",
+            "description": "No release action"
+          },
+          {
+            "value": "release",
+            "description": "Ship a new release"
+          },
+          {
+            "value": "rollback",
+            "description": "Roll back a release"
+          }
+        ]
+      },
+      {
+        "type": "score",
+        "id": "urgency",
+        "instructions": "How urgent is the message?",
+        "levels": [
+          {
+            "label": "Not urgent",
+            "description": null
+          },
+          {
+            "label": "Somewhat urgent",
+            "description": null
+          },
+          {
+            "label": "Blocking, needs action now",
+            "description": "customers are blocked"
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "kind": "http",
+    "method": "POST",
+    "url": "https://api.typesafe.ai/v1/systemone",
+    "headers": {
+      "Authorization": "Bearer test-key"
+    },
+    "body": {
+      "state": "Help! Our nightly release has been failing for 3 days and customers are blocked. Please roll it back now.",
+      "model": "jev-1.13.0",
+      "questions": {
+        "is_rollback_request": {
+          "type": "noul",
+          "instructions": "Does the message ask to roll back a release?"
+        },
+        "action": {
+          "type": "choice",
+          "instructions": "Which release action does the message ask for?",
+          "criteria": {
+            "none": "No release action",
+            "release": "Ship a new release",
+            "rollback": "Roll back a release"
+          }
+        },
+        "urgency": {
+          "type": "score",
+          "instructions": "How urgent is the message?",
+          "criteria": [
+            "Not urgent",
+            "Somewhat urgent",
+            "Blocking, needs action now: customers are blocked"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -76,6 +76,24 @@ reference:
       - ClaudeConfig
       - CodexConfig
       - GeminiConfig
+  - title: Deciding
+    desc: Typed yes/no, label, and score decisions over TypeSafe Jev and OpenAI Decisions, one question set for either provider.
+    contents:
+      - decide.decide
+      - decide.decide_sync
+      - Binary
+      - Label
+      - Score
+      - Decision
+      - BinaryAnswer
+      - LabelAnswer
+      - ScoreAnswer
+      - Refused
+      - Provider
+      - DecideError
+      - DecideKeyMissing
+      - decide.api_key
+      - decide.store_key
   - title: Backends
     desc: CLI backends (Claude, Codex, and the Gemini family), the in-process Claude Agent SDK backend, the Apple Foundation Models backend over its bundled Swift sidecar, the MLX and OpenAI-endpoint backends, the specialty registry, backend selection, and install/auth status checks.
     contents:

@@ -15,8 +15,10 @@ from spawnllm.backends import (
 )
 from spawnllm.backends.registry import BACKENDS_BY_NAME, PRIORITY, select_backend
 from spawnllm.call import DEFAULT_MODEL, call_sync
+from spawnllm.decide import JEV, OPENAI, Provider, store_key
 
 BACKEND_NAMES = tuple(BACKENDS_BY_NAME)
+DECIDE_PROVIDERS: dict[str, Provider] = {provider.name: provider for provider in (JEV, OPENAI)}
 
 
 @click.group()
@@ -69,3 +71,16 @@ def status() -> None:
     except BackendUnavailable:
         click.echo("selected: none available")
     click.echo(f"core: {(v := _core.version())['core_version']}@{v['source_hash'][:12]}")
+
+
+@main.group()
+def key() -> None:
+    """Manage the decision providers' API keys in the macOS Keychain."""
+
+
+@key.command("set")
+@click.argument("provider", type=click.Choice(list(DECIDE_PROVIDERS)))
+def key_set(provider: str) -> None:
+    """Store PROVIDER's API key, read from stdin, in the macOS Keychain, where `decide` reads it."""
+    store_key(DECIDE_PROVIDERS[provider], sys.stdin.read().strip())
+    click.echo(f"stored the {provider} key in the Keychain item spawnllm-{provider}-api-key")

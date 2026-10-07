@@ -1,0 +1,92 @@
+{
+  "name": "jev-recorded-reorders-to-declared",
+  "op": "decide_resolve",
+  "input": {
+    "provider": {
+      "name": "jev",
+      "model": "m"
+    },
+    "questions": [
+      {
+        "type": "binary",
+        "id": "is_rollback_request",
+        "instructions": "Does the message ask to roll back a release?"
+      },
+      {
+        "type": "label",
+        "id": "action",
+        "instructions": "Which release action does the message ask for?",
+        "options": [
+          {
+            "value": "none",
+            "description": "No release action"
+          },
+          {
+            "value": "release",
+            "description": "Ship a new release"
+          },
+          {
+            "value": "rollback",
+            "description": "Roll back a release"
+          }
+        ]
+      },
+      {
+        "type": "score",
+        "id": "urgency",
+        "instructions": "How urgent is the message?",
+        "levels": [
+          {
+            "label": "Not urgent",
+            "description": null
+          },
+          {
+            "label": "Somewhat urgent",
+            "description": null
+          },
+          {
+            "label": "Blocking, needs action now",
+            "description": "customers are blocked"
+          }
+        ]
+      }
+    ],
+    "status": 200,
+    "body": "{\"model\":\"jev-1.13.0\",\"answers\":{\"is_rollback_request\":{\"type\":\"noul\",\"noul\":0.99},\"action\":{\"type\":\"choice\",\"choice\":\"rollback\",\"confidence\":1.0,\"probabilities\":{\"release\":0.0,\"rollback\":1.0,\"none\":0.0}},\"urgency\":{\"type\":\"score\",\"score\":2.0,\"confidence\":1.0,\"legend\":{\"0\":\"Not urgent\",\"1\":\"Somewhat urgent\",\"2\":\"Blocking, needs action now\"},\"probabilities\":{\"0\":0.0,\"1\":0.0,\"2\":1.0}}},\"usage\":{\"input_tokens\":414,\"output_tokens\":73}}",
+    "retry_after": null,
+    "retry_after_ms": null,
+    "attempt": 0
+  },
+  "expected": {
+    "kind": "decision",
+    "model": "jev-1.13.0",
+    "input_tokens": 414,
+    "answers": {
+      "is_rollback_request": {
+        "type": "binary",
+        "p_yes": 0.99,
+        "confidence": 0.98
+      },
+      "action": {
+        "type": "label",
+        "choice": "rollback",
+        "probabilities": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "confidence": 1.0
+      },
+      "urgency": {
+        "type": "score",
+        "score": 2.0,
+        "probabilities": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "confidence": 1.0
+      }
+    }
+  }
+}

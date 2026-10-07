@@ -1,0 +1,64 @@
+{
+  "name": "openai-503-http-date-retry-after-backs-off",
+  "op": "decide_resolve",
+  "input": {
+    "provider": {
+      "name": "openai",
+      "model": "m"
+    },
+    "questions": [
+      {
+        "type": "binary",
+        "id": "is_rollback_request",
+        "instructions": "Does the message ask to roll back a release?"
+      },
+      {
+        "type": "label",
+        "id": "action",
+        "instructions": "Which release action does the message ask for?",
+        "options": [
+          {
+            "value": "none",
+            "description": "No release action"
+          },
+          {
+            "value": "release",
+            "description": "Ship a new release"
+          },
+          {
+            "value": "rollback",
+            "description": "Roll back a release"
+          }
+        ]
+      },
+      {
+        "type": "score",
+        "id": "urgency",
+        "instructions": "How urgent is the message?",
+        "levels": [
+          {
+            "label": "Not urgent",
+            "description": null
+          },
+          {
+            "label": "Somewhat urgent",
+            "description": null
+          },
+          {
+            "label": "Blocking, needs action now",
+            "description": "customers are blocked"
+          }
+        ]
+      }
+    ],
+    "status": 503,
+    "body": "",
+    "retry_after": "Wed, 21 Oct 2026 07:28:00 GMT",
+    "retry_after_ms": null,
+    "attempt": 2
+  },
+  "expected": {
+    "kind": "retry",
+    "sleep_s": 2.0
+  }
+}

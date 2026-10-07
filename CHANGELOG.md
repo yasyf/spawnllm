@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`decide` and `decide_sync` ask typed questions of TypeSafe Jev or OpenAI
+  Decisions.** A `Binary`, `Label`, or `Score` question set runs unchanged
+  on either provider (`JEV`, pinned to `jev-1.13.0`, or `OPENAI`, on
+  `gpt-6-luna`), and every answer comes back in declared order: a
+  `BinaryAnswer` with `p_yes`, a `LabelAnswer` or `ScoreAnswer` with
+  per-option probabilities and a confidence, or `Refused` when OpenAI
+  declines one question and answers the rest. The Rust core owns both wire
+  mappings and the retry policy as the `decide_plan` and `decide_resolve`
+  ops, pinned by 21 new golden vectors that include one recorded response
+  from each provider. The policy retries 408, 429, 5xx, 529, and a lost
+  connection, backing off from 0.5s to a 5s cap and honoring `retry-after`
+  and `retry-after-ms`, but only while the retry fits inside the caller's
+  `timeout`. A 401 or 422 raises `DecideError` on the first try. Each
+  process keeps one keep-alive client, and a warm three-question Jev call
+  measured 120 to 130 ms end to end from a Mac. Keys come from
+  `TYPESAFE_API_KEY` or `OPENAI_API_KEY`. On macOS, an unset variable falls
+  through to the Keychain item that `spawnllm key set jev` (or `openai`)
+  writes from stdin, read at call time.
 - **The OpenAI-compatible endpoint backend sets `reasoning_effort`.** A typed
   `reasoning_effort` (`none`, `minimal`, `low`, `medium`, `high` or `xhigh`)
   on the endpoint config goes into every `/chat/completions` request body,

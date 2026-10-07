@@ -1,0 +1,43 @@
+{
+  "name": "jev-binary-criteria",
+  "op": "decide_plan",
+  "input": {
+    "provider": {
+      "name": "jev",
+      "model": "jev-1.13.0"
+    },
+    "api_key": "test-key",
+    "state": "Help! Our nightly release has been failing for 3 days and customers are blocked. Please roll it back now.",
+    "questions": [
+      {
+        "type": "binary",
+        "id": "is_urgent",
+        "instructions": "Does this convey urgency?",
+        "yes": "Explicitly time-sensitive",
+        "no": "No urgency expressed"
+      }
+    ]
+  },
+  "expected": {
+    "kind": "http",
+    "method": "POST",
+    "url": "https://api.typesafe.ai/v1/systemone",
+    "headers": {
+      "Authorization": "Bearer test-key"
+    },
+    "body": {
+      "state": "Help! Our nightly release has been failing for 3 days and customers are blocked. Please roll it back now.",
+      "model": "jev-1.13.0",
+      "questions": {
+        "is_urgent": {
+          "type": "noul",
+          "instructions": "Does this convey urgency?",
+          "criteria": {
+            "true": "Explicitly time-sensitive",
+            "false": "No urgency expressed"
+          }
+        }
+      }
+    }
+  }
+}
