@@ -20,9 +20,8 @@ from importlib.resources import files
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from wasmtime import Engine, Func, Linker, Memory, Module, Store, Trap, WasiConfig, WasmtimeError
-
 if TYPE_CHECKING:
+    from wasmtime import Func, Memory, Store
     from wasmtime._instance import InstanceExports
 
 WASM_NAME = "spawnllm_core.wasm"
@@ -59,6 +58,8 @@ class Runtime:
     stderr_path: Path
 
     def invoke(self, request_json: str) -> str:
+        from wasmtime import Trap, WasmtimeError
+
         request = request_json.encode()
         request_len = len(request)
         request_ptr = self.alloc(self.store, request_len)
@@ -90,6 +91,8 @@ def export[T](exports: InstanceExports, name: str, kind: type[T]) -> T:
 
 
 def build() -> Runtime:
+    from wasmtime import Engine, Func, Linker, Memory, Module, Store, WasiConfig
+
     blob = files(__package__).joinpath(WASM_NAME)
     if not blob.is_file():
         raise FileNotFoundError(MISSING_BLOB)
@@ -145,6 +148,8 @@ def trap_message(runtime: Runtime, error: Exception) -> str:
 
 
 def dispatch_raw(request_json: str) -> str:
+    from wasmtime import Trap, WasmtimeError
+
     with LOCK:
         runtime = load()
         try:
