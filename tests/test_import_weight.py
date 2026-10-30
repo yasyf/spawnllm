@@ -36,6 +36,7 @@ def test_metadata_import_does_not_load_wasmtime(module: str, symbol: str) -> Non
         import sys
         from pathlib import Path
 
+        assert "wasmtime" not in sys.modules
         loaded = []
 
         def record(event, args):
