@@ -66,6 +66,24 @@ jobs:
       - name: Sync (dev)
         run: uv sync --extra dev
 
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        if: matrix.python-version == '3.13'
+        with:
+          ref: 6a26b9c96af5951bcde6b15d0e4bd47de10964cf
+          path: .ci-checkpoint-baseline
+
+      - name: Immutable uncancelled child reproduction and checkpoint reaping
+        if: matrix.python-version == '3.13'
+        run: |
+          test "$(git -C .ci-checkpoint-baseline rev-parse HEAD)" = 6a26b9c96af5951bcde6b15d0e4bd47de10964cf
+          if SPAWNLLM_PROC_BEFORE="$GITHUB_WORKSPACE/.ci-checkpoint-baseline/spawnllm/proc.py" uv run pytest tests/test_cli_checkpoint.py -q -s -k test_inflight_checkpoint_reaps_only_its_owned_child > "$RUNNER_TEMP/checkpoint-negative.log" 2>&1; then
+            cat "$RUNNER_TEMP/checkpoint-negative.log"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/checkpoint-negative.log"
+          grep -F 'owned child survived request cancellation:' "$RUNNER_TEMP/checkpoint-negative.log"
+          uv run pytest tests/test_cli_checkpoint.py -q -s
+
       - name: Type check (ty)
         continue-on-error: true
         run: uv run ty check spawnllm
