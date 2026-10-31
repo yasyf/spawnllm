@@ -7,6 +7,7 @@ import contextlib
 import os
 import subprocess
 import tempfile
+import time
 from collections.abc import Awaitable, Callable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +17,7 @@ __all__ = ["RunResult", "acapture_cli", "arun_cli", "capture_cli", "collect_proc
 # Drain stderr in fixed chunks: `StreamReader.readline` (what `async for` uses) caps a
 # line at 64 KiB and raises `LimitOverrunError` on a longer newline-free blob.
 _STDERR_CHUNK = 1 << 16
+CHECKPOINT_INTERVAL = 0.05
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +42,7 @@ def run_cli(
     timeout: int = 30,
     env: dict[str, str] | None = None,
     cwd: str | None = None,
+    checkpoint: Callable[[], None] | None = None,
 ) -> str:
     """Run a CLI command to completion and return its stdout.
 
@@ -49,6 +52,8 @@ def run_cli(
         timeout: Seconds to wait before the process is killed.
         env: Environment for the process; `None` inherits the current environment.
         cwd: Working directory for the process.
+        checkpoint: POSIX-only check before spawning, while waiting, and before returning.
+            An exception stops and reaps the direct child, then propagates unchanged.
 
     Returns:
         The decoded stdout.
@@ -57,16 +62,20 @@ def run_cli(
         subprocess.CalledProcessError: On a nonzero exit code, with the argv,
             exit code, and stdout/stderr tails attached as notes.
         subprocess.TimeoutExpired: When the process outlives `timeout`.
+        NotImplementedError: When a checkpoint is requested on a non-POSIX platform.
     """
-    result = subprocess.run(
-        argv,
-        input=input,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        env=env,
-        cwd=cwd,
-    )
+    if checkpoint is None:
+        result = subprocess.run(
+            argv,
+            input=input,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+            cwd=cwd,
+        )
+    else:
+        result = cancellable_cli(argv, input=input, timeout=timeout, env=env, cwd=cwd, checkpoint=checkpoint)
     if result.returncode != 0:
         err = subprocess.CalledProcessError(result.returncode, argv, output=result.stdout, stderr=result.stderr)
         err.add_note(f"argv: {argv}")
@@ -75,6 +84,49 @@ def run_cli(
         err.add_note(f"stdout: {result.stdout[-4096:]}")
         raise err
     return result.stdout
+
+
+def cancellable_cli(
+    argv: list[str],
+    *,
+    input: str | None,
+    timeout: int,
+    env: dict[str, str] | None,
+    cwd: str | None,
+    checkpoint: Callable[[], None],
+) -> subprocess.CompletedProcess[str]:
+    if os.name != "posix":
+        raise NotImplementedError("CLI cancellation checkpoints require POSIX")
+    checkpoint()
+    with subprocess.Popen(
+        argv,
+        stdin=subprocess.PIPE if input is not None else None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+        cwd=cwd,
+    ) as child:
+        deadline = time.monotonic() + timeout
+        partial = subprocess.TimeoutExpired(argv, timeout)
+        payload = input
+        try:
+            while True:
+                checkpoint()
+                if (remaining := deadline - time.monotonic()) <= 0:
+                    raise subprocess.TimeoutExpired(argv, timeout, output=partial.output, stderr=partial.stderr)
+                try:
+                    stdout, stderr = child.communicate(input=payload, timeout=min(CHECKPOINT_INTERVAL, remaining))
+                except subprocess.TimeoutExpired as expired:
+                    partial = expired
+                else:
+                    checkpoint()
+                    return subprocess.CompletedProcess(argv, child.wait(), stdout, stderr)
+                payload = None
+        except BaseException:
+            child.kill()
+            child.wait()
+            raise
 
 
 def capture_cli(
