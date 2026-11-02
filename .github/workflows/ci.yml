@@ -83,7 +83,7 @@ jobs:
             exit 1
           fi
           cat "$RUNNER_TEMP/plan-old.log"
-          grep -F '8 failed' "$RUNNER_TEMP/plan-old.log"
+          test "$(grep -Fc 'FAILED tests/test_cli_plan_reuse.py::test_one_expensive_plan_per_attempt[' "$RUNNER_TEMP/plan-old.log")" = 8
           test "$(grep -c 'PLAN_COUNTS .* plans=64 schemas=64 attempts=32$' "$RUNNER_TEMP/plan-old.log")" = 8
           grep -F 'duplicate expensive planning: actual=64 expected=32' "$RUNNER_TEMP/plan-old.log"
           cd "$GITHUB_WORKSPACE"
@@ -187,7 +187,7 @@ jobs:
             exit 1
           fi
           cat "$RUNNER_TEMP/plan-old.log"
-          grep -F '8 failed' "$RUNNER_TEMP/plan-old.log"
+          test "$(grep -Fc 'FAILED tests/test_cli_plan_reuse.py::test_one_expensive_plan_per_attempt[' "$RUNNER_TEMP/plan-old.log")" = 8
           test "$(grep -c 'PLAN_COUNTS .* plans=64 schemas=64 attempts=32$' "$RUNNER_TEMP/plan-old.log")" = 8
           grep -F 'duplicate expensive planning: actual=64 expected=32' "$RUNNER_TEMP/plan-old.log"
           cd "$GITHUB_WORKSPACE"
