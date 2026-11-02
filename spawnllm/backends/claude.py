@@ -146,17 +146,25 @@ class ClaudeCliBackend(CliBackend):
         return self.claude_isolation(spec.api_auth).env.get("CLAUDE_CODE_OAUTH_TOKEN") not in self._rejected_tokens
 
     async def aexecute(self, spec: RunSpec) -> Response:
-        env = self.env(spec)
-        response = await self.aexecute_invocation(spec, self.invocation(spec), env)
-        while self.reject_credentials(spec, env, response):
+        with self._reuse_plan(spec):
             env = self.env(spec)
-            response = await self.aexecute_invocation(spec, self.invocation(spec), env)
+            inv = self.invocation(spec)
+        response = await self.aexecute_invocation(spec, inv, env)
+        while self.reject_credentials(spec, env, response):
+            with self._reuse_plan(spec):
+                env = self.env(spec)
+                inv = self.invocation(spec)
+            response = await self.aexecute_invocation(spec, inv, env)
         return response
 
     def execute(self, spec: RunSpec) -> Response:
-        env = self.env(spec)
-        response = self.execute_invocation(spec, self.invocation(spec), env)
-        while self.reject_credentials(spec, env, response):
+        with self._reuse_plan(spec):
             env = self.env(spec)
-            response = self.execute_invocation(spec, self.invocation(spec), env)
+            inv = self.invocation(spec)
+        response = self.execute_invocation(spec, inv, env)
+        while self.reject_credentials(spec, env, response):
+            with self._reuse_plan(spec):
+                env = self.env(spec)
+                inv = self.invocation(spec)
+            response = self.execute_invocation(spec, inv, env)
         return response
