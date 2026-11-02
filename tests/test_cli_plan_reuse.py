@@ -143,7 +143,8 @@ async def test_one_expensive_plan_per_attempt(
             json.dumps(observation, sort_keys=True) + "\n"
         )
     print(
-        f"PLAN_COUNTS backend={backend.provider} async={asynchronous} isolated={isolated} plans={plan_calls} schemas={Answer.schema_calls} attempts=32"
+        f"PLAN_COUNTS backend={backend.provider} async={asynchronous} isolated={isolated} "
+        f"plans={plan_calls} schemas={Answer.schema_calls} attempts=32"
     )
     assert plan_calls == 32, f"duplicate expensive planning: actual={plan_calls} expected=32"
     assert Answer.schema_calls == 32, f"duplicate schema generation: actual={Answer.schema_calls} expected=32"
