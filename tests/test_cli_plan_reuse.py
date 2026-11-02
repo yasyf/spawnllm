@@ -127,7 +127,8 @@ async def test_one_expensive_plan_per_attempt(
     expected_isolation = 64 if backend_type is ClaudeCliBackend and isolated else 0
     assert isolation_calls == expected_isolation
     assert len(captures) == len(results) == 32
-    assert all(row == captures[0] for row in captures)
+    for index, row in enumerate(captures):
+        assert row == captures[0], (index, captures[0], row)
     observation = {
         "backend": backend.provider,
         "asynchronous": asynchronous,
