@@ -67,6 +67,49 @@ jobs:
         run: uv sync --extra dev
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: bdc032fc221459b7b828219c469befbc18ecdd73
+          path: .ci-plan-baseline
+
+      - name: Immutable duplicate planning and exact invocation parity
+        run: |
+          test "$(git -C .ci-plan-baseline rev-parse HEAD)" = bdc032fc221459b7b828219c469befbc18ecdd73
+          cp tests/test_cli_plan_reuse.py .ci-plan-baseline/tests/test_cli_plan_reuse.py
+          cp spawnllm/_core/spawnllm_core.wasm .ci-plan-baseline/spawnllm/_core/spawnllm_core.wasm
+          mkdir -p "$RUNNER_TEMP/plan-old" "$RUNNER_TEMP/plan-new"
+          cd .ci-plan-baseline
+          if SPAWNLLM_EXPECTED_SOURCE="$PWD" SPAWNLLM_PLAN_OBSERVATIONS="$RUNNER_TEMP/plan-old" PYTHONPATH="$PWD" uv run --project "$GITHUB_WORKSPACE" --no-sync python -m pytest tests/test_cli_plan_reuse.py -q -s -k test_one_expensive_plan_per_attempt > "$RUNNER_TEMP/plan-old.log" 2>&1; then
+            cat "$RUNNER_TEMP/plan-old.log"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/plan-old.log"
+          grep -F '8 failed' "$RUNNER_TEMP/plan-old.log"
+          test "$(grep -c 'PLAN_COUNTS .* plans=64 schemas=64 attempts=32$' "$RUNNER_TEMP/plan-old.log")" = 8
+          grep -F 'duplicate expensive planning: actual=64 expected=32' "$RUNNER_TEMP/plan-old.log"
+          cd "$GITHUB_WORKSPACE"
+          SPAWNLLM_EXPECTED_SOURCE="$PWD" SPAWNLLM_PLAN_OBSERVATIONS="$RUNNER_TEMP/plan-new" uv run --no-sync python -m pytest tests/test_cli_plan_reuse.py -q -s
+          python - <<'PY_COMPARE'
+          import os
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"])
+          old = {p.name: p.read_bytes() for p in (root / "plan-old").glob("*.json")}
+          new = {p.name: p.read_bytes() for p in (root / "plan-new").glob("*.json")}
+          assert len(old) == len(new) == 8, (old.keys(), new.keys())
+          assert old == new
+          print("PLAN_PARITY old=new:8 cases x32 attempts, args/env/files/output/isolation counts exact")
+          PY_COMPARE
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: cli-plan-linux-${{ matrix.python-version }}
+          path: |
+            ${{ runner.temp }}/plan-old.log
+            ${{ runner.temp }}/plan-old/*.json
+            ${{ runner.temp }}/plan-new/*.json
+          if-no-files-found: error
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         if: matrix.python-version == '3.13'
         with:
           ref: 6a26b9c96af5951bcde6b15d0e4bd47de10964cf
@@ -126,6 +169,49 @@ jobs:
 
       - name: Sync (dev)
         run: uv sync --extra dev
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: bdc032fc221459b7b828219c469befbc18ecdd73
+          path: .ci-plan-baseline
+
+      - name: Immutable duplicate planning and exact invocation parity
+        run: |
+          test "$(git -C .ci-plan-baseline rev-parse HEAD)" = bdc032fc221459b7b828219c469befbc18ecdd73
+          cp tests/test_cli_plan_reuse.py .ci-plan-baseline/tests/test_cli_plan_reuse.py
+          cp spawnllm/_core/spawnllm_core.wasm .ci-plan-baseline/spawnllm/_core/spawnllm_core.wasm
+          mkdir -p "$RUNNER_TEMP/plan-old" "$RUNNER_TEMP/plan-new"
+          cd .ci-plan-baseline
+          if SPAWNLLM_EXPECTED_SOURCE="$PWD" SPAWNLLM_PLAN_OBSERVATIONS="$RUNNER_TEMP/plan-old" PYTHONPATH="$PWD" uv run --project "$GITHUB_WORKSPACE" --no-sync python -m pytest tests/test_cli_plan_reuse.py -q -s -k test_one_expensive_plan_per_attempt > "$RUNNER_TEMP/plan-old.log" 2>&1; then
+            cat "$RUNNER_TEMP/plan-old.log"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/plan-old.log"
+          grep -F '8 failed' "$RUNNER_TEMP/plan-old.log"
+          test "$(grep -c 'PLAN_COUNTS .* plans=64 schemas=64 attempts=32$' "$RUNNER_TEMP/plan-old.log")" = 8
+          grep -F 'duplicate expensive planning: actual=64 expected=32' "$RUNNER_TEMP/plan-old.log"
+          cd "$GITHUB_WORKSPACE"
+          SPAWNLLM_EXPECTED_SOURCE="$PWD" SPAWNLLM_PLAN_OBSERVATIONS="$RUNNER_TEMP/plan-new" uv run --no-sync python -m pytest tests/test_cli_plan_reuse.py -q -s
+          python - <<'PY_COMPARE'
+          import os
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"])
+          old = {p.name: p.read_bytes() for p in (root / "plan-old").glob("*.json")}
+          new = {p.name: p.read_bytes() for p in (root / "plan-new").glob("*.json")}
+          assert len(old) == len(new) == 8, (old.keys(), new.keys())
+          assert old == new
+          print("PLAN_PARITY old=new:8 cases x32 attempts, args/env/files/output/isolation counts exact")
+          PY_COMPARE
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: cli-plan-macos-3.14
+          path: |
+            ${{ runner.temp }}/plan-old.log
+            ${{ runner.temp }}/plan-old/*.json
+            ${{ runner.temp }}/plan-new/*.json
+          if-no-files-found: error
 
       - name: Test (pytest)
         run: uv run pytest

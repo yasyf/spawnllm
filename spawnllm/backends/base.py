@@ -17,6 +17,10 @@ import subprocess
 import sys
 import tempfile
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -31,6 +35,9 @@ if TYPE_CHECKING:
 
     from spawnllm.spec import RunSpec
     from spawnllm.types import ProviderName, TModel
+
+
+INVOCATION_PLAN: ContextVar[InvocationPlanState | None] = ContextVar("spawnllm_invocation_plan", default=None)
 
 
 @dataclass(frozen=True)
@@ -162,6 +169,14 @@ def run_probe(probe: dict[str, Any], *, binary: str, timeout: int) -> bool:
             return os.path.exists(str(path))
         case _:
             return False
+
+
+@dataclass(slots=True)
+class InvocationPlanState:
+    backend: LlmBackend
+    spec: RunSpec
+    value: dict[str, Any] | None = None
+    active: bool = True
 
 
 class LlmBackend(ABC):
@@ -312,6 +327,14 @@ class LlmBackend(ABC):
 
     def core_plan(self, spec: RunSpec) -> dict[str, Any]:
         """Ask the core to plan this run's invocation (an exec argv or an HTTP request)."""
+        pending = INVOCATION_PLAN.get()
+        if pending is not None and pending.active and pending.backend is self and pending.spec is spec:
+            if pending.value is None:
+                pending.value = self._core_plan(spec)
+            return deepcopy(pending.value)
+        return self._core_plan(spec)
+
+    def _core_plan(self, spec: RunSpec) -> dict[str, Any]:
         return _core.dispatch(
             "plan", {"host": {"platform": sys.platform}, "provider": self.provider, "spec": self.wire_spec(spec)}
         )
@@ -386,6 +409,16 @@ class CliBackend(LlmBackend):
 
     binary: ClassVar[str]
     install_hint: ClassVar[str]
+
+    @contextmanager
+    def _reuse_plan(self, spec: RunSpec) -> Iterator[None]:
+        pending = InvocationPlanState(self, spec)
+        token = INVOCATION_PLAN.set(pending)
+        try:
+            yield
+        finally:
+            pending.active = False
+            INVOCATION_PLAN.reset(token)
 
     def binary_path(self) -> str:
         """Return the command every exec of this backend runs as `argv[0]`.
@@ -500,7 +533,10 @@ class CliBackend(LlmBackend):
         return Response(spec=spec, output=Output(""), error=Error(msg, TimeoutError(msg)))
 
     async def aexecute(self, spec: RunSpec) -> Response:
-        return await self.aexecute_invocation(spec, self.invocation(spec), self.env(spec))
+        with self._reuse_plan(spec):
+            inv = self.invocation(spec)
+            env = self.env(spec)
+        return await self.aexecute_invocation(spec, inv, env)
 
     async def aexecute_invocation(self, spec: RunSpec, inv: Invocation, env: dict[str, str]) -> Response:
         """Run a materialized `inv` asynchronously under `env` and resolve it, removing its temp files."""
@@ -525,7 +561,10 @@ class CliBackend(LlmBackend):
         return self.to_response(raw, returncode=rr.returncode, stderr=rr.stderr, spec=spec)
 
     def execute(self, spec: RunSpec) -> Response:
-        return self.execute_invocation(spec, self.invocation(spec), self.env(spec))
+        with self._reuse_plan(spec):
+            inv = self.invocation(spec)
+            env = self.env(spec)
+        return self.execute_invocation(spec, inv, env)
 
     def execute_invocation(self, spec: RunSpec, inv: Invocation, env: dict[str, str]) -> Response:
         """Run a materialized `inv` under `env` and resolve it, removing its temp files."""
