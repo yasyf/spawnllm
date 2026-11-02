@@ -144,6 +144,7 @@ jobs:
 
   macos:
     needs: blob
+    if: github.event_name != 'pull_request'
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
@@ -236,6 +237,7 @@ jobs:
         run: cargo test --workspace
 
   swift:
+    if: github.event_name != 'pull_request'
     runs-on: macos-26
     timeout-minutes: 20
     steps:
