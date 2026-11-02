@@ -55,7 +55,7 @@ async def test_one_expensive_plan_per_attempt(
     isolation_calls = 0
     captures: list[dict[str, Any]] = []
     minted: list[str] = []
-    original_mkstemp = base.tempfile.mkstemp
+    original_invocation = backend.invocation
 
     def dispatch(op: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         nonlocal plan_calls
@@ -69,10 +69,10 @@ async def test_one_expensive_plan_per_attempt(
         isolation_calls += 1
         return ClaudeIsolation(str(tmp_path / "config"), {"CLAUDE_CODE_OAUTH_TOKEN": f"synthetic-{isolation_calls}"})
 
-    def mkstemp(*args: Any, **kwargs: Any) -> tuple[int, str]:
-        fd, path = original_mkstemp(*args, **kwargs)
-        minted.append(path)
-        return fd, path
+    def invocation(run: RunSpec) -> base.Invocation:
+        inv = original_invocation(run)
+        minted.extend(inv.cleanup_paths)
+        return inv
 
     def capture(argv: list[str], **kwargs: Any) -> RunResult:
         paths = minted.copy()
@@ -113,7 +113,7 @@ async def test_one_expensive_plan_per_attempt(
 
     monkeypatch.setattr(_core, "dispatch", dispatch)
     monkeypatch.setattr(backend, "claude_isolation", isolation)
-    monkeypatch.setattr(base.tempfile, "mkstemp", mkstemp)
+    monkeypatch.setattr(backend, "invocation", invocation)
     monkeypatch.setattr(base, "capture_cli", capture)
     monkeypatch.setattr(base, "acapture_cli", acapture)
     results: list[dict[str, Any]] = []
