@@ -123,7 +123,7 @@ print(decision.answers["rollback"].p_yes)  # 0.99
 print(decision.answers["action"].choice)  # rollback
 ```
 
-On a warm keep-alive connection from a Mac, a three-question Jev call took 120 to 130 ms end to end. Pass `provider=OPENAI` to ask `gpt-6-luna` instead. Retries cover 408, 429, 5xx, and 529 and stop at `timeout`. Keys come from `TYPESAFE_API_KEY` or `OPENAI_API_KEY`, or on macOS from a Keychain item that `spawnllm key set jev` (or `openai`) writes from stdin.
+On a warm keep-alive connection from a Mac, a three-question Jev call took 120 to 130 ms end to end. Pass `provider=OPENAI` to ask `gpt-6-luna` instead. Retries cover 408, 429, 5xx, and 529 and stop at `timeout`. Keys come from `TYPESAFE_API_KEY` or `OPENAI_API_KEY`, or on macOS from a Keychain item that `spawnllm key set jev` (or `openai`) writes from stdin. Set `TYPESAFE_BASE_URL` to send Jev calls through a gateway such as a Sprites Connector, which supplies the real key in place of a placeholder `TYPESAFE_API_KEY`.
 
 ### Call the same backends from Go or Rust
 

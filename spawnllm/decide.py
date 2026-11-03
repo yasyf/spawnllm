@@ -47,6 +47,7 @@ TDecideProvider = Literal["jev", "openai"]
 """A decision provider: TypeSafe's Jev (`jev`) or OpenAI Decisions (`openai`)."""
 
 KEY_ENV: dict[TDecideProvider, str] = {"jev": "TYPESAFE_API_KEY", "openai": "OPENAI_API_KEY"}
+JEV_BASE_URL_ENV = "TYPESAFE_BASE_URL"
 KEY_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
 DEFAULT_TIMEOUT = 10.0
 
@@ -356,6 +357,7 @@ class Call:
         planned = {
             "provider": {"name": provider.name, "model": provider.model},
             "api_key": key or api_key(provider, timeout=timeout),
+            "base_url": (provider.name == "jev" and os.environ.get(JEV_BASE_URL_ENV)) or None,
             "state": state,
             "questions": wired,
         }

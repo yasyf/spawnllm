@@ -149,6 +149,28 @@ def test_jev_round_trip_sends_the_planned_request_and_orders_answers_as_declared
     assert decision.latency_ms > 0
 
 
+def test_typesafe_base_url_sends_jev_through_the_gateway_with_the_placeholder_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TYPESAFE_BASE_URL", "https://gateway.test/v1/gateway/typesafe/conn")
+    monkeypatch.setenv("TYPESAFE_API_KEY", "sprites")
+    seen = serve(monkeypatch, httpx.Response(200, json=JEV_RECORDED))
+
+    decide_sync(STATE, QUESTIONS)
+
+    assert str(seen[0].url) == "https://gateway.test/v1/gateway/typesafe/conn/v1/systemone"
+    assert seen[0].headers["authorization"] == "Bearer sprites"
+
+
+def test_typesafe_base_url_leaves_openai_decisions_on_openai(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TYPESAFE_BASE_URL", "https://gateway.test/v1/gateway/typesafe/conn")
+    seen = serve(monkeypatch, httpx.Response(200, json=OPENAI_REFUSAL))
+
+    decide_sync(STATE, QUESTIONS, provider=OPENAI, api_key="test-key")
+
+    assert str(seen[0].url) == "https://api.openai.com/v1/decisions"
+
+
 def test_openai_refusal_comes_back_beside_the_other_answers(monkeypatch: pytest.MonkeyPatch) -> None:
     seen = serve(monkeypatch, httpx.Response(200, json=OPENAI_REFUSAL))
 
