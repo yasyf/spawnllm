@@ -47,3 +47,22 @@ def test_dispatch_is_thread_safe_under_concurrent_load() -> None:
         results = [f.result() for f in [pool.submit(lambda: dispatch("version")) for _ in range(8 * 50)]]
     assert len(results) == 400
     assert all(result == expected for result in results)
+
+
+def test_the_core_compiles_serially_into_the_shared_code_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    import wasmtime
+
+    from spawnllm import _core
+
+    configured: list[tuple[str, object]] = []
+
+    class RecordingConfig(wasmtime.Config):
+        def __setattr__(self, name: str, value: object) -> None:
+            if not name.startswith("_"):
+                configured.append((name, value))
+            super().__setattr__(name, value)
+
+    monkeypatch.setattr(wasmtime, "Config", RecordingConfig)
+    runtime = _core.build()
+    runtime.stderr_path.unlink()
+    assert configured == [("parallel_compilation", False), ("cache", True)]
