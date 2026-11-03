@@ -6,6 +6,9 @@ wasmtime-py exposes no in-memory WASI stderr sink, so a panicking core's diagnos
 are routed to a process-lifetime temp file whose tail is read back into the raised
 `CoreTrap`. The core builds with panic=abort, so a trap leaves the allocator in an
 untrustworthy state: the cached runtime is dropped and the next call re-instantiates.
+The engine compiles serially into wasmtime's on-disk code cache, so a process loads the
+machine's one compiled artifact instead of standing up a Cranelift thread pool (one
+thread per core, kept for the process's life) to recompile the blob.
 """
 
 from __future__ import annotations
@@ -91,12 +94,15 @@ def export[T](exports: InstanceExports, name: str, kind: type[T]) -> T:
 
 
 def build() -> Runtime:
-    from wasmtime import Engine, Func, Linker, Memory, Module, Store, WasiConfig
+    from wasmtime import Config, Engine, Func, Linker, Memory, Module, Store, WasiConfig
 
     blob = files(__package__).joinpath(WASM_NAME)
     if not blob.is_file():
         raise FileNotFoundError(MISSING_BLOB)
-    engine = Engine()
+    config = Config()
+    config.parallel_compilation = False
+    config.cache = True
+    engine = Engine(config)
     linker = Linker(engine)
     linker.define_wasi()
     store = Store(engine)
