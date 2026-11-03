@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`TYPESAFE_BASE_URL` sends Jev decisions through a gateway.** With it set,
+  `decide` posts to `<base>/v1/systemone` instead of TypeSafe's host, so a
+  Sprites Connector can add the real key and the machine holds only a
+  placeholder `TYPESAFE_API_KEY`. OpenAI Decisions is unchanged.
 - **`decide` and `decide_sync` ask typed questions of TypeSafe Jev or OpenAI
   Decisions.** A `Binary`, `Label`, or `Score` question set runs unchanged
   on either provider (`JEV`, pinned to `jev-1.13.0`, or `OPENAI`, on

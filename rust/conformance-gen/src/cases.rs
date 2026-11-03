@@ -1372,8 +1372,19 @@ fn decide_plan_cases() -> Vec<Case> {
             "openai",
             "gpt-6-luna",
             json!(DECIDE_STATE),
-            binary_with_criteria,
+            binary_with_criteria.clone(),
         ),
+        Case {
+            op: "decide_plan",
+            name: "jev-base-url".to_owned(),
+            input: json!({
+                "provider": {"name": "jev", "model": "jev-1.13.0"},
+                "api_key": "test-key",
+                "base_url": "https://gateway.test/v1/gateway/typesafe/conn",
+                "state": DECIDE_STATE,
+                "questions": binary_with_criteria,
+            }),
+        },
         decide_plan_case(
             "jev-structured-state-verbatim",
             "jev",

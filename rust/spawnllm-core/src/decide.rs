@@ -7,7 +7,7 @@ use serde_json::{Map, Value, json};
 use crate::wire::{HttpPlan, InvocationPlan};
 use crate::{OpError, OpResult, from_input, unimplemented};
 
-const JEV_URL: &str = "https://api.typesafe.ai/v1/systemone";
+const JEV_BASE_URL: &str = "https://api.typesafe.ai";
 const OPENAI_URL: &str = "https://api.openai.com/v1/decisions";
 const MAX_OPTIONS: usize = 255;
 const MAX_LEVELS: usize = 10;
@@ -72,6 +72,7 @@ impl Question {
 struct PlanInput {
     provider: Provider,
     api_key: String,
+    base_url: Option<String>,
     state: Value,
     questions: Vec<Question>,
 }
@@ -312,7 +313,14 @@ fn openai_question(question: &Question) -> Value {
 fn plan(input: &PlanInput) -> InvocationPlan {
     let (url, body) = match input.provider.name {
         Vendor::Jev => (
-            JEV_URL,
+            format!(
+                "{}/v1/systemone",
+                input
+                    .base_url
+                    .as_deref()
+                    .unwrap_or(JEV_BASE_URL)
+                    .trim_end_matches('/'),
+            ),
             Map::from_iter([
                 ("state".to_owned(), input.state.clone()),
                 ("model".to_owned(), json!(input.provider.model)),
@@ -329,7 +337,7 @@ fn plan(input: &PlanInput) -> InvocationPlan {
             ]),
         ),
         Vendor::Openai => (
-            OPENAI_URL,
+            OPENAI_URL.to_owned(),
             Map::from_iter([
                 ("model".to_owned(), json!(input.provider.model)),
                 (
@@ -348,7 +356,7 @@ fn plan(input: &PlanInput) -> InvocationPlan {
     };
     InvocationPlan::Http(HttpPlan {
         method: "POST".to_owned(),
-        url: url.to_owned(),
+        url,
         headers: BTreeMap::from([(
             "Authorization".to_owned(),
             format!("Bearer {}", input.api_key),
@@ -602,9 +610,27 @@ mod tests {
     }
 
     #[test]
+    fn jev_plan_posts_under_the_base_url_with_or_without_a_trailing_slash() {
+        for base_url in [
+            "https://gateway.test/typesafe/conn",
+            "https://gateway.test/typesafe/conn/",
+        ] {
+            let plan = dispatch(
+                "decide_plan",
+                json!({"provider": {"name": "jev", "model": "m"}, "api_key": "k", "base_url": base_url, "state": "s", "questions": questions()}),
+            )
+            .unwrap_or_else(|error| panic!("{}: {}", error.kind, error.msg));
+            assert_eq!(
+                plan["url"],
+                "https://gateway.test/typesafe/conn/v1/systemone"
+            );
+        }
+    }
+
+    #[test]
     fn jev_plan_keys_questions_by_id_in_declared_order() {
         let plan = plan_for("jev", "jev-1.13.0", json!("roll it back"), questions());
-        assert_eq!(plan["url"], JEV_URL);
+        assert_eq!(plan["url"], "https://api.typesafe.ai/v1/systemone");
         assert_eq!(plan["headers"], json!({"Authorization": "Bearer k"}));
         assert_eq!(
             plan["body"]["questions"]["action"]["criteria"]
