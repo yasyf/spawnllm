@@ -54,6 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recognizes the rejection, and `claude_isolation_seed` takes an ordered
   `credentials_json` list plus `rejected_tokens`.
 
+### Security
+- **The Go module builds with go1.26.11.** It fixes the standard library `net/http`
+  vulnerability govulncheck reports in go1.26.10, which failed CI's `vuln` job.
+
 ## [0.13.4] - 2026-09-17
 
 ### Security
