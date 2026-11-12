@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`spawnllm decide` asks typed questions from any shell.** It reads one JSON
+  object on stdin, the `state` to judge and `questions` mapping each id to a
+  `binary`, `label`, or `score` question's fields, and prints each answer as
+  JSON with its type, probabilities, and confidence, so a tool with no Python
+  packages can ask Jev through a subprocess. `--provider` picks `jev` or
+  `openai` and `--timeout` caps the whole call; a missing key, a bad request,
+  or a failed call exits 1 with the reason.
 - **`TYPESAFE_BASE_URL` sends Jev decisions through a gateway.** With it set,
   `decide` posts to `<base>/v1/systemone` instead of TypeSafe's host, so a
   Sprites Connector can add the real key and the machine holds only a

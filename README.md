@@ -142,7 +142,7 @@ Both expose `Call`/`call` and typed `Extract`/`extract` against your existing CL
 - **Decisions** — every question and answer type, the provider pins, and the retry and key-lookup rules — [Deciding reference](https://yasyf.github.io/spawnllm/reference/#deciding)
 - **Backend selection** — the priority chain, plus `specialty=` routing (`debugging` and `review` go to Codex, `general` to the Claude Agent SDK backend) — [Backends reference](https://yasyf.github.io/spawnllm/reference/#backends)
 - **Transport helpers** — `run_cli`, `collect_process`, and `map_concurrent`, the subprocess plumbing shared by every CLI backend — [Transport reference](https://yasyf.github.io/spawnllm/reference/#transport)
-- **The CLI** — `spawnllm call`, `status`, `backends`, and `key set` from any shell — [CLI reference](https://yasyf.github.io/spawnllm/reference/cli/)
+- **The CLI** — `spawnllm call`, `decide`, `status`, `backends`, and `key set` from any shell — [CLI reference](https://yasyf.github.io/spawnllm/reference/cli/)
 - **MLX internals** — the adapter codec, fuser, and runtime patches behind the local engine — [MLX reference](https://yasyf.github.io/spawnllm/reference/#mlx)
 
 Read the [docs](https://yasyf.github.io/spawnllm/) for the full guide and API reference. Licensed under [MIT](https://github.com/yasyf/spawnllm/blob/main/LICENSE).

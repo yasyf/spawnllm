@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import dataclasses
+import json
 import subprocess
 import sys
+from typing import Any
 
 import click
 from loguru import logger
@@ -15,10 +18,35 @@ from spawnllm.backends import (
 )
 from spawnllm.backends.registry import BACKENDS_BY_NAME, PRIORITY, select_backend
 from spawnllm.call import DEFAULT_MODEL, call_sync
-from spawnllm.decide import JEV, OPENAI, Provider, store_key
+from spawnllm.decide import (
+    DEFAULT_TIMEOUT,
+    JEV,
+    OPENAI,
+    Answer,
+    Binary,
+    BinaryAnswer,
+    DecideError,
+    DecideKeyMissing,
+    Label,
+    LabelAnswer,
+    Provider,
+    Question,
+    Refused,
+    Score,
+    ScoreAnswer,
+    decide_sync,
+    store_key,
+)
 
 BACKEND_NAMES = tuple(BACKENDS_BY_NAME)
 DECIDE_PROVIDERS: dict[str, Provider] = {provider.name: provider for provider in (JEV, OPENAI)}
+QUESTION_TYPES: dict[str, type[Binary | Label | Score]] = {"binary": Binary, "label": Label, "score": Score}
+ANSWER_TYPES: dict[type[Answer], str] = {
+    BinaryAnswer: "binary",
+    LabelAnswer: "label",
+    ScoreAnswer: "score",
+    Refused: "refused",
+}
 
 
 @click.group()
@@ -71,6 +99,51 @@ def status() -> None:
     except BackendUnavailable:
         click.echo("selected: none available")
     click.echo(f"core: {(v := _core.version())['core_version']}@{v['source_hash'][:12]}")
+
+
+@main.command("decide")
+@click.option("--provider", type=click.Choice(list(DECIDE_PROVIDERS)), default=JEV.name, show_default=True)
+@click.option(
+    "--timeout",
+    type=float,
+    default=DEFAULT_TIMEOUT,
+    show_default=True,
+    help="Seconds for the whole call, retries included.",
+)
+def decide_questions(provider: str, timeout: float) -> None:
+    """Ask the questions a JSON object on stdin holds about its state, and print the answers as JSON.
+
+    The object holds `state`, the text or JSON to judge, and `questions`, each id mapped to
+    `{"binary": {...}}`, `{"label": {...}}` or `{"score": {...}}` holding that question's fields,
+    such as `{"label": {"instructions": "...", "options": {"none": "...", "a1": null}}}`. It prints
+    `{"model": ..., "answers": {<id>: {"type": "label", "choice": ..., "probabilities": {...}, "confidence": ...}}}`.
+    """
+    try:
+        request = json.loads(sys.stdin.read())
+        questions = {id: question(spec) for id, spec in request["questions"].items()}
+        decision = decide_sync(request["state"], questions, provider=DECIDE_PROVIDERS[provider], timeout=timeout)
+    except (
+        json.JSONDecodeError,
+        KeyError,
+        TypeError,
+        ValueError,
+        TimeoutError,
+        DecideError,
+        DecideKeyMissing,
+    ) as error:
+        raise click.ClickException(str(error)) from error
+    answers = {
+        id: {"type": ANSWER_TYPES[type(answer)], **dataclasses.asdict(answer)}
+        for id, answer in decision.answers.items()
+    }
+    click.echo(json.dumps({"model": decision.model, "answers": answers}))
+
+
+def question(spec: dict[str, Any]) -> Question:
+    [(kind, fields)] = spec.items()
+    if kind not in QUESTION_TYPES:
+        raise ValueError(f"unknown question type {kind!r}: use {', '.join(QUESTION_TYPES)}")
+    return QUESTION_TYPES[kind](**fields)
 
 
 @main.group()
