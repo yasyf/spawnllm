@@ -21,6 +21,9 @@ class CodexCliBackend(CliBackend):
 
     Attributes:
         models: Mapping from abstract model size to an OpenAI model name.
+        max_input_chars: The longest prompt `codex exec` accepts, in characters;
+            a longer one exits 1 at `turn/start` with `input_too_large` before
+            any model call.
 
     Example:
         >>> from spawnllm.spec import RunSpec
@@ -33,6 +36,7 @@ class CodexCliBackend(CliBackend):
         "medium": "gpt-6-luna:medium",
         "large": "gpt-5.5:medium",
     }
+    max_input_chars: ClassVar[int] = 1_048_576
     provider: ClassVar[ProviderName] = "codex"
     binary: ClassVar[str] = "codex"
     install_hint: ClassVar[str] = "npm install -g @openai/codex"
