@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 import spawnllm.backends.claude_sdk as claude_sdk_module
 from spawnllm.backends.base import BackendNotAuthenticated, BackendNotInstalled, BackendReady
+from spawnllm.backends.claude import ClaudeCliBackend
 from spawnllm.backends.claude_sdk import ClaudeSdkBackend, sdk_cli_path
 from spawnllm.spec import ClaudeConfig, RunSpec
 
@@ -164,18 +165,18 @@ class TestBuildOptions:
     def test_default_blanks_claude_api_key_variables(self) -> None:
         options = ClaudeSdkBackend().build_options(spec())
 
-        assert options.env == {
+        assert options.env == ClaudeCliBackend.light_env() | {
             "ANTHROPIC_API_KEY": "",
             "ANTHROPIC_AUTH_TOKEN": "",
         }
 
-    def test_api_auth_leaves_api_key_environment_unmodified(self) -> None:
-        assert ClaudeSdkBackend().build_options(spec(api_auth=True)).env == {}
+    def test_api_auth_carries_only_the_light_env(self) -> None:
+        assert ClaudeSdkBackend().build_options(spec(api_auth=True)).env == ClaudeCliBackend.light_env()
 
     def test_explicit_environment_wins_over_blanking(self) -> None:
         options = ClaudeSdkBackend().build_options(spec(env={"ANTHROPIC_API_KEY": "explicit", "OTHER": "value"}))
 
-        assert options.env == {
+        assert options.env == ClaudeCliBackend.light_env() | {
             "ANTHROPIC_API_KEY": "explicit",
             "ANTHROPIC_AUTH_TOKEN": "",
             "OTHER": "value",

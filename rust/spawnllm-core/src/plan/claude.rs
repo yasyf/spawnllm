@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde_json::Value;
 
-use crate::auth::CLAUDE_API_KEY_VARS;
+use crate::auth::{CLAUDE_API_KEY_VARS, CLAUDE_LIGHT_ENV};
 use crate::wire::{
     ClaudeConfig, ExecPlan, FileId, InvocationPlan, PlanFile, ReadResultFrom, RunSpec,
 };
@@ -15,7 +15,10 @@ pub(super) fn plan(spec: &RunSpec) -> InvocationPlan {
         "--model".into(),
         spec.model.clone(),
     ];
-    let mut env = BTreeMap::new();
+    let mut env: BTreeMap<String, String> = CLAUDE_LIGHT_ENV
+        .iter()
+        .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
+        .collect();
 
     let config = spec.claude.as_ref();
     argv.extend(["--setting-sources".into(), setting_sources(spec, config)]);
