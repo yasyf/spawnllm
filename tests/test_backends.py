@@ -592,8 +592,10 @@ class TestClaudeIsolation:
         assert "CLAUDE_CODE_OAUTH_TOKEN" not in env
         assert Path(env["CLAUDE_CONFIG_DIR"]).is_dir()
 
-    def test_env_non_isolated_adds_nothing(self) -> None:
-        assert ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku", isolated=False)) == {}
+    def test_env_non_isolated_adds_only_the_light_env(self) -> None:
+        assert (
+            ClaudeCliBackend().env(RunSpec(prompt="hi", model="haiku", isolated=False)) == ClaudeCliBackend.light_env()
+        )
 
     def test_killed_run_leaves_no_token_on_disk(self, tmp_path: Path) -> None:
         token = f"leak-{os.urandom(8).hex()}"

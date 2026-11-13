@@ -68,6 +68,22 @@ class ClaudeCliBackend(CliBackend):
     _api_config_dir: str | None = None
     _rejected_tokens: frozenset[str] = frozenset()
 
+    @staticmethod
+    def light_env() -> dict[str, str]:
+        """Return the env every planned `claude` run carries to start light.
+
+        It turns off the plugin and CLI auto-updater, telemetry, error reporting,
+        IDE auto-connect, claude.ai MCP connectors, bundled skills, file
+        checkpointing, and the native file watchers a headless run never needs.
+        A caller launching `claude` itself merges it into the child env; a
+        `RunSpec.env` entry overrides any of it.
+
+        Example:
+            >>> ClaudeCliBackend.light_env()["DISABLE_AUTOUPDATER"]
+            '1'
+        """
+        return _core.dispatch("capabilities")["claude_light_env"]
+
     def claude_isolation(self, api_auth: bool) -> ClaudeIsolation:
         """Return the isolation for one run: the process-lifetime config home and the env resolved now.
 

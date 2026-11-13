@@ -51,6 +51,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   field, so a struct literal that names every field must add it.
 
 ### Fixed
+- **Every `claude -p` run starts light.** The core's Claude plan now sets
+  `DISABLE_AUTOUPDATER` and thirteen other switches on every run, so a long
+  call no longer starts the plugin auto-update pass partway through, and no
+  run starts telemetry, error reporting, IDE auto-connect, claude.ai MCP
+  connectors, bundled skills, file checkpointing, or native file watchers.
+  The Python, Go, and Rust hosts inherit it through the plan, the Agent SDK
+  backend merges the same map, and `ClaudeCliBackend.light_env()` returns it
+  for callers that launch `claude` themselves. A `RunSpec.env` entry still
+  overrides any of them.
 - **Isolated Claude runs read the macOS Keychain before
   `~/.claude/.credentials.json`.** Claude Code reads its Keychain item first
   and the plaintext file only when the item is missing; every host read them

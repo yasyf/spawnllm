@@ -4,8 +4,8 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::auth::{
-    ANTIGRAVITY_API_KEY_VARS, APPLE_API_KEY_VARS, CLAUDE_API_KEY_VARS, CODEX_API_KEY_VARS,
-    GEMINI_API_KEY_VARS,
+    ANTIGRAVITY_API_KEY_VARS, APPLE_API_KEY_VARS, CLAUDE_API_KEY_VARS, CLAUDE_LIGHT_ENV,
+    CODEX_API_KEY_VARS, GEMINI_API_KEY_VARS,
 };
 use crate::{OpError, OpResult};
 
@@ -28,6 +28,7 @@ pub struct Capabilities {
     pub auto_select_excludes: Vec<&'static str>,
     pub auto_select_tiers: BTreeMap<&'static str, Vec<&'static str>>,
     pub api_key_vars: BTreeMap<&'static str, Vec<&'static str>>,
+    pub claude_light_env: BTreeMap<&'static str, &'static str>,
     pub specialties: BTreeMap<&'static str, &'static str>,
     pub models: BTreeMap<&'static str, ModelTiers>,
     pub binaries: BTreeMap<&'static str, &'static str>,
@@ -47,6 +48,7 @@ pub fn capabilities() -> Capabilities {
             ("antigravity", ANTIGRAVITY_API_KEY_VARS.to_vec()),
             ("apple", APPLE_API_KEY_VARS.to_vec()),
         ]),
+        claude_light_env: CLAUDE_LIGHT_ENV.iter().copied().collect(),
         specialties: BTreeMap::from([
             ("debugging", "codex"),
             ("review", "codex"),

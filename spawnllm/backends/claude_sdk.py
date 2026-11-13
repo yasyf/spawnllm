@@ -21,7 +21,7 @@ from spawnllm.backends.base import (
     BackendReady,
     LlmBackend,
 )
-from spawnllm.backends.claude import CLAUDE_MODELS
+from spawnllm.backends.claude import CLAUDE_MODELS, ClaudeCliBackend
 from spawnllm.response import Error, Output, Response, Result
 from spawnllm.spec import ClaudeConfig
 
@@ -57,6 +57,7 @@ class ClaudeSdkBackend(LlmBackend):
     `["project"]`, matching the CLI plan, until `ClaudeConfig.setting_sources`
     names its own.
 
+    Every run carries `ClaudeCliBackend.light_env()`, and
     `api_auth=False` blanks Claude's API-key environment variables because the
     SDK can only overlay its subprocess environment, not truly unset inherited
     keys. An explicit `RunSpec.env` value still wins. `ClaudeConfig.mcp_config`
@@ -96,7 +97,9 @@ class ClaudeSdkBackend(LlmBackend):
         options = ClaudeAgentOptions(
             model=spec.model,
             cwd=spec.cwd,
-            env=({} if spec.api_auth else {key: "" for key in api_key_vars}) | (spec.env or {}),
+            env=ClaudeCliBackend.light_env()
+            | ({} if spec.api_auth else {key: "" for key in api_key_vars})
+            | (spec.env or {}),
             setting_sources=host_free if cfg.setting_sources is None else list(cfg.setting_sources),
             strict_mcp_config=spec.isolated or cfg.strict_mcp,
             max_turns=cfg.max_turns,
