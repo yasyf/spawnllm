@@ -73,6 +73,25 @@ The `spawnllm-apple` sidecar itself needs no install: when it is not on `PATH`, 
 
 Local MLX inference stays Python-only — use the [Python package](https://github.com/yasyf/spawnllm) for that.
 
+## Decisions
+
+`Decide` asks typed yes/no, label and score questions of [TypeSafe Jev](https://docs.typesafe.ai) or OpenAI Decisions in one request, the same mapping and retry policy as the Python `decide`, run by the shared core.
+
+```go
+decision, err := spawnllm.Decide(ctx, map[string]string{"message": "Please roll back last night's release."},
+	map[string]spawnllm.Question{
+		"rollback": spawnllm.Binary{Instructions: "Does `message` ask to roll back a release?"},
+	}, spawnllm.DecideOpts{})
+if err != nil {
+	return err
+}
+if decision.Answers["rollback"].(spawnllm.BinaryAnswer).PYes >= 0.7 {
+	rollBack()
+}
+```
+
+The zero `DecideOpts` asks `spawnllm.Jev`, pinned to `jev-1.13.0`, within 10 seconds, reading the key from `TYPESAFE_API_KEY` or the Keychain item `spawnllm key set jev` stores; `TYPESAFE_BASE_URL` sends it through a gateway. `Timeout` bounds the whole call, retries included, and a call that runs out returns an error wrapping `ErrTimeout`; a rejected request returns a `*DecideError`.
+
 ## Parity
 
 Behavior lives once in the `spawnllm-core` Rust engine all three languages share — embedded here as a WASM blob (`CGO_ENABLED=0` throughout), linked natively by the Rust crate, and embedded via wasmtime by the Python package — with every vector of a shared golden suite replayed in CI. Versions release in lockstep; identical versions implement identical semantics.
