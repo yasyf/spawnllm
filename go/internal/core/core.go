@@ -52,7 +52,7 @@ var load = sync.OnceValues(loadEngine)
 
 func loadEngine() (*engine, error) {
 	ctx := context.Background()
-	runtime := wazero.NewRuntime(ctx)
+	runtime := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	if _, err := wasi_snapshot_preview1.Instantiate(ctx, runtime); err != nil {
 		return nil, fmt.Errorf("spawnllm core: instantiate wasi: %w", err)
 	}

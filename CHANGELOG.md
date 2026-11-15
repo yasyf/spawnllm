@@ -59,6 +59,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   field, so a struct literal that names every field must add it.
 
 ### Fixed
+- **The Go module runs in binaries signed with the hardened runtime.** It
+  runs the core under wazero's interpreter rather than its compiler, which
+  writes machine code into memory it maps executable; macOS kills a binary
+  signed with the hardened runtime and no JIT entitlement on its first core
+  call, with `SIGKILL (Code Signature Invalid)`. The core's ops are small JSON
+  transforms, so the interpreter costs no measurable time.
 - **Every `claude -p` run starts light.** The core's Claude plan now sets
   `DISABLE_AUTOUPDATER` and thirteen other switches on every run, so a long
   call no longer starts the plugin auto-update pass partway through, and no
