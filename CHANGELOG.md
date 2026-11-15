@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Go's `Decide` asks the same typed questions as Python's `decide`.** It
+  takes a `Binary`, `Label` or `Score` question per id, posts them to Jev
+  (`spawnllm.Jev`) or OpenAI Decisions (`spawnllm.OpenAIDecisions`) in one
+  request through the core's `decide_plan` and `decide_resolve` ops, and
+  returns a `BinaryAnswer`, `LabelAnswer`, `ScoreAnswer` or `Refused` per id.
+  The key comes from `TYPESAFE_API_KEY` or `OPENAI_API_KEY`, else the
+  Keychain item `spawnllm key set` stores, and `TYPESAFE_BASE_URL` applies as
+  it does in Python, so a Go program asks Jev with no Python or subprocess.
 - **`spawnllm decide` asks typed questions from any shell.** It reads one JSON
   object on stdin, the `state` to judge and `questions` mapping each id to a
   `binary`, `label`, or `score` question's fields, and prints each answer as

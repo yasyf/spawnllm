@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 type openaiBackend struct {
@@ -37,7 +38,7 @@ func (b *openaiBackend) execute(ctx context.Context, spec RunSpec, wantsValue bo
 	if kind != "http" {
 		return nil, fmt.Errorf("spawnllm: provider %q planned a %s invocation, want http", ProviderOpenAIEndpoint, kind)
 	}
-	result, err := runHTTPPlan(ctx, b.client, plan, spec)
+	result, err := runHTTPPlan(ctx, b.client, plan, spec.timeout())
 	if err != nil {
 		return nil, err
 	}
@@ -57,12 +58,13 @@ func (b *openaiBackend) execute(ctx context.Context, spec RunSpec, wantsValue bo
 type httpResult struct {
 	body         string
 	status       int
+	header       http.Header
 	timedOut     bool
 	transportErr string
 }
 
-func runHTTPPlan(ctx context.Context, client *http.Client, plan httpPlan, spec RunSpec) (httpResult, error) {
-	attemptCtx, cancel := context.WithTimeout(ctx, spec.timeout())
+func runHTTPPlan(ctx context.Context, client *http.Client, plan httpPlan, timeout time.Duration) (httpResult, error) {
+	attemptCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(attemptCtx, plan.Method, plan.URL, bytes.NewReader(plan.Body))
@@ -84,7 +86,7 @@ func runHTTPPlan(ctx context.Context, client *http.Client, plan httpPlan, spec R
 	if err != nil {
 		return classifyHTTPError(ctx, attemptCtx, err)
 	}
-	return httpResult{body: string(body), status: resp.StatusCode}, nil
+	return httpResult{body: string(body), status: resp.StatusCode, header: resp.Header}, nil
 }
 
 // classifyHTTPError routes a transport failure: a parent-context fault is a
