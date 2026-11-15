@@ -64,7 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writes machine code into memory it maps executable; macOS kills a binary
   signed with the hardened runtime and no JIT entitlement on its first core
   call, with `SIGKILL (Code Signature Invalid)`. The core's ops are small JSON
-  transforms, so the interpreter costs no measurable time.
+  transforms: a `Decide` call's core work takes about 4 ms interpreted against
+  under 1 ms compiled, and the first call is faster, 27 ms against 150 ms,
+  since nothing is compiled first.
 - **Every `claude -p` run starts light.** The core's Claude plan now sets
   `DISABLE_AUTOUPDATER` and thirteen other switches on every run, so a long
   call no longer starts the plugin auto-update pass partway through, and no
